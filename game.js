@@ -1256,7 +1256,7 @@ setInterval(tick, 250);
   const lerp3 = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
   const css = (c, a) => a == null ? 'rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')' : 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + a + ')';
   // the colour of the air at each depth: leaf light, green shade, dusk, then stone
-  const AIR = [[0, [122, 204, 132]], [150, [58, 146, 88]], [500, [24, 88, 54]], [1200, [11, 50, 32]], [3000, [6, 30, 20]], [4000, [9, 22, 15]], [5200, [13, 16, 15]], [7500, [7, 9, 10]], [11000, [2, 3, 4]]];
+  const AIR = [[0, [122, 204, 132]], [120, [52, 128, 84]], [300, [22, 62, 44]], [600, [12, 34, 26]], [1200, [8, 24, 19]], [3000, [6, 18, 14]], [4000, [8, 15, 12]], [5200, [10, 12, 12]], [7500, [6, 7, 9]], [11000, [2, 3, 4]]];
   function air(m) {
     if (m <= 0) return AIR[0][1];
     for (let i = 1; i < AIR.length; i++) if (m <= AIR[i][0]) { const a = AIR[i - 1], b = AIR[i]; return lerp3(a[1], b[1], (m - a[0]) / (b[0] - a[0])); }
@@ -1415,8 +1415,8 @@ setInterval(tick, 250);
     W = innerWidth; H = innerHeight; DPR = window.__low ? 1 : Math.min(2, devicePixelRatio || 1); if (W * H * DPR * DPR > 3.4e6) DPR = Math.max(1, Math.sqrt(3.4e6 / (W * H))); mpp = MPS / H; barkP = null; fxInit();
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     const mk = (n, par) => Array.from({ length: n }, () => ({ x: R() * W, y: R() * H, par: par * (0.6 + R() * 0.8), a: 0.25 + R() * 0.5, r: 2 + R() * 3, ph: R() * 9, c: ['#6fbf58', '#9bd66a', '#d9c24a', '#3f8f45', '#c98a3a'][R() * 5 | 0] }));
-    leavesA = mk(Math.round(W * H / 9000), 0.55); leavesB = mk(Math.round(W * H / 16000), 1.25);
-    roam = Array.from({ length: 4 }, () => ({ x: R() * W, off: D(-180, 180), sp: D(14, 34) * (R() < 0.5 ? -1 : 1), ph: R() * 9, c: ['#ffb347', '#6fd6ff', '#ff8fd0', '#fff07a'][R() * 4 | 0] }));
+    leavesA = mk(Math.round(W * H / 22000), 0.55); leavesB = mk(Math.round(W * H / 40000), 1.25);
+    roam = Array.from({ length: 2 }, () => ({ x: R() * W, off: D(-180, 180), sp: D(14, 34) * (R() < 0.5 ? -1 : 1), ph: R() * 9, c: ['#ffb347', '#6fd6ff', '#ff8fd0', '#fff07a'][R() * 4 | 0] }));
     clouds = Array.from({ length: 7 }, () => ({ x: R() * (W + 200) - 100, f: 0.12 + R() * 0.5, w: 8 + Math.round(R() * 14), v: 4 + R() * 6 }));
   }
   function ensureOverlay() {
@@ -1490,7 +1490,7 @@ setInterval(tick, 250);
     for (const p of list) {
       p.y -= push * p.par - 9 * dt; p.x += 12 * Math.sin(0.6 * time + p.ph) * dt;
       if (p.y > H + 12) p.y -= H + 24; if (p.y < -12) p.y += H + 24; if (p.x > W + 12) p.x = -12; if (p.x < -12) p.x = W + 12;
-      const streak = Math.min(70, Math.abs(vel * p.par / mpp) * 0.035), deep = Math.min(1, Math.max(0, (camS - 700) / 900)), lit = deep > 0 && p.ph < 2.4;
+      const streak = Math.min(9, Math.abs(vel * p.par / mpp) * 0.035), deep = Math.min(1, Math.max(0, (camS - 700) / 900)), lit = deep > 0 && p.ph < 2.4;
       if (yOf(0) > p.y) continue;
       ctx.fillStyle = lit ? (p.ph < 1.2 ? '#e8ff7a' : '#7dffb0') : camS > FLOOR ? '#8a9a94' : p.c;
       ctx.globalAlpha = lit ? deep * Math.max(0.1, Math.sin(time * 2.2 + p.ph * 4)) + p.a * (1 - deep) * 0.6 : p.a * (camS > 1500 ? 0.45 : 1);
@@ -1655,6 +1655,11 @@ setInterval(tick, 250);
     }
     if (!low) { lianas(0.85, 330, 57, 0.7); mist(0.9, 260, 241, 0.09 * fog); }
     limbs(1, 310, 60, 0.82, 1.35);
+    // depth haze over everything behind the lens: the deep forest becomes quiet silhouettes, so the answer and the text stand out
+    const haze = Math.min(0.62, Math.max(0, (camS - 80) / 900));
+    if (haze > 0.01) { ctx.fillStyle = css(air(camS + H * mpp * 0.1), haze.toFixed(3)); ctx.fillRect(-W, -H, W * 3, H * 3); }
+    // spores and dust hanging in the still air: tiny, sparse, drifting up past you as you fall
+    if (!low) { const n = Math.round(W * H / 9000), drift = camS / mpp; for (let q = 0; q < n; q++) { const x = mod(hsh(q, 401) * W + Math.sin(time * 0.3 + q) * 6, W), y = mod(hsh(q, 402) * (H + 40) - drift * (0.6 + hsh(q, 403) * 0.5) - time * (3 + hsh(q, 404) * 5), H + 40) - 20, big = hsh(q, 405) > 0.85, warm = hsh(q, 406) > 0.9; ctx.fillStyle = (warm ? 'rgba(232,255,122,' : 'rgba(190,236,210,') + ((big ? 0.5 : 0.28) * (0.6 + 0.4 * Math.sin(time * 1.7 + q))).toFixed(2) + ')'; ctx.fillRect(sn(x), sn(y), big ? 2 : 1, big ? 2 : 1); } }
     // the trunks you are climbing down between
     for (const side of [0, 1]) {
       const w = Math.max(26, Math.min(70, W * 0.06)), x = side ? W - w : 0, top = Math.max(0, sy - 20), bot = Math.min(H, yOf(FLOOR) + 30);
@@ -1668,8 +1673,8 @@ setInterval(tick, 250);
     if (camS < FLOOR + 100) {
       ctx.fillStyle = css(lerp3(air(camS), [1, 5, 3], 0.9));
       const cz = camS * 1.6;
-      for (let i = Math.max(0, Math.floor((cz - AY * mpp - 200) / 420)); i <= Math.ceil((cz + (H - AY) * mpp + 200) / 420); i++) {
-        const dep = (i + hsh(i, 91) * 0.6) * 420; if (dep / 1.6 > FLOOR) continue;
+      for (let i = Math.max(0, Math.floor((cz - AY * mpp - 200) / 1100)); i <= Math.ceil((cz + (H - AY) * mpp + 200) / 1100); i++) {
+        const dep = (i + hsh(i, 91) * 0.6) * 1100; if (dep / 1.6 > FLOOR) continue;
         const y = AY + (dep - cz) / mpp, left = hsh(i, 92) < 0.5, im = bigLeaf(i % 3), sc = AP, w = im.width * sc, hh2 = im.height * sc;
         ctx.save(); ctx.translate(left ? -w * 0.22 : W + w * 0.22, sn(y)); ctx.rotate((left ? 1 : -1) * (0.22 + Math.sin(time * 0.7 + i) * 0.05 + (hsh(i, 94) - 0.5) * 0.5));
         if (!left) ctx.scale(-1, 1); ctx.drawImage(im, 0, -hh2 / 2, w, hh2); ctx.restore();
@@ -1768,7 +1773,7 @@ setInterval(tick, 250);
     if (!reduce && time - frog.emit > 2.2 + R()) { frog.emit = time; fx.bubble(frog.x + 20, frog.y + bob - 8, 1.5 + 2 * R()); }
     // depth ruler, notes, vignette
     const trek = bc.contains('trek');
-    if (vig) { const o = Math.min(0.72, 0.25 + Math.max(0, camS) / 2400).toFixed(2); if (vig.style.opacity !== o) vig.style.opacity = o; }
+    if (vig) { const o = Math.min(0.4, 0.25 + Math.max(0, camS) / 8000).toFixed(2); if (vig.style.opacity !== o) vig.style.opacity = o; }
     if (ruler) ruler.hidden = !trek;
     if (notes) notes.hidden = !trek || bc.contains('quiet');
     if (trek) {

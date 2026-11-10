@@ -636,6 +636,9 @@ body.spot.dive::after { opacity: 1; }
 .landed .note { font-size: 14px; letter-spacing: 0.14em; margin-top: 4px; opacity: 1; }
 .landed .go { animation: risein 0.5s cubic-bezier(.34, 1.56, .64, 1) backwards, btnbob 1.9s cubic-bezier(.65, 0, .35, 1) 0.9s infinite; margin-top: 26px; }
 body.quiet #tierlines { opacity: 0 !important; transition: opacity 0.6s ease; }
+/* Krillion's restraint, in Obscura's own forest: the prompt card lifts away as the answer drops, and the scene stays quiet */
+@keyframes cardgone { 0% { opacity: 1; filter: none; transform: none; } 100% { opacity: 0; filter: blur(2px); transform: translateY(-28px) scale(0.9); } }
+body.sinking .play .topic { animation: cardgone 0.6s ease-in 0.45s forwards; }
 </style>
 </head>
 <body>

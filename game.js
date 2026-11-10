@@ -592,6 +592,7 @@ function leave() {
   if (S.mode === 'online' && S.room.phase === 'lobby' && S.meRef) S.meRef.delete().catch(() => {});
   else if (S.mode === 'online' && S.meRef && S.mine) { S.mine.left = true; S.meRef.set(clone(S.mine)).catch(() => {}); } // gone mid-game: do not hold the others up
   S.mode = null; S.room = null; S.roomRef = null; S.meRef = null; S.code = null; S.players = {}; S.fb = null; S.dive = null; S.shown = null; S.allAt = 0;
+  S._lead = undefined; S._seenKey = null; S._ranks = null; S._fan = null; const rv = $('rival'); if (rv) rv.remove();
   ls.set('code', null); S.msg = '';
   render();
 }
@@ -866,12 +867,53 @@ function refreshGauge() {
   lanes.querySelectorAll('.diver').forEach(m => { if (!seen.has(m.dataset.id)) m.remove(); });
 }
 function boardRows(withRound) {
-  const r = S.room;
-  return ordered().sort((a, b) => total(b) - total(a)).map((p, i) => h('li', { class: p.id === S.me.id ? 'me' : '' },
-    icon('krill', colorOf(p.id), 24),
-    h('span', { class: 'who', text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }),
-    withRound && h('span', { class: 'count', text: roundOf(p, r.round).a.length + '/' + (r.dives || 5) }),
-    h('span', { class: 'depth' + (p.id === S.me.id && fxOn() ? ' slam' : ''), text: fmt(depthOf(p)) + 'm' })));
+  const r = S.room, ps = ordered().sort((a, b) => total(b) - total(a)), multi = ps.length > 1, top = ps[0] ? total(ps[0]) : 0;
+  const prev = S._ranks || {}; S._ranks = {};
+  let rank = 0;
+  return ps.map((p, i) => {
+    if (i === 0 || total(p) !== total(ps[i - 1])) rank = i + 1;
+    const up = multi && prev[p.id] && rank < prev[p.id]; S._ranks[p.id] = rank;
+    const lead = multi && rank === 1 && top > 0;
+    return h('li', { class: (p.id === S.me.id ? 'me' : '') + (up ? ' up' : '') },
+      multi && h('span', { class: 'rk', style: 'color:' + (MEDAL[rank - 1] || '#8fae8f'), text: String(rank) }),
+      icon('krill', colorOf(p.id), 24),
+      h('span', { class: 'who' }, h('span', { text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }), lead && h('i', { class: 'crown', 'aria-label': 'in the lead', text: '♛' })),
+      withRound && h('span', { class: 'count', text: roundOf(p, r.round).a.length + '/' + (r.dives || 5) }),
+      multi && rank > 1 && top > 0 && h('small', { class: 'gap', text: '−' + fmt((top - total(p)) * M_PER_PT) + 'm' }),
+      h('span', { class: 'depth' + (p.id === S.me.id && fxOn() ? ' slam' : ''), text: fmt(depthOf(p)) + 'm' }));
+  });
+}
+// ---------- a little rivalry in party rooms: lead changes and rivals' rare finds pop up (tier only, never the answer) ----------
+const MEDAL = ['#ffe08a', '#d7e1f2', '#ffb35c'];
+function rivalToast(kids, color, big) {
+  const old = $('rival'); if (old) old.remove();
+  const el = h('div', { id: 'rival', class: 'rival' + (big ? ' big' : ''), style: '--rc:' + (color || '#7dffb0'), role: 'status' }, kids);
+  document.body.append(el); clearTimeout(rivalToast._t); rivalToast._t = setTimeout(() => el.remove(), big ? 3300 : 2700);
+}
+function rivalWatch() {
+  const r = S.room; if (S.mode !== 'online' || !r || r.phase !== 'play') return;
+  const ps = ordered(); if (ps.length < 2) return;
+  if (diveState().stage === 'sink') return; // hold news until your own answer has landed
+  const key = r.g + ':' + r.round;
+  if (S._seenKey !== key) { S._seenKey = key; S._seen = {}; ps.forEach(p => { S._seen[p.id] = roundOf(p, r.round).a.length; }); }
+  for (const p of ps) {
+    if (p.id === S.me.id) continue;
+    const a = roundOf(p, r.round).a, was = S._seen[p.id] == null ? a.length : S._seen[p.id];
+    S._seen[p.id] = a.length;
+    if (a.length > was) {
+      const best = a.slice(was).reduce((m, x) => (x[1] > m[1] ? x : m), ['', -1]);
+      if (best[1] >= 2) { const T = TIERS[best[1]]; rivalToast([icon(T.art, T.color, 28), h('span', { text: nameOf(p) + (best[1] === 4 ? ' found the Obscura' : ' found a ' + T.name) }), h('b', { text: '+' + T.pts })], T.color, best[1] === 4); snd(best[1] === 4 ? 'best' : 'ding'); }
+    }
+  }
+  const sorted = ps.slice().sort((a, b) => total(b) - total(a)), lead = sorted[0];
+  const leadId = total(lead) > 0 && total(sorted[1]) < total(lead) ? lead.id : null;
+  if (!leadId) { if (S._lead === undefined) S._lead = null; return; }
+  if (S._lead !== undefined && leadId !== S._lead) {
+    if (leadId === S.me.id) { rivalToast([h('span', { text: '▲ You took the lead' })], '#ffe08a', true); snd('best'); }
+    else if (S._lead === S.me.id) { rivalToast([h('span', { text: '▼ ' + nameOf(lead) + ' overtook you' })], '#ff7a45'); snd('miss'); }
+    else rivalToast([h('span', { text: nameOf(lead) + ' takes the lead' })], '#bfa7ff');
+  }
+  S._lead = leadId;
 }
 function topBar() {
   return h('header', { class: 'bar' },
@@ -1115,6 +1157,7 @@ function refreshPlay() {
   }
   $('board').replaceChildren(...boardRows(true));
   window.__depth = total(S.mine) * M_PER_PT;
+  rivalWatch();
 }
 function buildReveal() {
   const r = S.room, T = TOPICS[r.topic] || { name: '?' };
@@ -1132,14 +1175,16 @@ function buildReveal() {
 }
 function refreshReveal() {
   const r = S.room, T = TOPICS[r.topic];
-  const ps = ordered().sort((a, b) => roundOf(b, r.round).pts - roundOf(a, r.round).pts);
-  $('results').replaceChildren(...ps.map(p => {
-    const rd = roundOf(p, r.round);
-    return h('article', { class: 'panel haul' + (p.id === S.me.id ? ' me' : '') },
+  const ps = ordered().sort((a, b) => roundOf(b, r.round).pts - roundOf(a, r.round).pts), multi = ps.length > 1;
+  const saidN = {}; ps.forEach(p => roundOf(p, r.round).a.forEach(x => { if (x[1] >= 0) saidN[x[0]] = (saidN[x[0]] || 0) + 1; }));
+  const topPts = ps[0] ? roundOf(ps[0], r.round).pts : 0, win = multi && topPts > 0 && (!ps[1] || roundOf(ps[1], r.round).pts < topPts);
+  $('results').replaceChildren(...ps.map((p, pi) => {
+    const rd = roundOf(p, r.round), won = win && pi === 0;
+    return h('article', { class: 'panel haul' + (p.id === S.me.id ? ' me' : '') + (won ? ' win' : '') },
       h('header', null, h('span', { class: 'dot', style: 'background:' + colorOf(p.id) }),
-        h('strong', { text: nameOf(p) }),
+        h('strong', { text: nameOf(p) }), won && h('i', { class: 'crown', text: '♛ round' }),
         h('span', { class: 'depth', text: '+' + fmt(rd.pts * M_PER_PT) + 'm · ' + rd.pts + ' pts' })),
-      rd.a.some(x => x[1] >= 0) ? h('ul', { class: 'chips' }, rd.a.filter(x => x[1] >= 0).sort((a, b) => b[1] - a[1]).map(([n, t], i) => chip(n, t, '+' + TIERS[t].pts, i)))
+      rd.a.some(x => x[1] >= 0) ? h('ul', { class: 'chips' }, rd.a.filter(x => x[1] >= 0).sort((a, b) => b[1] - a[1]).map(([n, t], i) => { const c = chip(n, t, '+' + TIERS[t].pts, i); if (multi && saidN[n] === 1) { c.classList.add('solo'); c.title = 'nobody else said it'; } return c; }))
                   : h('p', { class: 'note', text: 'Found nothing.' }));
   }));
   if (!T) return;
@@ -1158,7 +1203,9 @@ function buildFinal() {
     h('h2', { id: 'winner' }),
     h('div', { class: 'split' },
       h('div', { class: 'main' },
+        h('div', { id: 'podium', class: 'podium' }),
         panel('Final depths', null, h('ol', { id: 'ranks', class: 'ranks' })),
+        h('div', { id: 'awards' }),
         isHost() ? h('button', { class: 'go', type: 'button', onclick: again, text: S.mode === 'solo' ? '▼ Drop again ▼' : '▼ Back to the lobby ▼' })
                  : h('p', { class: 'note', style: 'text-align:center', text: 'The host can start another expedition.' })),
       h('aside', null, gaugeEl())));
@@ -1177,6 +1224,22 @@ function refreshFinal() {
       h('span', { class: 'count', text: n + ' answers · reached the ' + zoneOf(depthOf(p)).toLowerCase() }),
       h('span', { class: 'depth', text: fmt(depthOf(p)) + ' m' }));
   }));
+  // a podium and a few awards when there was someone to beat
+  if (ps.length < 2) { $('podium').replaceChildren(); $('awards').replaceChildren(); return; }
+  const place = (p, k) => p && h('div', { class: 'pl p' + (k + 1), style: '--mc:' + MEDAL[k] }, icon('krill', colorOf(p.id), k === 0 ? 56 : 40), h('span', { class: 'who', text: nameOf(p) }), h('span', { class: 'd', text: fmt(depthOf(p)) + ' m' }), h('div', { class: 'block', text: String(k + 1) }));
+  $('podium').replaceChildren(...[place(ps[1], 1), place(ps[0], 0), place(ps[2], 2)].filter(Boolean));
+  const all = p => (p.g === S.room.g && p.rounds) ? Object.entries(p.rounds).flatMap(([k, rd]) => rd.a.filter(x => x[1] >= 0).map(x => ({ n: x[0], t: x[1], r: k }))) : [];
+  const said = {}; ps.forEach(p => all(p).forEach(x => { const key = x.r + '|' + x.n; said[key] = (said[key] || 0) + 1; }));
+  const bestOf = (score) => { let b = null, v = 0; for (const p of ps) { const s = score(p); if (s > v) { v = s; b = p; } } return b && { p: b, v }; };
+  const deep = bestOf(p => Math.max(0, ...all(p).map(x => x.t + 1))), deepA = deep && all(deep.p).reduce((m, x) => (x.t > m.t ? x : m), { t: -1 });
+  const hunter = bestOf(p => all(p).filter(x => x.t >= 2).length), wolf = bestOf(p => all(p).filter(x => said[x.r + '|' + x.n] === 1).length);
+  const row = (k, tier, who, what) => h('li', null, tierIcon(tier, 22), h('span', { class: 'k', text: k }), h('strong', { text: nameOf(who.p) }), h('span', { class: 'note', text: what }));
+  $('awards').replaceChildren(panel('Awards', null, h('ul', { class: 'awards' },
+    deep && row('Deepest find', deepA.t, deep, '“' + deepA.n + '” · ' + (deepA.t === 4 ? 'Pure Obscura' : TIERS[deepA.t].name)),
+    hunter && row('Rare hunter', 2, hunter, hunter.v + ' sloth-or-rarer finds'),
+    wolf && row('Lone wolf', 3, wolf, wolf.v + ' answers nobody else said'))));
+  const key = S.room.g + ':' + ps[0].id;
+  if (S._fan !== key) { S._fan = key; if (ps[0].id === S.me.id && total(ps[0]) > total(ps[1])) snd('fanfare'); }
 }
 
 /* ---------- render loop ---------- */
@@ -1845,7 +1908,8 @@ setInterval(tick, 250);
         sk.began = true; orbit = null; burstT = 0; snd('sink', { tier: tr, dur: sk.dur });
         if (tr === 0) { frog.mood = 'sad'; frog.moodT = sk.dur + 0.8; }
         if (tr === 2) { fx.flash('rgba(255,82,82,.4)', 1, 220); fx.puff(cx, AY, 10); }
-        if (tr === 4) { fx.flash('rgba(255,209,102,.45)', 1, 180); orbit = null; }
+        // the Obscura brings company, as Krillion's rarest tier does: moths circling the falling answer
+        if (tr === 4) { fx.flash('rgba(255,209,102,.45)', 1, 180); orbit = Array.from({ length: W < 700 ? 14 : 20 }, () => ({ ang: R() * 6.283, rad: 30 + 48 * R(), w: (0.7 + 1.5 * R()) * (R() < 0.5 ? -1 : 1), ph: 9 * R(), s: 15 + 13 * R() })); }
       }
       if (!reduce && p < 1) {
         if (tr === 0) { if (R() < 0.25) fx.bubble(cx + D(-30, 30), AY, 1.2 + 1.8 * R(), '160,176,160'); }
@@ -1863,8 +1927,8 @@ setInterval(tick, 250);
         else if (tr === 2) { fx.puff(W / 2, AY, 22); fx.burst(W / 2, AY, SPARK[2], 26, 0.9); fx.shake(); fx.flash('rgba(255,82,82,.45)', 1, 240); }
         else if (tr === 3) fx.burst(W / 2, AY, SPARK[3], 18, 0.7);
         else {
-          frog.mood = 'loop'; frog.moodT = 1.25; fx.flash('rgba(255,209,102,.35)', 1, 220);
-          setTimeout(() => { window.__gold = true; fx.burst(W / 2, AY, '#ffd166', 16, 0.7); for (let k = 0; k < 12; k++) fx.burst(W / 2 + D(-18, 18), AY + D(-18, 18), ['#ffd166', '#ffe9a8', '#ff7a45', '#7dffb0'][k % 4], 1, 0.2); }, 1000);
+          frog.mood = 'loop'; frog.moodT = 1.25; fx.flash('rgba(255,209,102,.35)', 1, 220); if (orbit) orbit.keep = true;
+          setTimeout(() => { window.__gold = true; burstT = 0.0001; fx.burst(W / 2, AY, '#ffd166', 16, 0.7); for (let k = 0; k < 12; k++) fx.burst(W / 2 + D(-18, 18), AY + D(-18, 18), ['#ffd166', '#ffe9a8', '#ff7a45', '#7dffb0'][k % 4], 1, 0.2); }, 1000);
         }
       }
     } else {
@@ -1894,7 +1958,7 @@ setInterval(tick, 250);
     if (puffs.length && puffs.some(q => q.t >= q.life)) puffs = puffs.filter(q => q.t < q.life);
     flash = Math.max(0, flash - dt * 1.5);
     if (burstT > 0) { burstT += dt / 1.5; if (burstT >= 1) { burstT = 0; orbit = null; } }
-    if (orbit && !window.__sink && !window.__lines && burstT === 0) orbit = null;
+    if (orbit && !orbit.keep && !window.__sink && !window.__lines && burstT === 0) orbit = null;
     draw(dt);
   }
   addEventListener('pointerdown', e => { if (frog.hop > 0 || Math.hypot(e.clientX - frog.x, e.clientY - frog.y) > 36 || (e.target.closest && e.target.closest('button, input, select'))) return; frog.hop = 1; snd('ribbit'); { const pop = h('span', { class: 'ribbit', 'aria-hidden': 'true', text: (window.__pal && window.__pal.id !== 'frog') ? 'hey!' : 'ribbit!', style: 'left:' + Math.round(frog.x) + 'px;top:' + Math.round(frog.y - 34) + 'px' }); document.body.append(pop); setTimeout(() => pop.remove(), 1000); } for (let q = 0; q < 6; q++) fx.bubble(frog.x + D(-16, 26), frog.y - 16, 1 + 3 * R()); fx.burst(frog.x, frog.y, '#ff7a45', 10, 0.5); });

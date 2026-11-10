@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // party rooms: anyone with the four-letter code can read and play
+    match /rooms/{code} {
+      allow read: if true;
+      allow create, update: if code.size() == 4 && request.resource.data.keys().size() < 30;
+      match /players/{pid} {
+        allow read: if true;
+        allow write: if pid.size() < 64;
+      }
+    }
+    // daily ranking: one score sheet per player per day, written once
+    match /daily/{day}/scores/{pid} {
+      allow read: if true;
+      allow create: if request.resource.data.score is number && request.resource.data.score >= 0 && request.resource.data.score <= 700;
+    }
+  }
+}

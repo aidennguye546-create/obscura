@@ -761,8 +761,11 @@ function setStage(stage, ms, extra) {
   document.body.classList.toggle('sinking', stage === 'sink');
   document.body.classList.toggle('quiet', stage === 'landed' || stage === 'done');
   // the spotlight: dark everywhere but around the answer while it falls, lifting a couple of seconds after it lands
-  document.body.classList.toggle('spot', stage === 'sink' || stage === 'landed'); clearTimeout(setStage._spot);
-  if (stage === 'landed') setStage._spot = setTimeout(() => document.body.classList.remove('spot'), 2300);
+  // only a Jaguar (Krillion's Deep Cut) dims the forest: a tight spotlight on the falling answer, wider when it lands, gone 2.3 s later
+  const dh = diveState().hit, deep = !!dh && dh.tier === 3; clearTimeout(setStage._spot);
+  document.body.classList.toggle('spot', deep && (stage === 'sink' || stage === 'landed'));
+  document.body.style.setProperty('--spot', stage === 'landed' ? '200px' : '66px');
+  if (deep && stage === 'landed') setStage._spot = setTimeout(() => document.body.classList.remove('spot'), 2300);
   if (stage !== 'sink') window.__lines = null;
   renderDive();
 }
@@ -1732,7 +1735,7 @@ setInterval(tick, 250);
     const cx = W / 2 + (sinking && L ? wobble(p, L.tier) : 0);
     if (L && sinking) {
       // a soft glow around the falling answer
-      const tc = TIERS[L.tier].color, rp = rampOf(SPARK[L.tier]), tl = Math.min(70, sp * 0.1), bx = F(cx), by = F(AY - 30), tk = (time * 30) | 0;
+      const tc = TIERS[L.tier].color, rp = rampOf(SPARK[L.tier]), tl = 0, bx = F(cx), by = F(AY - 30), tk = (time * 30) | 0;
       // embers streaming up off the answer, thinning as they rise
       for (let k = 0; k < tl; k++) {
         const u = k / tl, half = 16 * (1 - u) * (1 - u) + 1, dens = (1 - u) * 0.22, wob = Math.sin((k + time * 40) * 0.2) * 2 * u, Y = (by - k) | 0;
@@ -1808,7 +1811,7 @@ setInterval(tick, 250);
         for (let i = 0; i < 5; i++) {
           const d = L.base + TIERS[i].pts * M_PER_PT, el = kids[i];
           el.style.transform = 'translateY(' + sn(yOf(d)) + 'px)';
-          if (i <= L.tier && cam >= d - 4 && !el.classList.contains('passed')) { el.classList.add('passed', 'flash'); snd('line', i); if (i !== L.tier) for (let b = 0; b < 3; b++) fx.bubble(W / 2 + D(-50, 50), yOf(d) + D(-6, 6), 3); }
+          if (i <= L.tier && cam >= d - 4 && !el.classList.contains('passed')) { el.classList.add('passed', 'flash'); snd('line', i); if (i !== L.tier) fx.burst(W / 2, yOf(d), SPARK[i], 7, 0.5); }
         }
         const wx = sinking ? wobble(p, L.tier) : 0;
         kids[5].style.transform = 'translate3d(calc(-50% + ' + wx.toFixed(1) + 'px), ' + sn(AY - 24) + 'px, 0) rotate(' + (wx * (L.tier === 0 ? 0.55 : L.tier === 4 ? 0.5 : 0.4)).toFixed(2) + 'deg)';
@@ -1840,39 +1843,29 @@ setInterval(tick, 250);
       const cx = W / 2 + wobble(p, tr);
       if (!sk.began) {
         sk.began = true; orbit = null; burstT = 0; snd('sink', { tier: tr, dur: sk.dur });
-        if (tr === 2) { fx.flash('rgba(255,82,110,.4)', 1, 220); fx.puff(cx, AY, 10); }
+        if (tr === 0) { frog.mood = 'sad'; frog.moodT = sk.dur + 0.8; }
+        if (tr === 2) { fx.flash('rgba(255,82,82,.4)', 1, 220); fx.puff(cx, AY, 10); }
         if (tr === 4) { fx.flash('rgba(255,209,102,.45)', 1, 180); orbit = null; }
       }
       if (!reduce && p < 1) {
         if (tr === 0) { if (R() < 0.25) fx.bubble(cx + D(-30, 30), AY, 1.2 + 1.8 * R(), '160,176,160'); }
-        else if (tr === 2) { if (R() < 0.6) fx.bubble(cx + D(-34, 34), AY + D(-8, 4), 1.5 + 2.5 * R()); if (R() < 0.09) fx.puff(cx + D(-20, 20), AY - 10, 3); }
+        else if (tr === 2) { if (R() < 0.09) fx.puff(cx + D(-20, 20), AY - 10, 3); }
         else if (tr === 3) { if (R() < 0.3) fx.bubble(cx + D(-20, 20), AY, 1 + 2 * R()); }
         else if (tr === 4) { if (R() < 0.5) fx.bubble(cx + D(-30, 30), AY, 1.5 + 2 * R(), '255,224,138'); }
         else if (R() < 0.6) fx.bubble(cx + D(-34, 34), AY + D(-8, 4), 1.5 + 2.5 * R());
       }
       if (p >= 1) {
         window.__sink = null; window.__sinkP = 1;
-        const c = TIERS[tr].color, at = cam;
-        // contact: a white hit, a jolt, and a beat of stillness that is longer the rarer the answer
-        flash = 0.18; flashC = '#ffffff'; punch = 0.25; hold = [0, 0.05, 0.09, 0.13, 0.2][tr]; snd('impact', tr);
-        setTimeout(() => {
-          flash = 0.3 + tr * 0.06; flashC = c; punch = 0.25 + tr * 0.08; snd('land', tr);
-          if (tr === 0) { frog.mood = 'sad'; frog.moodT = 3.2; } else if (tr === 4) { frog.mood = 'loop'; frog.moodT = 1.25; window.__gold = true; }
-          rings.push({ m: at, color: c, t: 0, life: 0.9, R: 300 + tr * 40 });
-          if (tr >= 2) rings.push({ m: at, color: c, t: -0.12, life: 1.1, R: 460 + tr * 40 });
-          if (tr >= 3) rings.push({ m: at, color: '#ffffff', t: -0.24, life: 1.3, R: 640 });
-          fx.leaves(W / 2, AY, [2, 4, 6, 9, 16][tr], [0.5, 0.6, 0.7, 0.8, 1][tr]); for (let b = 0; b < 4 + tr * 3; b++) fx.bubble(W / 2 + D(-70, 70), AY + D(-20, 30), 3);
-          fx.burst(W / 2, AY, SPARK[tr], [4, 8, 12, 16, 22][tr], [0.35, 0.5, 0.6, 0.7, 0.85][tr]);
-          
-          if (tr === 2) fx.flash('rgba(255,77,77,.26)', 1, 460);
-          if (tr === 3) { fx.shake(); fx.flash('rgba(157,123,255,.34)', 1, 520); }
-          if (tr === 4) {
-            fx.shake(); fx.zap(); fx.flash('rgba(255,209,102,.42)', 2, 320);
-            // gold keeps raining for a moment
-            for (let w = 1; w <= 3; w++) setTimeout(() => { fx.burst(W / 2 + D(-120, 120), AY + D(-70, 40), ['#ffd166', '#ffe9a8'][w % 2], 6, 0.6); fx.leaves(W / 2 + D(-160, 160), AY - 60, 8, 0.9); rings.push({ m: toM(AY + D(-60, 60)), color: '#ffd166', t: 0, life: 0.8, R: 200 }); }, w * 230);
-            setTimeout(() => { burstT = 0.0001; }, 900);
-          }
-        }, hold * 1000);
+        // landing, rarity by rarity as Krillion does it: no freeze-frame, no zoom jolt, no glow disc
+        flash = 0; punch = 0; hold = 0; snd('impact', tr); snd('land', tr);
+        if (tr === 0) fx.burst(W / 2, AY, '#8fa3c4', 8, 0.4);
+        else if (tr === 1) fx.burst(W / 2, AY, SPARK[1], 22, 0.8);
+        else if (tr === 2) { fx.puff(W / 2, AY, 22); fx.burst(W / 2, AY, SPARK[2], 26, 0.9); fx.shake(); fx.flash('rgba(255,82,82,.45)', 1, 240); }
+        else if (tr === 3) fx.burst(W / 2, AY, SPARK[3], 18, 0.7);
+        else {
+          frog.mood = 'loop'; frog.moodT = 1.25; fx.flash('rgba(255,209,102,.35)', 1, 220);
+          setTimeout(() => { window.__gold = true; fx.burst(W / 2, AY, '#ffd166', 16, 0.7); for (let k = 0; k < 12; k++) fx.burst(W / 2 + D(-18, 18), AY + D(-18, 18), ['#ffd166', '#ffe9a8', '#ff7a45', '#7dffb0'][k % 4], 1, 0.2); }, 1000);
+        }
       }
     } else {
       const target = dive ? (window.__depth || 0) : 0;

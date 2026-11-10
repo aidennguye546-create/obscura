@@ -72,6 +72,11 @@ const FILLER = new Set(['the', 'of', 'and', 'a', 'an', 'in', 'de', 'la', 'le', '
 for (const a of window.BANK_ADD || []) {
   const t = window.BANK.find(x => x && x.id === a.id);
   if (t && Array.isArray(a.t)) a.t.forEach((str, i) => { if (str && i < 5) t.t[i] = t.t[i] ? t.t[i] + ', ' + str : str; });
+  // extra spellings for answers that are already there: { alias: { 'Thylacine': ['Tasmanian tiger'] } }
+  if (t && a.alias) {
+    const want = {}; for (const [k, v] of Object.entries(a.alias)) want[norm(k)] = [].concat(v);
+    t.t = t.t.map(str => String(str || '').split(',').map(raw => { const head = raw.split('|')[0].trim(), extra = want[norm(head)]; return extra ? raw.replace(/\s+$/, '') + '|' + extra.join('|') : raw; }).join(','));
+  }
 }
 // Each prompt is indexed the first time it is needed, so loading stays quick however big the bank gets.
 function buildTopic(t) {
@@ -879,8 +884,9 @@ function boardRows(withRound) {
       icon('krill', colorOf(p.id), 24),
       h('span', { class: 'who' }, h('span', { text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }), lead && h('i', { class: 'crown', 'aria-label': 'in the lead', text: '♛' })),
       withRound && h('span', { class: 'count', text: roundOf(p, r.round).a.length + '/' + (r.dives || 5) }),
-      multi && rank > 1 && top > 0 && h('small', { class: 'gap', text: '−' + fmt((top - total(p)) * M_PER_PT) + 'm' }),
-      h('span', { class: 'depth' + (p.id === S.me.id && fxOn() ? ' slam' : ''), text: fmt(depthOf(p)) + 'm' }));
+      multi && rank > 1 && top > 0 && h('small', { class: 'gap', text: '−' + fmt(top - total(p)) }),
+      // depth stops at the bottom of the forest, so rivals are ranked and shown by points, which never cap
+      h('span', { class: 'depth' + (p.id === S.me.id && fxOn() ? ' slam' : ''), text: multi ? fmt(total(p)) + ' pts' : fmt(depthOf(p)) + 'm' }));
   });
 }
 // ---------- a little rivalry in party rooms: lead changes and rivals' rare finds pop up (tier only, never the answer) ----------
@@ -1215,18 +1221,18 @@ function refreshFinal() {
   const ps = ordered().sort((a, b) => total(b) - total(a));
   const top = ps[0];
   $('winner').textContent = !top ? '' : ps.length === 1 ? 'You reached ' + fmt(depthOf(top)) + ' m'
-    : (ps[1] && total(ps[1]) === total(top)) ? 'A tie at ' + fmt(depthOf(top)) + ' m' : nameOf(top) + ' went deepest';
+    : (ps[1] && total(ps[1]) === total(top)) ? 'A tie at ' + fmt(total(top)) + ' pts' : nameOf(top) + ' went deepest';
   $('ranks').replaceChildren(...ps.map(p => {
     const n = (p.g === S.room.g && p.rounds) ? Object.values(p.rounds).reduce((s, r) => s + r.a.filter(x => x[1] >= 0).length, 0) : 0;
     return h('li', { class: p.id === S.me.id ? 'me' : '' },
       h('span', { class: 'dot', style: 'background:' + colorOf(p.id) }),
       h('span', { class: 'who', text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }),
       h('span', { class: 'count', text: n + ' answers · reached the ' + zoneOf(depthOf(p)).toLowerCase() }),
-      h('span', { class: 'depth', text: fmt(depthOf(p)) + ' m' }));
+      h('span', { class: 'depth', text: ps.length > 1 ? fmt(total(p)) + ' pts' : fmt(depthOf(p)) + ' m' }));
   }));
   // a podium and a few awards when there was someone to beat
   if (ps.length < 2) { $('podium').replaceChildren(); $('awards').replaceChildren(); return; }
-  const place = (p, k) => p && h('div', { class: 'pl p' + (k + 1), style: '--mc:' + MEDAL[k] }, icon('krill', colorOf(p.id), k === 0 ? 56 : 40), h('span', { class: 'who', text: nameOf(p) }), h('span', { class: 'd', text: fmt(depthOf(p)) + ' m' }), h('div', { class: 'block', text: String(k + 1) }));
+  const place = (p, k) => p && h('div', { class: 'pl p' + (k + 1), style: '--mc:' + MEDAL[k] }, icon('krill', colorOf(p.id), k === 0 ? 56 : 40), h('span', { class: 'who', text: nameOf(p) }), h('span', { class: 'd', text: fmt(total(p)) + ' pts' }), h('div', { class: 'block', text: String(k + 1) }));
   $('podium').replaceChildren(...[place(ps[1], 1), place(ps[0], 0), place(ps[2], 2)].filter(Boolean));
   const all = p => (p.g === S.room.g && p.rounds) ? Object.entries(p.rounds).flatMap(([k, rd]) => rd.a.filter(x => x[1] >= 0).map(x => ({ n: x[0], t: x[1], r: k }))) : [];
   const said = {}; ps.forEach(p => all(p).forEach(x => { const key = x.r + '|' + x.n; said[key] = (said[key] || 0) + 1; }));

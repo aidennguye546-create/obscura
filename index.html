@@ -639,6 +639,8 @@ body.quiet #tierlines { opacity: 0 !important; transition: opacity 0.6s ease; }
 /* Krillion's restraint, in Obscura's own forest: the prompt card lifts away as the answer drops, and the scene stays quiet */
 @keyframes cardgone { 0% { opacity: 1; filter: none; transform: none; } 100% { opacity: 0; filter: blur(2px); transform: translateY(-28px) scale(0.9); } }
 body.sinking .play .topic { animation: cardgone 0.6s ease-in 0.45s forwards; }
+/* Krillion's Deep Cut spotlight, exactly: clear for --spot px around the answer, .72 at +90 px, .96 at +260 px */
+body::after { background: radial-gradient(circle at 50% 30%, rgba(2, 8, 5, 0) var(--spot, 66px), rgba(2, 8, 5, 0.72) calc(var(--spot, 66px) + 90px), rgba(2, 8, 5, 0.96) calc(var(--spot, 66px) + 260px)); }
 </style>
 </head>
 <body>

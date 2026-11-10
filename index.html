@@ -641,6 +641,35 @@ body.quiet #tierlines { opacity: 0 !important; transition: opacity 0.6s ease; }
 body.sinking .play .topic { animation: cardgone 0.6s ease-in 0.45s forwards; }
 /* Krillion's Deep Cut spotlight, exactly: clear for --spot px around the answer, .72 at +90 px, .96 at +260 px */
 body::after { background: radial-gradient(circle at 50% 30%, rgba(2, 8, 5, 0) var(--spot, 66px), rgba(2, 8, 5, 0.72) calc(var(--spot, 66px) + 90px), rgba(2, 8, 5, 0.96) calc(var(--spot, 66px) + 260px)); }
+/* party-room rivalry */
+.board .rk { flex: none; width: 16px; text-align: center; font-size: 20px; text-shadow: 0 0 8px currentColor; }
+.board .who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.crown { font-style: normal; color: #ffe08a; text-shadow: 0 0 10px rgba(255, 224, 138, 0.7); }
+.haul .crown { font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase; }
+.board .gap { margin-left: auto; color: #8fae8f; font-size: 14px; letter-spacing: 0.06em; }
+.board .gap + .depth { margin-left: 8px; }
+.board .count + .depth, .board .count + .gap { margin-left: auto; }
+.board li.up { animation: rankup 0.9s cubic-bezier(.22, 1, .36, 1); }
+@keyframes rankup { 0% { background: rgba(255, 224, 138, 0.24); transform: translateY(8px); } }
+.rival { position: fixed; top: max(66px, calc(env(safe-area-inset-top, 0px) + 56px)); left: 50%; z-index: 9; display: flex; align-items: center; gap: 10px; padding: 8px 16px 6px; transform: translateX(-50%); background: rgba(7, 18, 11, 0.94); box-shadow: 0 0 0 2px #06110a, 0 0 0 4px var(--rc), 0 0 22px color-mix(in srgb, var(--rc) 35%, transparent); color: #f0f7e4; font-size: 18px; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; pointer-events: none; animation: rivalin 2.7s cubic-bezier(.22, 1, .36, 1) both; }
+.rival b { color: var(--rc); font-weight: 400; }
+.rival.big { font-size: 22px; color: var(--rc); animation-duration: 3.3s; }
+@keyframes rivalin { 0% { opacity: 0; transform: translate(-50%, -14px) scale(0.9); } 10%, 85% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -6px); } }
+.haul.win { box-shadow: 0 0 0 3px #ffe08a, 0 0 26px rgba(255, 224, 138, 0.25); }
+.chips .solo::after { content: "★"; color: #ffe08a; margin-left: 4px; font-size: 0.8em; }
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 10px; margin: 6px 0 2px; }
+.podium .pl { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 30%; max-width: 170px; text-align: center; }
+.podium .who { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; letter-spacing: 0.08em; text-transform: uppercase; }
+.podium .p1 .who { color: #ffe08a; }
+.podium .d { font-size: 16px; color: #f0f7e4; }
+.podium .block { width: 100%; display: grid; place-items: center; font-size: 30px; color: #050d08; background: var(--mc); box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), inset 0 -4px 0 rgba(0, 0, 0, 0.25); transform-origin: bottom; animation: podup 0.8s cubic-bezier(.2, 1.5, .4, 1) backwards; }
+.podium .p1 .block { height: 92px; animation-delay: 0.5s; } .podium .p2 .block { height: 66px; animation-delay: 0.25s; } .podium .p3 .block { height: 46px; }
+@keyframes podup { 0% { transform: scaleY(0); } }
+.podium .p1 .spr { filter: drop-shadow(0 0 14px #ffe08a); animation: iconbob 2.6s ease-in-out infinite; }
+.awards li { display: flex; align-items: center; gap: 10px; padding: 8px 2px 7px; border-bottom: 1px dashed var(--edge); font-size: 17px; flex-wrap: wrap; }
+.awards li:last-child { border-bottom: 0; }
+.awards .k { min-width: 110px; color: #8fae8f; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
+.awards strong { font-weight: 400; color: #f0f7e4; text-transform: uppercase; letter-spacing: 0.08em; }
 </style>
 </head>
 <body>

@@ -619,6 +619,23 @@ body::after { background: radial-gradient(ellipse 95% 85% at 50% 36%, rgba(3, 10
 html:has(body.sinking)::after { opacity: 1; }
 body.quiet.dive::after { opacity: 1; }
 .landed::after { display: none; }
+/* Krillion's landing, matched: a spotlight on the falling answer, the result popping in with a bounce, the lights back up after */
+html::after { display: none; }
+body::after { background: radial-gradient(circle at 50% 30%, rgba(2, 8, 5, 0) min(200px, 30vw), rgba(2, 8, 5, 0.72) min(290px, 46vw), rgba(2, 8, 5, 0.96) min(460px, 78vw)); transition: opacity 0.9s cubic-bezier(.22, 1, .36, 1); }
+body.quiet.dive::after { opacity: 0; }
+body.spot.dive::after { opacity: 1; }
+.landed { animation: banner 0.8s cubic-bezier(.2, 1.7, .4, 1) backwards; gap: 4px; }
+@keyframes banner { 0% { opacity: 0; transform: scale(0.5); } }
+.landed .bigicon { width: 66px; height: 66px; filter: drop-shadow(0 0 20px var(--c)); animation: iconbob 2.6s ease-in-out infinite; margin-bottom: 6px; }
+.landed.t-deepcut .bigicon, .landed.t-krillion .bigicon { width: 88px; height: 88px; }
+.landed .tname { font-size: clamp(28px, 8.5vw, 44px); letter-spacing: 0.12em; text-shadow: 0 0 22px var(--c, transparent), 0 3px 0 #0009; }
+.landed .tname span { animation: none; }
+.landed .badges, .landed .tans, .landed .tname ~ .tans, .landed .tpts, .landed .note { animation: none; }
+.landed .tans { font-size: 19px; letter-spacing: 0.08em; margin-top: 2px; }
+.landed .tpts { font-size: 22px; margin-top: 4px; }
+.landed .note { font-size: 14px; letter-spacing: 0.14em; margin-top: 4px; opacity: 1; }
+.landed .go { animation: risein 0.5s cubic-bezier(.34, 1.56, .64, 1) backwards, btnbob 1.9s cubic-bezier(.65, 0, .35, 1) 0.9s infinite; margin-top: 26px; }
+body.quiet #tierlines { opacity: 0 !important; transition: opacity 0.6s ease; }
 </style>
 </head>
 <body>

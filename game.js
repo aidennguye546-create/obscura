@@ -541,7 +541,7 @@ async function joinRoom(code, silent) {
     const meRef = ref.collection('players').doc(S.me.id);
     const old = await withTimeout(meRef.get());
     const prev = old.exists ? clone(old.data()) : null;
-    const mine = prev && prev.g === room.g ? Object.assign(prev, { name: S.me.name }) : freshMine(room.g, prev && prev.joinedAt);
+    const mine = prev && prev.g === room.g ? Object.assign(prev, { name: S.me.name, left: false }) : freshMine(room.g, prev && prev.joinedAt);
     await withTimeout(meRef.set(clone(mine)));
     if (S.mode) return; // started something else while this was loading
     S.mode = 'online'; S.code = code; S.room = room; S.mine = mine;
@@ -578,7 +578,8 @@ function leave() {
   S.unsub.forEach(u => { try { u(); } catch (e) { /* already closed */ } });
   S.unsub = [];
   if (S.mode === 'online' && S.room.phase === 'lobby' && S.meRef) S.meRef.delete().catch(() => {});
-  S.mode = null; S.room = null; S.roomRef = null; S.meRef = null; S.code = null; S.players = {}; S.fb = null;
+  else if (S.mode === 'online' && S.meRef && S.mine) { S.mine.left = true; S.meRef.set(clone(S.mine)).catch(() => {}); } // gone mid-game: do not hold the others up
+  S.mode = null; S.room = null; S.roomRef = null; S.meRef = null; S.code = null; S.players = {}; S.fb = null; S.dive = null; S.shown = null; S.allAt = 0;
   ls.set('code', null); S.msg = '';
   render();
 }
@@ -601,6 +602,7 @@ function pickSeven(pool, rnd) {
 const dayNoOf = key => { const p = key.split('-').map(Number); return Math.max(1, Math.floor((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
 // No repeats: the pool is shuffled once per cycle and dealt out seven a day until it runs out, then reshuffled.
 function dealSeven(pool, tag, n) { const ids = pool.filter(usable).sort(), per = Math.floor(ids.length / 7); if (!per) return []; const cyc = Math.floor((n - 1) / per), rnd = seeded('obscura:' + tag + ':' + cyc); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } const k = ((n - 1) % per) * 7; return ids.slice(k, k + 7); }
+window.__dbg = { S: () => S, topic: id => TOPICS[id] };
 window.__deal = (tag, n) => dealSeven(tag === 'daily' ? TOPIC_IDS : packPool(tag), tag, n);
 const dailySaved = () => { try { return JSON.parse(ls.get('daily_' + dayKey()) || 'null'); } catch (e) { return null; } };
 const dailyKey = kind => 'daily_' + kind + '_' + dayKey();
@@ -738,7 +740,7 @@ function again() {
 function once(key, fn) { if (S.done === key) return; S.done = key; fn(); }
 
 function diveState() {
-  const r = S.room, key = r.g + ':' + r.round;
+  const r = S.room, key = S.code + ':' + r.g + ':' + r.round;
   if (!S.dive || S.dive.key !== key) S.dive = { key, stage: 'wait', i: roundOf(S.mine, r.round).a.length, until: 0, hit: null };
   return S.dive;
 }
@@ -1057,6 +1059,7 @@ function renderDive() {
         const t0 = performance.now(), ms = 380 + hit.tier * 90;
         const step = now => { if (!b.isConnected) return; const o = Math.min((now - t0) / ms, 1); b.textContent = '+' + Math.round(T.pts * (1 - Math.pow(1 - o, 3))) + ' PTS'; if (o < 1) requestAnimationFrame(step); else { b.classList.add('pop'); snd('ding'); } };
         requestAnimationFrame(step);
+        setTimeout(() => { if (b.isConnected) b.textContent = '+' + T.pts + ' PTS'; }, ms + 400);
       }, tUp);
       setTimeout(() => {
         const b = document.querySelector('.landed .ptsup'); if (!sc || !sc.isConnected || !b) return;
@@ -1090,6 +1093,7 @@ function refreshPlay() {
     sc._to = pts;
     const step = now => { if (sc._to !== pts || !sc.isConnected) return; if (now < t0) return requestAnimationFrame(step); const o = Math.min((now - t0) / ms, 1), a = 1 - Math.pow(1 - o, 4); sc.textContent = String(Math.round(from + (pts - from) * (big && a < 0.9 ? 1.06 * a : a))); if (o < 1) { if (pts !== from && now - (sc._tk || 0) > 55) { sc._tk = now; snd('tally', o); } requestAnimationFrame(step); } else { sc.textContent = String(pts); if (pts !== from) { restart(sc, 'slam'); snd('ding'); } } };
     requestAnimationFrame(step);
+    setTimeout(() => { if (sc.isConnected && sc._to === pts) sc.textContent = String(pts); }, Math.max(0, t0 - performance.now()) + ms + 400);
   }
   $('board').replaceChildren(...boardRows(true));
   window.__depth = total(S.mine) * M_PER_PT;
@@ -1216,7 +1220,7 @@ function tick() {
     } else if (d.stage === 'landed') {
       if (now > d.until) advance();
     }
-    const all = ordered().every(p => roundOf(p, r.round).a.length >= K);
+    const all = ordered().every(p => p.left || roundOf(p, r.round).a.length >= K);
     if (all && d.stage === 'done') { if (!S.allAt) S.allAt = now; } else S.allAt = 0;
     if (!r.fixed && ((S.allAt && now > S.allAt + 2500 + lag) || now > r.endsAt + lag)) once('play:' + r.g + ':' + r.round, () => patchRoom({ phase: 'reveal', revealAt: Date.now() }));
   } else if (r.phase === 'reveal') {
@@ -1730,9 +1734,9 @@ setInterval(tick, 250);
     // (shockwave rings removed: the landing is carried by the burst, the flash and the card)
     if (flash > 0) {
       const rp = rampOf(flashC), cx0 = fw / 2, cy0 = F(AY);
-      pglow(cx0, cy0, F(170 + (1 - flash) * 90), flash * 1.1, rp, 5);
+      pglow(cx0, cy0, F(60 + (1 - flash) * 30), flash * 0.6, rp, 4);
       // a starburst: rays plotted as pixel lines, every fourth one long
-      for (let q = 0; q < 16; q++) { const ang = q * 0.3927 + 0.2, r0 = F(30 + (1 - flash) * 120), r1 = r0 + F((q % 4 === 0 ? 150 : 70) * flash * (0.6 + hsh(q, 300) * 0.6)); pline(cx0 + Math.cos(ang) * r0, cy0 + Math.sin(ang) * r0, cx0 + Math.cos(ang) * r1, cy0 + Math.sin(ang) * r1, rp[flash > 0.5 ? 4 : 3], 6); }
+      for (let q = 0; q < 0; q++) { const ang = q * 0.3927 + 0.2, r0 = F(30 + (1 - flash) * 120), r1 = r0 + F((q % 4 === 0 ? 150 : 70) * flash * (0.6 + hsh(q, 300) * 0.6)); pline(cx0 + Math.cos(ang) * r0, cy0 + Math.sin(ang) * r0, cx0 + Math.cos(ang) * r1, cy0 + Math.sin(ang) * r1, rp[flash > 0.5 ? 4 : 3], 6); }
       // and a thin horizontal flare through the middle
       const arm = F(W * 0.34 * flash);
       for (let x = -arm | 0; x <= arm; x++) { const edge = 1 - Math.abs(x) / (arm + 1); if (edge < 0.4 && (x & 1)) continue; pset(cx0 + x, cy0, rp[edge > 0.5 ? 4 : 3], 6); if (edge > 0.6) { pset(cx0 + x, cy0 - 1, rp[3], 5); pset(cx0 + x, cy0 + 1, rp[3], 5); } }

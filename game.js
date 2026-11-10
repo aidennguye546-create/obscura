@@ -598,6 +598,10 @@ function pickSeven(pool, rnd) {
   const ids = pool.slice().sort(); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
   const out = []; for (const id of ids) { if (usable(id)) out.push(id); if (out.length === 7) break; } return out;
 }
+const dayNoOf = key => { const p = key.split('-').map(Number); return Math.max(1, Math.floor((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
+// No repeats: the pool is shuffled once per cycle and dealt out seven a day until it runs out, then reshuffled.
+function dealSeven(pool, tag, n) { const ids = pool.filter(usable).sort(), per = Math.floor(ids.length / 7); if (!per) return []; const cyc = Math.floor((n - 1) / per), rnd = seeded('obscura:' + tag + ':' + cyc); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } const k = ((n - 1) % per) * 7; return ids.slice(k, k + 7); }
+window.__deal = (tag, n) => dealSeven(tag === 'daily' ? TOPIC_IDS : packPool(tag), tag, n);
 const dailySaved = () => { try { return JSON.parse(ls.get('daily_' + dayKey()) || 'null'); } catch (e) { return null; } };
 const dailyKey = kind => 'daily_' + kind + '_' + dayKey();
 const dailyDone = kind => { try { return JSON.parse(ls.get(dailyKey(kind)) || 'null'); } catch (e) { return null; } };
@@ -606,7 +610,7 @@ function startRun(kind, day, daily) {
   let saved = null;
   if (kind === 'daily') { try { saved = JSON.parse(ls.get('daily_' + (day || dayKey())) || 'null'); } catch (e) { saved = null; } }
   if (daily && kind !== 'daily') saved = dailyDone(kind);
-  const ids = saved ? saved.ids : kind === 'daily' ? pickSeven(TOPIC_IDS, seeded('obscura:' + (day || dayKey()))) : pickSeven(packPool(kind), daily ? seeded('obscura:' + kind + ':' + dayKey()) : Math.random);
+  const ids = saved ? saved.ids : kind === 'daily' ? dealSeven(TOPIC_IDS, 'daily', dayNoOf(day || dayKey())) : (daily ? dealSeven(packPool(kind), kind, dayNo()) : pickSeven(packPool(kind), Math.random));
   if (ids.length < 7) return say('That pack is still being stocked. Try the daily descent or geography for now.');
   say('');
   S.mode = 'solo'; S.code = kind === 'daily' ? 'DAILY' : kind.toUpperCase();

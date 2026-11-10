@@ -581,7 +581,7 @@ async function joinRoom(code, silent) {
 
 function leave() {
   window.__gold = false;
-  document.body.classList.remove('trek', 'quiet', 'run');
+  document.body.classList.remove('trek', 'quiet', 'run', 'spot');
   window.__lines = null; window.__sink = null; document.body.classList.remove('sinking');
   S.unsub.forEach(u => { try { u(); } catch (e) { /* already closed */ } });
   S.unsub = [];
@@ -756,6 +756,9 @@ function setStage(stage, ms, extra) {
   Object.assign(diveState(), extra || {}, { stage, until: ms ? Date.now() + ms : 0 });
   document.body.classList.toggle('sinking', stage === 'sink');
   document.body.classList.toggle('quiet', stage === 'landed' || stage === 'done');
+  // the spotlight: dark everywhere but around the answer while it falls, lifting a couple of seconds after it lands
+  document.body.classList.toggle('spot', stage === 'sink' || stage === 'landed'); clearTimeout(setStage._spot);
+  if (stage === 'landed') setStage._spot = setTimeout(() => document.body.classList.remove('spot'), 2300);
   if (stage !== 'sink') window.__lines = null;
   renderDive();
 }
@@ -1060,7 +1063,7 @@ function renderDive() {
       if (tags.length) { kids[0].insertBefore(h('p', { class: 'badges' }, tags.map(tx => h('span', { text: tx }))), kids[0].children[1]); setTimeout(() => snd('best'), 650); }
       // the points leave the card and land in the score
       const sc = $('hud-score');
-      const nL = hit.tier === 4 ? 12 : T.name.length, tUp = 520 + nL * 55;
+      const nL = hit.tier === 4 ? 12 : T.name.length, tUp = 150;
       // the points tick up on the card, then lift off and land in the score
       setTimeout(() => {
         const b = document.querySelector('.landed .ptsup'); if (!b) return;
@@ -1074,7 +1077,7 @@ function renderDive() {
         const rc = sc.getBoundingClientRect(), rb = b.getBoundingClientRect(), x0 = rb.left + rb.width / 2, y0 = rb.top + rb.height / 2;
         const fly = h('span', { class: 'fly t-' + T.key, 'aria-hidden': 'true', text: '+' + T.pts, style: 'left:' + Math.round(x0) + 'px;top:' + Math.round(y0) + 'px;--dx:' + Math.round(rc.left + rc.width / 2 - x0) + 'px;--dy:' + Math.round(rc.top + rc.height / 2 - y0) + 'px' });
         document.body.append(fly); setTimeout(() => { fly.remove(); if (sc.isConnected) restart(sc, 'slam'); }, 820);
-      }, tUp + 620 + hit.tier * 90);
+      }, tUp + 750);
       
     } else kids = [h('div', { class: 'landed' }, h('h2', { class: 'tname miss', text: 'Lost your grip' }), h('p', { class: 'tans', text: '—' }),
       h('p', { class: 'tpts', text: '+0 PTS' }), h('p', { class: 'note', text: 'the clock beat you to it.' }), btn)];
@@ -1097,7 +1100,7 @@ function refreshPlay() {
   const held = d.stage === 'sink' && d.hit ? TIERS[d.hit.tier].pts : 0, pts = total(S.mine) - held;
   const sc = $('hud-score');
   if (sc._to !== pts) {
-    const from = sc._to == null ? pts : Number(sc.textContent) || 0, t0 = performance.now() + (sc._to == null ? 0 : d.stage === 'landed' && d.hit ? 1900 + (d.hit.tier === 4 ? 12 : TIERS[d.hit.tier].name.length) * 55 + d.hit.tier * 90 : 520), big = d.hit && d.hit.tier === 4, ms = big ? 1300 : 600 + (d.hit ? d.hit.tier * 120 : 0);
+    const from = sc._to == null ? pts : Number(sc.textContent) || 0, t0 = performance.now() + (sc._to == null ? 0 : d.stage === 'landed' && d.hit ? 1150 : 520), big = d.hit && d.hit.tier === 4, ms = big ? 1300 : 600 + (d.hit ? d.hit.tier * 120 : 0);
     sc._to = pts;
     const step = now => { if (sc._to !== pts || !sc.isConnected) return; if (now < t0) return requestAnimationFrame(step); const o = Math.min((now - t0) / ms, 1), a = 1 - Math.pow(1 - o, 4); sc.textContent = String(Math.round(from + (pts - from) * (big && a < 0.9 ? 1.06 * a : a))); if (o < 1) { if (pts !== from && now - (sc._tk || 0) > 55) { sc._tk = now; snd('tally', o); } requestAnimationFrame(step); } else { sc.textContent = String(pts); if (pts !== from) { restart(sc, 'slam'); snd('ding'); } } };
     requestAnimationFrame(step);
@@ -1852,10 +1855,10 @@ setInterval(tick, 250);
           fx.leaves(W / 2, AY, [2, 4, 6, 9, 16][tr], [0.5, 0.6, 0.7, 0.8, 1][tr]); for (let b = 0; b < 4 + tr * 3; b++) fx.bubble(W / 2 + D(-70, 70), AY + D(-20, 30), 3);
           fx.burst(W / 2, AY, SPARK[tr], [4, 8, 12, 16, 22][tr], [0.35, 0.5, 0.6, 0.7, 0.85][tr]);
           
-          if (tr === 2) fx.flash('rgba(255,77,77,.16)', 1, 420);
-          if (tr === 3) fx.flash('rgba(157,123,255,.2)', 1, 480);
+          if (tr === 2) fx.flash('rgba(255,77,77,.26)', 1, 460);
+          if (tr === 3) { fx.shake(); fx.flash('rgba(157,123,255,.34)', 1, 520); }
           if (tr === 4) {
-            fx.flash('rgba(255,209,102,.28)', 1, 600);
+            fx.shake(); fx.zap(); fx.flash('rgba(255,209,102,.42)', 2, 320);
             // gold keeps raining for a moment
             for (let w = 1; w <= 3; w++) setTimeout(() => { fx.burst(W / 2 + D(-120, 120), AY + D(-70, 40), ['#ffd166', '#ffe9a8'][w % 2], 6, 0.6); fx.leaves(W / 2 + D(-160, 160), AY - 60, 8, 0.9); rings.push({ m: toM(AY + D(-60, 60)), color: '#ffd166', t: 0, life: 0.8, R: 200 }); }, w * 230);
             setTimeout(() => { burstT = 0.0001; }, 900);

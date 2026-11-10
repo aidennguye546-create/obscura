@@ -421,6 +421,14 @@ function openSettings() {
 for (const ev of ['copy', 'cut', 'contextmenu', 'dragstart', 'selectstart']) addEventListener(ev, e => { const t = e.target; if (!(t && t.closest && t.closest('input'))) e.preventDefault(); }, true);
 addEventListener('pointerdown', e => { Sound.unlock(); if (e.target.closest && e.target.closest('button:not(#mute)')) snd('click'); }, true);
 addEventListener('keydown', () => Sound.unlock(), true);
+// Enter moves you on: from a result to the next prompt, and (for whoever can) from a round's results to the next round.
+addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.repeat || e.isComposing || document.querySelector('.modal')) return;
+  const t = e.target, tag = t && t.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'A') return;
+  const nx = document.getElementById('next'), go = document.querySelector('.landed .go') || (nx && !nx.hidden ? nx : null);
+  if (go && !go.disabled) { e.preventDefault(); go.click(); }
+});
 // Phones only let sound start from a finished tap, not from the press, so wake the audio on those too
 // and nudge it with a silent blip (Safari needs one before it will play anything).
 ['pointerup', 'touchend', 'click'].forEach(ev => addEventListener(ev, () => {

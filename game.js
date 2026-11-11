@@ -711,7 +711,7 @@ function pickSeven(pool, rnd) {
 const dayNoOf = key => { const p = key.split('-').map(Number); return Math.max(1, Math.floor((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
 // No repeats: the pool is shuffled once per cycle and dealt out seven a day until it runs out, then reshuffled.
 function dealSeven(pool, tag, n) { const ids = pool.filter(usable).sort(), per = Math.floor(ids.length / 7); if (!per) return []; const cyc = Math.floor((n - 1) / per), rnd = seeded('obscura:' + tag + ':' + cyc); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } const k = ((n - 1) % per) * 7; return ids.slice(k, k + 7); }
-window.__dbg = { sprite, S: () => S, topic: id => TOPICS[id], rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
+window.__dbg = { sprite, S: () => S, topic: id => TOPICS[id], champ: name => moment(Math.round(innerHeight * 0.3), 'CHAMPION', name + ' · 1,240 pts', icon('krill', '#ffc23a', 128), 'champ'), lead: (name, kind) => leadSlam({ id: 'x', name }, kind), emote: e => showEmote(S.me.id, e), count: t => { const m = S.mode; S.mode = 'online'; bigCount(t); S.mode = m; }, rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
 window.__deal = (tag, n) => dealSeven(tag === 'daily' ? TOPIC_IDS : packPool(tag), tag, n);
 const dailySaved = () => { try { return JSON.parse(ls.get('daily_' + dayKey()) || 'null'); } catch (e) { return null; } };
 const dailyKey = kind => 'daily_' + kind + '_' + dayKey();
@@ -1118,9 +1118,9 @@ function rivalWatch() {
   const leadId = total(lead) > 0 && total(sorted[1]) < total(lead) ? lead.id : null;
   if (!leadId) { if (S._lead === undefined) S._lead = null; return; }
   if (S._lead !== undefined && leadId !== S._lead) {
-    if (leadId === S.me.id) { rivalToast([h('span', { text: '▲ You took the lead' })], '#ffe08a', true); snd('best'); }
-    else if (S._lead === S.me.id) { rivalToast([h('span', { text: '▼ ' + nameOf(lead) + ' overtook you' })], '#ff7a45'); snd('miss'); }
-    else rivalToast([h('span', { text: nameOf(lead) + ' takes the lead' })], '#bfa7ff');
+    if (leadId === S.me.id) { leadSlam(lead, 'you'); snd('best'); }
+    else if (S._lead === S.me.id) { leadSlam(lead, 'lost'); snd('miss'); }
+    else { leadSlam(lead, 'other'); snd('ding'); }
   }
   S._lead = leadId;
 }
@@ -1145,19 +1145,64 @@ function modal(id, label, title, ...kids) {
 }
 // The Obscura moment: the forest goes dark, gold rays turn behind the moth, rings break outward,
 // and the name slams down letter by letter, each with its own rising note, before the result card arrives.
-window.__obscura = y => {
+function moment(y, word, sub, pic, cls) {
   const old = $('obz'); if (old) old.remove();
-  const word = 'OBSCURA', low = SET.low || matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const el = h('div', { id: 'obz', class: low ? 'low' : '', 'aria-hidden': 'true', style: '--y:' + Math.round(y) + 'px' },
+  const low = SET.low || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const el = h('div', { id: 'obz', class: (low ? 'low ' : '') + (cls || ''), 'aria-hidden': 'true', style: '--y:' + Math.round(y) + 'px' },
     h('div', { class: 'obz-dim' }), h('div', { class: 'obz-rays' }), h('div', { class: 'obz-core' }),
     [0, 1, 2].map(i => h('div', { class: 'obz-ring', style: '--d:' + (0.05 + i * 0.22) + 's' })),
-    h('div', { class: 'obz-moth' }, icon('moth', '#ffe08a', 128)),
+    h('div', { class: 'obz-moth' }, pic),
     h('div', { class: 'obz-word' }, [...word].map((c, i) => h('span', { style: '--i:' + i, text: c }))),
-    h('div', { class: 'obz-sub', text: 'the rarest find in the forest' }));
+    h('div', { class: 'obz-sub', text: sub }));
   document.body.append(el);
-  if (!low) [...word].forEach((c, i) => setTimeout(() => snd('slam', i), 640 + i * 90));
+  if (!low) [...word].forEach((c, i) => setTimeout(() => snd('slam', Math.min(6, Math.round(i * 6 / Math.max(1, word.length - 1)))), 640 + i * 90));
   setTimeout(() => el.remove(), 3300);
-};
+}
+window.__obscura = y => moment(y, 'OBSCURA', 'the rarest find in the forest', icon('moth', '#ffe08a', 128));
+// ---------- party-room flair ----------
+// a big 3, 2, 1, DIVE! at the start of every round
+function bigCount(t) {
+  if (S.mode !== 'online') return;
+  const old = $('bigcount'); if (old) old.remove();
+  const el = h('div', { id: 'bigcount', class: t.length > 1 ? 'go' : '', 'aria-hidden': 'true', text: t });
+  document.body.append(el); setTimeout(() => el.remove(), 900);
+}
+// a lead change gets a banner with the leader's frog
+function leadSlam(p, kind) {
+  const old = $('leadslam'); if (old) old.remove();
+  const col = kind === 'lost' ? '#ff7a45' : kind === 'you' ? '#ffe08a' : colorOf(p.id);
+  const el = h('div', { id: 'leadslam', class: kind, style: '--lc:' + col, role: 'status' },
+    icon('krill', kind === 'you' ? '#ffc23a' : colorOf(p.id), 52),
+    h('div', null, h('small', { text: kind === 'lost' ? 'overtaken' : 'new leader' }), h('strong', { text: kind === 'you' ? 'You take the lead' : kind === 'lost' ? nameOf(p) + ' passed you' : nameOf(p) + ' takes the lead' })));
+  document.body.append(el); setTimeout(() => el.remove(), 2500);
+}
+// reactions: a quick word to the room that floats up on everyone's screen (only these words can be sent)
+const EMOTES = ['GG', 'WOW', 'NOO', 'LOL', 'SO CLOSE', '🐸'];
+function emoteBar() {
+  if (S.mode !== 'online') return null;
+  return h('div', { class: 'emotes', role: 'group', 'aria-label': 'React' }, EMOTES.map(e => h('button', { class: 'small', type: 'button', text: e, onclick: () => sendEmote(e) })));
+}
+function sendEmote(e) {
+  const now = Date.now(); if (now - (S._emoAt || 0) < 1200) return; S._emoAt = now;
+  S.mine.emo = { e, t: now }; saveMe(); showEmote(S.me.id, e); snd('pick');
+}
+function showEmote(pid, e) {
+  let box = $('emos'); if (!box) { box = h('div', { id: 'emos', 'aria-live': 'polite' }); document.body.append(box); }
+  const p = S.players[pid];
+  const b = h('div', { class: 'emo' + (pid === S.me.id ? ' me' : ''), style: '--pc:' + colorOf(pid) }, icon('krill', colorOf(pid), 22), h('span', { class: 'who', text: p ? nameOf(p) : '' }), h('b', { text: e }));
+  box.append(b); while (box.children.length > 5) box.firstChild.remove(); setTimeout(() => b.remove(), 3800);
+}
+function emoteWatch() {
+  if (S.mode !== 'online' || !S.room) return;
+  const first = !S._emo; S._emo = S._emo || {};
+  for (const p of ordered()) {
+    if (p.id === S.me.id || !p.emo || !EMOTES.includes(p.emo.e)) continue;
+    const t = Number(p.emo.t) || 0;
+    if (t > (S._emo[p.id] || 0)) { S._emo[p.id] = t; if (!first && Date.now() - t < 8000) { showEmote(p.id, p.emo.e); snd('click'); } }
+  }
+}
+// the end of a game: everyone watches the winner's frog turn gold and CHAMPION slam down
+function champion(p) { moment(Math.round(innerHeight * 0.3), 'CHAMPION', nameOf(p) + ' · ' + fmt(total(p)) + ' pts', icon('krill', '#ffc23a', 128), 'champ'); }
 const goHome = () => { if (S.mode) leave(); document.querySelectorAll('.modal').forEach(m => m.remove()); };
 function openMenu() {
   const here = !S.mode ? 'home' : S.room && S.room.fixed ? S.room.kind : S.mode;
@@ -1176,7 +1221,8 @@ function openMenu() {
       S.mode && tile('home', '⌂', 'Home', goHome)),
     h('p', { class: 'fine', style: 'text-align:left', text: 'pure obscura.' }));
 }
-function openHowto() { modal('howto', 'Obscura', 'How to play', h('ul', { class: 'howlist' }, HOWTO.map(tx => h('li', { text: tx }))), h('div', { class: 'ph' }, h('span', { text: 'The finds' })), tierLegend()); }
+function openHowto() { modal('howto', 'Obscura', 'How to play', h('ul', { class: 'howlist' }, HOWTO.map(tx => h('li', { text: tx }))), h('div', { class: 'ph' }, h('span', { text: 'The finds' })), tierLegend(),
+  h('button', { class: 'small', type: 'button', style: 'align-self:center', text: '▶ Watch an Obscura land', onclick: () => { document.querySelectorAll('.modal').forEach(m => m.remove()); Sound.unlock(); snd('land', 4); window.__obscura(Math.round(innerHeight * 0.36)); } })); }
 function openPacks() {
   modal('packs', 'Seven prompts', 'Themed packs',
     h('div', { class: 'ph' }, h('span', { text: 'Today’s' })),
@@ -1263,6 +1309,7 @@ function buildLobby() {
       h('div', { class: 'opts' }, opt('o-rounds', 'Prompts', [3, 5, 7], ''), opt('o-dives', 'Answers per prompt', [3, 5, 7], ''), opt('o-secs', 'Seconds per answer', [15, 25, 40], ' s'))),
     host ? h('button', { class: 'go', type: 'button', onclick: () => startRound(1), text: '▼ Begin descent ▼' })
          : h('p', { class: 'note', id: 'waithost', style: 'text-align:center', text: 'Waiting for the host to set off.' }),
+    emoteBar(),
     h('p', { id: 'msg', class: 'msg', role: 'status', hidden: true }));
 }
 function refreshLobby() {
@@ -1394,7 +1441,7 @@ function buildReveal() {
         h('div', { id: 'missed' }),
         h('div', { id: 'allans' }, h('button', { class: 'small', type: 'button', text: 'See every answer', onclick: e => { const box = $('allans'), open = box.querySelector('.browser'); if (open) { open.remove(); e.currentTarget.textContent = 'See every answer'; } else if (TOPICS[S.room.topic]) { const mineA = roundOf(S.mine, S.room.round).a.filter(x => x[1] >= 0).map(x => x[0]); box.append(answerBrowser(TOPICS[S.room.topic], mineA[0] || null)); e.currentTarget.textContent = 'Hide answers'; } } })),
         h('button', { id: 'next', class: 'go', type: 'button', onclick: next, hidden: !isHost(), text: r.round < r.rounds ? '▼ Next round ▼' : '▼ Final depths ▼' }),
-        !isHost() && h('p', { class: 'note', id: 'waithost', style: 'text-align:center', text: 'Waiting for the host to continue.' })),
+        !isHost() && h('p', { class: 'note', id: 'waithost', style: 'text-align:center', text: 'Waiting for the host to continue.' }), emoteBar()),
       h('aside', null, gaugeEl())));
 }
 function refreshReveal() {
@@ -1431,7 +1478,7 @@ function buildFinal() {
         panel('Final depths', null, h('ol', { id: 'ranks', class: 'ranks' })),
         h('div', { id: 'awards' }),
         isHost() ? h('button', { class: 'go', type: 'button', onclick: again, text: S.mode === 'solo' ? '▼ Drop again ▼' : '▼ Back to the lobby ▼' })
-                 : h('p', { class: 'note', style: 'text-align:center', text: 'The host can start another expedition.' })),
+                 : h('p', { class: 'note', style: 'text-align:center', text: 'The host can start another expedition.' }), emoteBar()),
       h('aside', null, gaugeEl())));
 }
 function refreshFinal() {
@@ -1463,7 +1510,7 @@ function refreshFinal() {
     hunter && row('Rare hunter', 2, hunter, hunter.v + ' sloth-or-rarer finds'),
     wolf && row('Lone wolf', 3, wolf, wolf.v + ' answers nobody else said'))));
   const key = S.room.g + ':' + ps[0].id;
-  if (S._fan !== key) { S._fan = key; if (ps[0].id === S.me.id && total(ps[0]) > total(ps[1])) snd('fanfare'); }
+  if (S._fan !== key) { S._fan = key; if (total(ps[0]) > total(ps[1])) { if (ps[0].id === S.me.id) snd('fanfare'); else snd('best'); if (S.mode === 'online') setTimeout(() => champion(ps[0]), 400); } }
 }
 
 /* ---------- render loop ---------- */
@@ -1472,6 +1519,7 @@ const REFRESH = { lobby: refreshLobby, pick: () => $('board').replaceChildren(..
 function refresh() {
   if (!S.mode) return refreshHome();
   (REFRESH[S.room.phase] || (() => {}))();
+  emoteWatch();
   refreshGauge();
   say(S.msg);
   tick();
@@ -1513,8 +1561,8 @@ function tick() {
     const d = diveState(), K = r.dives || 5;
     if (d.stage === 'wait') {
       const c = $('clock'), txt = String(Math.max(1, Math.min(3, Math.ceil((r.startsAt - now) / 1000))));
-      if (c && c.dataset.n !== txt) { c.dataset.n = txt; c.replaceChildren('dropping · the clock starts in ', h('b', { text: txt })); restart(c.lastChild, 'pop'); snd('count'); }
-      if (now >= r.startsAt) { snd('count', true); if (d.i >= K) setStage('done'); else setStage('ask', r.secs * 1000); }
+      if (c && c.dataset.n !== txt) { c.dataset.n = txt; c.replaceChildren('dropping · the clock starts in ', h('b', { text: txt })); restart(c.lastChild, 'pop'); snd('count'); bigCount(txt); }
+      if (now >= r.startsAt) { snd('count', true); if (!d.i) bigCount('DIVE!'); if (d.i >= K) setStage('done'); else setStage('ask', r.secs * 1000); }
     } else if (d.stage === 'ask') {
       const ring = $('ring'), bar = $('airbar'), left = Math.max(0, d.until - now), f = Math.min(1, left / (r.secs * 1000)), low = left < 6000;
       if (ring) {

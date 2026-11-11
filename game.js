@@ -37,8 +37,10 @@ function sprite(art, color) {
 const icon = (art, color, size, cls) => h('img', { class: 'spr ' + (cls || ''), src: sprite(art, color), width: size, height: size, alt: '' });
 const tierIcon = (tier, size, cls) => icon(TIERS[tier].art, TIERS[tier].color, size, cls);
 const M_PER_PT = 10;
-const MAX_DEPTH = 10935; // Challenger Deep, metres
-const TICKS = [[0, 'Canopy', 'canopy'], [200, 'Understory', 'understory'], [1000, 'Deep shade', 'deep shade'], [4000, 'Forest floor', 'forest floor'], [6000, 'Root caves', 'root caves'], [MAX_DEPTH, 'Underground river', 'underground river']];
+const MAX_DEPTH = 12000; // the bottom of the Obscura, metres
+// every world on the way down, for 'reached the …'; the gauge shows a few landmarks from it
+const ZONES = [[0, 'Canopy'], [150, 'Understory'], [600, 'Deep shade'], [1500, 'Forest floor'], [2000, 'Root caves'], [2800, 'Underground river'], [3700, 'Glowworm grotto'], [4700, 'Crystal caverns'], [5800, 'Sunken temple'], [7000, 'Fungal deep'], [8400, 'Magma veins'], [10000, 'Obscura']];
+const TICKS = [[0, 'Canopy', 'canopy'], [600, 'Deep shade', 'deep shade'], [1500, 'Forest floor', 'forest floor'], [2800, 'River', 'river'], [4700, 'Crystals', 'crystals'], [7000, 'Fungal deep', 'fungal deep'], [10000, 'The Obscura', 'the obscura'], [MAX_DEPTH, 'The bottom', 'the bottom']];
 const COLORS = ['#ff7a45', '#7dffb0', '#ffe08a', '#ff8fd0', '#6fd6ff', '#c9f26a', '#ffb0a0', '#e6f0dc'];
 const PICK_MS = 25000, COUNTDOWN_MS = 4000;
 
@@ -270,9 +272,25 @@ function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.fl
 // Everything pitched is in C major pentatonic so cues never clash, and the reward grows with the tier:
 // a dull knock for the obvious answer, a chord for a good one, a full cascade for the rarest.
 const Sound = (() => {
-  let ac = null, out = null, wet = null, muted = ls.get('mute') === '1', riserNodes = null;
-  function ctx() {
+  let amb = null, ac = null, out = null, wet = null, NB = null, muted = ls.get('mute') === '1', riserNodes = null, clock = null, resumeAt = null, pending = [];
+  // Krillion's recovery rules: a context that has closed, whose clock has frozen, or that has not woken
+  // within a second of being asked is thrown away and rebuilt on the next tap or key press.
+  function reset() {
+    const old = ac; ac = out = wet = NB = amb = null; riserNodes = null; clock = resumeAt = null;
+    if (old) { try { old.onstatechange = null; const p = old.close(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* already gone */ } }
+  }
+  function flush() {
+    const now = performance.now(), due = pending.filter(p => now - p.t <= 300); pending = [];
+    for (const p of due) if (!muted && ac && ac.state === 'running' && CUES[p.name]) { try { CUES[p.name](p.arg); } catch (e) { /* audio is optional */ } }
+  }
+  function ctx(gesture) {
+    const now = performance.now();
+    if (ac) {
+      const st = ac.state, stuck = st === 'running' && clock && ac.currentTime === clock.a && now - clock.w >= 1000, stalled = st !== 'running' && resumeAt !== null && now - resumeAt >= 1000;
+      if (st === 'closed' || (gesture && (stuck || stalled))) reset();
+    }
     if (!ac) {
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* only some browsers have it */ }
       const A = window.AudioContext || window.webkitAudioContext; if (!A) return null;
       try {
         ac = new A();
@@ -282,9 +300,16 @@ const Sound = (() => {
         const len = Math.floor(ac.sampleRate * 1.9), ir = ac.createBuffer(2, len, ac.sampleRate);
         for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
         const conv = ac.createConvolver(); conv.buffer = ir; wet = ac.createGain(); wet.gain.value = 0.32; wet.connect(conv); conv.connect(out);
+        // one shared stretch of noise, so a busy moment does not have to generate fresh noise for every sound
+        NB = ac.createBuffer(1, ac.sampleRate * 4, ac.sampleRate); const nd = NB.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+        ac.onstatechange = () => { clock = null; if (ac && ac.state === 'running') { resumeAt = null; flush(); } };
       } catch (e) { ac = null; return null; }
     }
-    if (ac.state !== 'running') { try { const p = ac.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* stays silent */ } }
+    if (ac.state === 'running') { if (!clock || clock.a !== ac.currentTime) clock = { a: ac.currentTime, w: now }; resumeAt = null; }
+    else if (ac.state !== 'closed') {
+      if (resumeAt === null) resumeAt = now;
+      try { const a = ac, p = a.resume(); if (p && p.then) p.then(() => { if (ac === a && a.state === 'running') { resumeAt = null; flush(); } }, () => {}); } catch (e) { /* stays silent until the next tap */ }
+    }
     return ac;
   }
   const env = (g, t, a, peak, d) => { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
@@ -300,13 +325,12 @@ const Sound = (() => {
     node.connect(g); route(g, o.pan, o.send); osc.start(t); osc.stop(t + dur + a + 0.05);
   }
   function noise(o) {
-    const t = ac.currentTime + (o.delay || 0), dur = o.dur || 0.3, n = Math.ceil(ac.sampleRate * (dur + 0.1)), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
-    const src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain(); src.buffer = buf;
+    const t = ac.currentTime + (o.delay || 0), dur = o.dur || 0.3;
+    const src = ac.createBufferSource(), lp = ac.createBiquadFilter(), g = ac.createGain(); src.buffer = NB; src.loop = true;
     lp.type = o.bp ? 'bandpass' : 'lowpass'; if (o.bp) lp.Q.value = o.q || 1.2; lp.frequency.setValueAtTime(o.lp || 1200, t); if (o.to) lp.frequency.exponentialRampToValueAtTime(o.to, t + dur);
     let node = lp; src.connect(lp); if (o.hp) { const hf = ac.createBiquadFilter(); hf.type = 'highpass'; hf.frequency.value = o.hp; lp.connect(hf); node = hf; }
     if (o.swell) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.peak || 0.2, t + dur * 0.96); g.gain.linearRampToValueAtTime(0.0001, t + dur); } else env(g, t, o.a || 0.003, o.peak || 0.2, dur);
-    node.connect(g); route(g, o.pan, o.send); src.start(t); src.stop(t + dur + 0.1);
+    node.connect(g); route(g, o.pan, o.send); src.start(t, Math.random() * 3.5); src.stop(t + dur + 0.1);
   }
   // a struck bell or mallet: a fundamental with a few quickly fading overtones
   function bell(f, o = {}) {
@@ -333,7 +357,9 @@ const Sound = (() => {
   const LINE = [C.G4, C.C5, C.E5, C.G5, C.C6];
   const CUES = {
     click() { tone({ type: 'triangle', f0: 620, dur: 0.05, peak: 0.06 }); },
-    type() { tone({ type: 'triangle', f0: 1500 + Math.random() * 500, dur: 0.025, peak: 0.022 }); noise({ dur: 0.02, lp: 3000, hp: 1200, peak: 0.02 }); },
+    // a soft wooden tap per letter that climbs a little as the word grows, and a lower one for deleting
+    type(n) { const f = 1250 + Math.min(n || 0, 18) * 22 + Math.random() * 90; tone({ f0: f, f1: f * 0.72, dur: 0.035, a: 0.002, peak: 0.05, lp: 3800 }); noise({ dur: 0.016, lp: 6000, hp: 2200, peak: 0.022 }); },
+    erase() { tone({ type: 'triangle', f0: 760, f1: 560, dur: 0.04, a: 0.002, peak: 0.04, lp: 2600 }); },
     pick() { bell(C.C5, { peak: 0.1, dur: 0.6 }); bell(C.G5, { peak: 0.09, dur: 0.7, delay: 0.07 }); },
     submit() { tone({ type: 'triangle', f0: 740, f1: 1110, dur: 0.09, peak: 0.13 }); noise({ dur: 0.05, lp: 5000, hp: 2000, peak: 0.05 }); bell(C.E6, { peak: 0.05, dur: 0.4, delay: 0.06 }); },
     reject() { tone({ f0: 170, f1: 70, dur: 0.32, peak: 0.2, lp: 600 }); noise({ dur: 0.18, lp: 380, peak: 0.14 }); },
@@ -376,14 +402,44 @@ const Sound = (() => {
     surface() { noise({ dur: 1.8, lp: 300, to: 3200, peak: 0.13, send: 0.5 }); tone({ f0: 80, f1: 620, dur: 1.7, peak: 0.07, send: 0.4 }); },
     fanfare() { [C.C5, C.E5, C.G5, C.C6].forEach((f, i) => bell(f, { peak: 0.14, dur: 1.4, delay: i * 0.12 })); pad([C.C4, C.E4, C.G4], { dur: 1.8, peak: 0.035 }); tone({ f0: 98, dur: 1, peak: 0.16 }); },
   };
+  // ambience: a quiet bed of filtered noise shaped to each place, and now and then the sound of something living there
+  const AMB = { canopy: [1400, 0.014, 'lowpass'], forest: [700, 0.016, 'lowpass'], floor: [420, 0.02, 'lowpass'], roots: [260, 0.026, 'lowpass'], river: [1000, 0.034, 'bandpass'], grotto: [380, 0.015, 'lowpass'], crystal: [2400, 0.008, 'bandpass'], temple: [300, 0.02, 'lowpass'], fungal: [520, 0.015, 'lowpass'], magma: [140, 0.05, 'lowpass'], obscura: [190, 0.032, 'lowpass'] };
+  const pan = () => Math.random() * 1.4 - 0.7;
+  const drip = () => { const f = 1000 + Math.random() * 700; tone({ f0: f, f1: f * 2.1, dur: 0.07, a: 0.002, peak: 0.035, pan: pan(), send: 0.9 }); };
+  const CRITTERS = {
+    canopy() { const f = 2400 + Math.random() * 1400, p = pan(); tone({ f0: f, f1: f * 1.25, dur: 0.07, peak: 0.022, pan: p, send: 0.4 }); tone({ f0: f * 1.1, f1: f * 1.4, dur: 0.06, peak: 0.018, pan: p, delay: 0.11, send: 0.4 }); },
+    forest() { if (Math.random() < 0.5) CRITTERS.canopy(); else { const p = pan(); for (let i = 0; i < 3; i++) tone({ type: 'triangle', f0: 4300, dur: 0.025, peak: 0.01, pan: p, delay: i * 0.07 }); } },
+    floor() { const p = pan(); for (let i = 0; i < 4; i++) tone({ type: 'triangle', f0: 4600, dur: 0.02, peak: 0.01, pan: p, delay: i * 0.06 }); },
+    roots: drip, river: drip, grotto() { drip(); if (Math.random() < 0.4) bell(2093 + Math.random() * 800, { peak: 0.012, dur: 1.4, pan: pan(), send: 0.95 }); },
+    crystal() { bell([1318.5, 1568, 1975.5, 2349.3][Math.random() * 4 | 0], { peak: 0.025, dur: 1.8, pan: pan(), send: 0.95 }); },
+    temple() { bell(98 + Math.random() * 30, { peak: 0.05, dur: 3, pan: pan(), send: 0.95 }); },
+    fungal() { tone({ f0: 280 + Math.random() * 120, f1: 760, dur: 0.06, peak: 0.022, pan: pan(), send: 0.6 }); },
+    magma() { const p = pan(); for (let i = 0; i < 3 + (Math.random() * 3 | 0); i++) noise({ dur: 0.03, bp: true, lp: 1600 + Math.random() * 1600, q: 2, peak: 0.04, pan: p, delay: i * 0.05 + Math.random() * 0.04 }); },
+    obscura() { tone({ f0: 58, f1: 40, dur: 0.28, peak: 0.1 }); tone({ f0: 52, f1: 38, dur: 0.3, peak: 0.08, delay: 0.32 }); },
+  };
+  function ambient(kind) {
+    if (!ac || ac.state !== 'running' || !NB || muted || !kind) { if (amb && ac) { amb.g.gain.setTargetAtTime(0, ac.currentTime, 0.4); amb.kind = null; } return; }
+    if (!amb) { const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); src.buffer = NB; src.loop = true; g.gain.value = 0; src.connect(f); f.connect(g); g.connect(out); src.start(); amb = { src, f, g, kind: null, next: ac.currentTime + 2 }; }
+    const t = ac.currentTime;
+    if (amb.kind !== kind) { const p = AMB[kind] || AMB.forest; amb.kind = kind; if (amb.f.type !== p[2]) amb.f.type = p[2]; amb.f.Q.value = p[2] === 'bandpass' ? 0.6 : 0.7; amb.f.frequency.setTargetAtTime(p[0], t, 1.2); amb.g.gain.setTargetAtTime(p[1], t, 1.5); }
+    if (t > amb.next) { amb.next = t + (kind === 'obscura' ? 2.6 : 3 + Math.random() * 6); try { (CRITTERS[kind] || CRITTERS.forest)(); } catch (e) { /* ambience is optional */ } }
+  }
   return {
-    unlock: ctx,
-    play(name, arg) { if (muted || document.hidden || !ctx() || ac.state !== 'running' || !CUES[name]) return; try { CUES[name](arg); } catch (e) { /* audio is optional */ } },
+    ambient,
+    unlock: () => ctx(true),
+    // a sound asked for while the audio is still waking is held for a moment and played once it is up, not dropped
+    play(name, arg) {
+      if (muted || document.hidden || !CUES[name] || !ctx()) return;
+      if (ac.state !== 'running') { if (pending.length < 8) pending.push({ name, arg, t: performance.now() }); return; }
+      try { CUES[name](arg); } catch (e) { /* audio is optional */ }
+    },
+    sleep() { pending = []; if (ac && ac.state === 'running') { try { const p = ac.suspend(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* fine */ } } },
     muted: () => muted,
-    toggle() { muted = !muted; ls.set('mute', muted ? '1' : null); if (out) out.gain.value = muted ? 0 : 0.8; if (!muted) this.play('pick'); return muted; },
+    toggle() { muted = !muted; ls.set('mute', muted ? '1' : null); if (out) out.gain.value = muted ? 0 : 0.8; if (!muted) { reset(); ctx(true); this.play('pick'); } return muted; },
   };
 })();
 const snd = (n, a) => Sound.play(n, a);
+window.__amb = kind => Sound.ambient(SET.amb && !document.hidden ? kind : null);
 // Settings, after Krillion's: low-power graphics, colour-blind tier colours, whether corrections
 // are previewed, and whether a rejected answer is cleared from the box.
 // Companions, unlocked by keeping a daily streak going (Krillion does the same with its mascots).
@@ -398,7 +454,7 @@ const PALS = [
 const streakNow = () => { const last = ls.get('lastDay'), d = new Date(), y = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1), yk = y.getFullYear() + '-' + String(y.getMonth() + 1).padStart(2, '0') + '-' + String(y.getDate()).padStart(2, '0'); return last === dayKey() || last === yk ? Number(ls.get('streak') || 0) : 0; };
 const bestStreak = () => Math.max(Number(ls.get('beststreak') || 0), streakNow());
 function setPal(id) { const p = PALS.find(x => x.id === id && bestStreak() >= x.need) || PALS[0]; ls.set('pal', p.id === 'frog' ? null : p.id); window.__pal = p; }
-const SET = { low: ls.get('s_low') === '1', cb: ls.get('s_cb') === '1', corr: ls.get('s_corr') !== '0', clear: ls.get('s_clear') === '1' };
+const SET = { amb: ls.get('s_amb') !== '0', low: ls.get('s_low') === '1', cb: ls.get('s_cb') === '1', corr: ls.get('s_corr') !== '0', clear: ls.get('s_clear') === '1' };
 const TIER_COLOURS = { normal: ['#d7e1f2', '#7deaff', '#ff4d4d', '#bfa7ff', '#ffe08a'], cb: ['#ffffff', '#56b4e9', '#e69f00', '#cc79a7', '#f0e442'] };
 function applySettings() {
   document.body.classList.toggle('low', SET.low); document.body.classList.toggle('cb', SET.cb);
@@ -418,6 +474,7 @@ function openSettings() {
     h('div', { class: 'panel' },
       h('div', { class: 'ph' }, h('span', { text: 'Settings' }), h('button', { class: 'small', type: 'button', onclick: close, text: 'Close' })),
       row('sound', 'Sound', 'Chimes, thumps and the climb as an answer falls.', () => !Sound.muted(), () => { Sound.toggle(); const mb = $('mute'); if (mb) { mb.textContent = Sound.muted() ? 'Sound off' : 'Sound on'; mb.setAttribute('aria-pressed', String(Sound.muted())); } }),
+      row('amb', 'Ambience', 'The sound of each place as you fall: birds, dripping caves, humming crystal, rumbling rock.', ...flag('amb', 's_amb', true)),
       row('low', 'Low-power mode', 'Lighter graphics and fewer background animations.', ...flag('low', 's_low', false)),
       row('cb', 'Colourblind mode', 'Brighter text and more separated tier colours.', ...flag('cb', 's_cb', false)),
       row('corr', 'Answer corrections', 'Preview corrected answers before scoring. Off accepts them immediately.', ...flag('corr', 's_corr', true)),
@@ -444,7 +501,7 @@ addEventListener('keydown', e => {
   const ac = Sound.unlock(); if (!ac || Sound._kicked) return;
   try { const b = ac.createBufferSource(); b.buffer = ac.createBuffer(1, 1, 22050); b.connect(ac.destination); b.start(0); if (ac.state === 'running') Sound._kicked = true; } catch (e) { /* audio is optional */ }
 }, true));
-addEventListener('visibilitychange', () => { if (!document.hidden) Sound.unlock(); });
+addEventListener('visibilitychange', () => { if (document.hidden) Sound.sleep(); else Sound.unlock(); });
 {
   const b = h('button', { id: 'mute', class: 'small', type: 'button', 'aria-pressed': String(Sound.muted()), text: Sound.muted() ? 'Sound off' : 'Sound on' });
   b.addEventListener('click', () => { const m = Sound.toggle(); b.textContent = m ? 'Sound off' : 'Sound on'; b.setAttribute('aria-pressed', String(m)); });
@@ -471,7 +528,7 @@ const colorOf = id => COLORS[Math.max(0, ordered().findIndex(p => p.id === id)) 
 const roundOf = (p, r) => (p && p.g === S.room.g && p.rounds && p.rounds[r]) || { a: [], pts: 0 };
 const total = p => (p && p.g === S.room.g && p.rounds) ? Object.values(p.rounds).reduce((s, r) => s + (r.pts || 0), 0) : 0;
 const depthOf = p => Math.min(MAX_DEPTH, total(p) * M_PER_PT);
-const zoneOf = d => { let z = 'Canopy'; for (const [m, name] of TICKS) if (m > 0 && d >= m) z = name; return z; };
+const zoneOf = d => { let z = 'Canopy'; for (const [m, name] of ZONES) if (m > 0 && d >= m) z = name; return z; };
 const isHost = () => S.mode === 'solo' || (S.room && S.room.host === S.me.id);
 const nameOf = p => (p && p.name) || 'Diver';
 
@@ -502,17 +559,17 @@ async function saveMe() {
 }
 
 /* ---------- joining and leaving ---------- */
-function readName() {
+function readName(solo) {
   const el = $('nick');
-  const v = (el ? el.value : S.me.name).trim().slice(0, 16);
+  const typed = (el ? el.value : S.me.name).trim().slice(0, 16), v = typed || (solo ? S.me.name || 'Diver' : '');
   if (!v) { say('Type a name first.'); if (el) el.focus(); return null; }
-  S.me.name = v; ls.set('name', v);
+  S.me.name = v; if (typed) ls.set('name', v);
   return v;
 }
 function freshMine(g, joinedAt) { return { name: S.me.name, joinedAt: joinedAt || Date.now(), g, rounds: {} }; }
 
 function startSolo() {
-  if (!readName()) return;
+  if (!readName(true)) return;
   say('');
   S.mode = 'solo'; S.code = 'SOLO';
   S.room = { host: S.me.id, phase: 'lobby', g: 1, round: 0, rounds: 3, dives: 5, secs: 25, used: [] };
@@ -555,6 +612,8 @@ async function joinRoom(code, silent) {
     const snap = await withTimeout(ref.get());
     if (!snap.exists) { ls.set('code', null); if (!silent) say('No room has the code ' + code + '.'); return; }
     const room = clone(snap.data());
+    // coming back on page load: only if that game is still going, not to a finished or long-abandoned room
+    if (silent && (room.phase === 'final' || (room.createdAt && Date.now() - room.createdAt > 3 * 3600e3))) { ls.set('code', null); return; }
     const meRef = ref.collection('players').doc(S.me.id);
     const old = await withTimeout(meRef.get());
     const prev = old.exists ? clone(old.data()) : null;
@@ -563,7 +622,7 @@ async function joinRoom(code, silent) {
     if (S.mode) return; // started something else while this was loading
     S.mode = 'online'; S.code = code; S.room = room; S.mine = mine;
     S.players = { [S.me.id]: mine }; S.roomRef = ref; S.meRef = meRef;
-    ls.set('code', code); say('');
+    ls.set('code', code); say(''); heartbeat();
     S.unsub.push(
       ref.onSnapshot(s => {
         if (!s.exists || S.roomRef !== ref) return;
@@ -637,7 +696,17 @@ function startRun(kind, day, daily) {
   S.room = { host: S.me.id, phase: saved ? 'final' : 'lobby', g: 1, round: saved ? 7 : 0, rounds: 7, dives: 1, secs: 25, used: [], fixed: ids, kind, day: day || null, daily: !!daily && kind !== 'daily' };
   S.mine = freshMine(1); if (saved) S.mine.rounds = saved.rounds;
   S.players = { [S.me.id]: S.mine };
-  if (saved) { window.__depth = total(S.mine) * M_PER_PT; render(); } else startRound(1);
+  if (saved) { window.__depth = total(S.mine) * M_PER_PT; render(); return; }
+  let prog = null; try { prog = JSON.parse(ls.get(progKey(S.room)) || 'null'); } catch (e) { prog = null; }
+  if (prog && JSON.stringify(prog.ids) === JSON.stringify(ids) && prog.rounds) {
+    S.mine.rounds = prog.rounds;
+    for (let n = 1; n <= 7; n++) { const rd = S.mine.rounds[n]; if (rd && rd.seen && !rd.a.length) rd.a.push(['', -1]); }
+    let next = 1; while (next <= 7 && S.mine.rounds[next] && S.mine.rounds[next].a.length) next++;
+    window.__depth = total(S.mine) * M_PER_PT; saveProg();
+    if (next > 7) { S.room.round = 7; S.room.phase = 'play'; finishRun(); return; }
+    S.room.round = next - 1; startRound(next); return;
+  }
+  startRound(1);
 }
 // With the shared store available, today's descents are compared: where you rank, and how many chose each answer.
 async function dailyStats() {
@@ -663,6 +732,7 @@ function finishRun() {
     ls.set('played', String(Number(ls.get('played') || 0) + 1)); ls.set('sum', String(Number(ls.get('sum') || 0) + t));
   }
   else if (r.daily && !dailyDone(r.kind)) ls.set(dailyKey(r.kind), JSON.stringify({ ids: r.fixed, rounds: S.mine.rounds }));
+  const pk = progKey(r); if (pk) ls.set(pk, null);
   patchRoom({ phase: 'final' });
 }
 // Every accepted answer for a prompt, browsable by tier and searchable, shown once a prompt is over.
@@ -723,8 +793,13 @@ function buildRunFinal() {
 }
 
 /* ---------- game flow ---------- */
+// Daily runs are saved as they go, so a reload picks up where you were. A prompt you had already seen counts as a miss,
+// which stops a reload from buying extra time or a second try at today's descent.
+const progKey = r => !r || !r.fixed ? null : r.kind === 'daily' ? 'dprog_' + (r.day || dayKey()) : r.daily ? 'dprog_' + r.kind + '_' + dayKey() : null;
+function saveProg() { const r = S.room, k = progKey(r); if (k && S.mode === 'solo') ls.set(k, JSON.stringify({ ids: r.fixed, rounds: S.mine.rounds })); }
 function startRound(n) {
   const r = S.room;
+  if (r.fixed && progKey(r)) { if (!S.mine.rounds[n]) S.mine.rounds[n] = { a: [], pts: 0 }; S.mine.rounds[n].seen = 1; saveProg(); }
   if (r.fixed) { const now = Date.now(); return patchRoom({ phase: 'play', round: n, topic: r.fixed[n - 1], startsAt: now + 2600, endsAt: now + 2600 + (r.secs + 14) * 1000 }); }
   let used = r.used || [];
   let pool = TOPIC_IDS.filter(id => !used.includes(id));
@@ -784,7 +859,7 @@ function lockIn(hit) {
   if (hit) rd.pts += TIERS[hit.tier].pts;
   d.i = rd.a.length; S.fb = null;
   $('edge').classList.remove('hot');
-  saveMe();
+  saveMe(); saveProg();
   if (hit) {
     const dur = [3.4, 3.0, 3.4, 4.3, 4.6][hit.tier], to = total(S.mine) * M_PER_PT, box = $('answer');
     if (window.__fx && box) window.__fx.submit(box.getBoundingClientRect());
@@ -792,7 +867,7 @@ function lockIn(hit) {
     window.__sink = { to, dur, start: performance.now() };
     window.__lines = { id: Date.now() + Math.random(), base: to - TIERS[hit.tier].pts * M_PER_PT, tier: hit.tier, label: '“' + hit.name + '” ▼' };
     setStage('sink', dur * 1000 + 450, { hit });
-  } else { if (window.__fx) window.__fx.miss(); setStage('landed', 5000, { hit: null }); }
+  } else { if (window.__fx) window.__fx.miss(); setStage('landed', 0, { hit: null }); }
   refresh();
 }
 function advance() {
@@ -810,8 +885,8 @@ function submit(ev) {
   const m = match(r.topic, text), form = input.closest('form'), typed = '“' + text.slice(0, 30) + '”';
   const say2 = (fb) => { S.fb = fb; renderFb(); };
   if ((!m || m.amb) && SET.clear) input.value = '';
-  if (m && m.amb) { restart(form, 'jolt'); return say2({ kind: 'miss', text: typed + ' fits more than one answer', sub: 'be more specific' }); }
-  if (!m) { restart(form, 'jolt'); if (window.__fx) window.__fx.reject(); return say2({ kind: 'miss', text: typed + ': no trace of that. try again' }); }
+  if (m && m.amb) { restart(form, 'jolt'); restart($('fb'), 'shake'); return say2({ kind: 'miss', text: typed + ' fits more than one answer', sub: 'be more specific' }); }
+  if (!m) { restart(form, 'jolt'); if (window.__fx) window.__fx.reject(); say2({ kind: 'miss', text: typed + ': no trace of that. try again' }); return restart($('fb'), 'shake'); }
   const hit = m.e;
   if (roundOf(S.mine, r.round).a.some(x => x[0] === hit.name)) { restart(form, 'jolt'); return say2({ kind: 'dup', text: '“' + hit.name + '” is already in your notebook' }); }
   const changed = norm(text) !== norm(hit.name);
@@ -840,10 +915,98 @@ function tierLegend() {
 }
 const panel = (title, aside, ...kids) => h('div', { class: 'panel' },
   h('div', { class: 'ph' }, h('span', { text: title }), aside && h('em', { text: aside })), kids);
+// The title: OBSCURA in mossy green pixels, overgrown along the tops, with a vine draped across
+// the word and more hanging off it that sway. Drawn once at pixel size, then shown scaled up.
+const LOGO = { art: null, wait: null };
+function drawLogo() {
+  if (LOGO.art) return Promise.resolve(LOGO.art);
+  if (LOGO.wait) return LOGO.wait;
+  const fontReady = document.fonts && document.fonts.load ? document.fonts.load('24px VT323').catch(() => {}) : Promise.resolve();
+  return (LOGO.wait = fontReady.then(() => {
+    const F = 24, TOP = 7, BOT = 30, PAD = 6, word = 'OBSCURA', rnd = seeded('obscura-logo');
+    const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+    const tmp = document.createElement('canvas').getContext('2d'); tmp.font = F + 'px VT323';
+    const ws = [...word].map(c => Math.ceil(tmp.measureText(c).width)), GAP = 2;
+    const TW = ws.reduce((a, b) => a + b, 0) + GAP * (word.length - 1), W = TW + PAD * 2, H = TOP + F + BOT;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d'); c.font = F + 'px VT323'; c.textBaseline = 'top'; c.fillStyle = '#fff';
+    let x = PAD; const lx = [];
+    [...word].forEach((ch, i) => { lx.push(x); c.fillText(ch, x, TOP); x += ws[i] + GAP; });
+    const raw = c.getImageData(0, 0, W, H).data, M = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) M[i] = raw[i * 4 + 3] > 110 ? 1 : 0;
+    // thicken the strokes by a pixel so the letters read as chunky blocks
+    const B = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x2 = 0; x2 < W; x2++) if (M[y * W + x2] || (x2 > 0 && M[y * W + x2 - 1])) B[y * W + x2] = 1;
+    const m = (x2, y) => x2 >= 0 && y >= 0 && x2 < W && y < H && B[y * W + x2] === 1;
+    let gy0 = H, gy1 = 0; for (let y = 0; y < H; y++) for (let x2 = 0; x2 < W; x2++) if (B[y * W + x2]) { gy0 = Math.min(gy0, y); gy1 = Math.max(gy1, y); }
+    c.clearRect(0, 0, W, H);
+    const px = (x2, y, col) => { c.fillStyle = col; c.fillRect(x2, y, 1, 1); };
+    const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    // a hard shadow two pixels down, then a dark rim, then the letters lit from above
+    for (let y = 0; y < H; y++) for (let x2 = 0; x2 < W; x2++) if (!m(x2, y) && (m(x2, y - 1) || m(x2, y - 2) || m(x2 - 1, y - 2))) px(x2, y, '#03140a');
+    for (let y = 0; y < H; y++) for (let x2 = 0; x2 < W; x2++) if (!m(x2, y) && (m(x2 - 1, y) || m(x2 + 1, y) || m(x2, y - 1) || m(x2, y + 1) || m(x2 - 1, y - 1) || m(x2 + 1, y - 1) || m(x2 - 1, y + 1) || m(x2 + 1, y + 1))) px(x2, y, '#06200f');
+    const ramp = ['#e4ffb0', '#b8f27a', '#8fde5c', '#6cc84a', '#4aa83c', '#2c7a30'];
+    for (let y = 0; y < H; y++) for (let x2 = 0; x2 < W; x2++) if (m(x2, y)) {
+      const u = (y - gy0) / Math.max(1, gy1 - gy0), v = u * (ramp.length - 1.2) + BAY[(x2 & 3) + ((y & 3) << 2)] / 16 - 0.4;
+      let col = ramp[Math.max(1, Math.min(ramp.length - 1, Math.round(v)))];
+      if (!m(x2, y - 1)) col = ramp[0];
+      else if (!m(x2 - 1, y) && u < 0.7) col = ramp[1];
+      else if (!m(x2 + 1, y) || !m(x2, y + 1)) col = ramp[5];
+      px(x2, y, col);
+    }
+    // moss tufts and the odd fleck of lichen on every upward surface
+    const tops = []; for (let x2 = 0; x2 < W; x2++) for (let y = 1; y < H; y++) if (m(x2, y) && !m(x2, y - 1)) tops.push([x2, y]);
+    const moss = ['#2f7d32', '#3f9b3a', '#5fbf45', '#8be05a'];
+    for (const [x2, y] of tops) {
+      if (rnd() < 0.82) px(x2, y - 1, moss[ri(0, 2)]);
+      if (rnd() < 0.42) px(x2, y - 2, moss[ri(1, 3)]);
+      if (rnd() < 0.12) px(x2, y - 3, moss[3]);
+      if (rnd() < 0.18) px(x2, y + 1, moss[ri(0, 1)]);
+    }
+    for (let y = gy0; y <= gy1; y++) for (let x2 = 0; x2 < W; x2++) if (m(x2, y) && m(x2, y - 1) && rnd() < 0.012) px(x2, y, '#3f9b3a');
+    const leaf = (x2, y, dir, big) => { px(x2 + dir, y, '#5cc24a'); px(x2 + dir * 2, y - 1, '#7fdc58'); if (big) { px(x2 + dir * 2, y, '#3d8f35'); px(x2 + dir * 3, y - 1, '#a6ef72'); } };
+    // a vine draped across the top of the word, sagging between the letters
+    const lastX = lx[lx.length - 1] + ws[ws.length - 1];
+    for (let x2 = lx[0] - 2; x2 <= lastX + 2; x2++) {
+      const u = (x2 - lx[0]) / (lastX - lx[0]), sag = Math.abs(Math.sin(u * Math.PI * 3.5)) * 4;
+      const y = Math.round(gy0 - 1 + sag + Math.sin(x2 * 0.7) * 0.6);
+      px(x2, y, '#2b5f22'); if (x2 % 2) px(x2, y - 1, '#447f2c');
+      if (x2 % 4 === 0) leaf(x2, y, rnd() < 0.5 ? -1 : 1, rnd() < 0.5);
+      if (rnd() < 0.05) { px(x2, y - 1, '#ff4d4d'); px(x2 + 1, y - 2, '#ffd166'); }
+    }
+    // hanging vines: each its own small picture so it can sway from where it hangs
+    const vines = [], anchors = [];
+    for (let i = 0; i < word.length; i++) { anchors.push(lx[i] + ri(1, Math.max(1, ws[i] - 2))); if (rnd() < 0.55) anchors.push(lx[i] + ri(0, ws[i])); }
+    anchors.push(lx[0] - 3, lastX + 3);
+    for (const ax of anchors) {
+      // hang from the underside of the letter in that column, so the faces stay readable
+      let ay = -1; for (let y = H - 1; y >= gy0; y--) if (m(ax, y)) { ay = y + 2; break; }
+      if (ay < 0) ay = gy0 + Math.round(Math.abs(Math.sin(((ax - lx[0]) / (lastX - lx[0])) * Math.PI * 3.5)) * 4);
+      const len = ri(6, Math.max(8, H - ay - 3)), VW = 9, vc = document.createElement('canvas'); vc.width = VW; vc.height = len + 2;
+      const v = vc.getContext('2d'), vp = (x2, y, col) => { v.fillStyle = col; v.fillRect(x2, y, 1, 1); }, ph = rnd() * 6;
+      for (let y = 0; y < len; y++) {
+        const x2 = 4 + Math.round(Math.sin(y * 0.33 + ph) * 1.2);
+        vp(x2, y, y % 3 ? '#2b5f22' : '#3c7a2a');
+        if (y > 1 && y % 3 === 1) { const dir = (y / 3 | 0) % 2 ? 1 : -1; vp(x2 + dir, y, '#4fae3e'); vp(x2 + dir * 2, y - 1, '#7fdc58'); if (rnd() < 0.5) vp(x2 + dir * 2, y, '#3d8f35'); }
+      }
+      const ex = 4 + Math.round(Math.sin((len - 1) * 0.33 + ph) * 1.2);
+      if (rnd() < 0.35) { vp(ex - 1, len, '#ff4d4d'); vp(ex + 1, len, '#ff4d4d'); vp(ex, len - 1, '#ff4d4d'); vp(ex, len + 1, '#ff4d4d'); vp(ex, len, '#ffd166'); }
+      else { vp(ex, len, '#7fdc58'); vp(ex - 1, len - 1, '#5cc24a'); vp(ex + 1, len - 1, '#5cc24a'); }
+      vines.push({ src: vc.toDataURL(), x: (ax - 4) / W, y: ay / H, w: VW / W, h: (len + 2) / H, d: -rnd() * 4, s: 3.2 + rnd() * 2.4 });
+    }
+    LOGO.art = { src: cv.toDataURL(), w: W, h: H, vines };
+    return LOGO.art;
+  }));
+}
 function logo() {
-  let i = 0;
-  return h('h1', { class: 'logo', 'aria-label': 'Obscura' }, ['OBSCURA'].map(w =>
-    h('span', { class: 'word', 'aria-hidden': 'true' }, [...w].map(c => h('span', { style: '--i:' + (i++), text: c })))));
+  const box = h('h1', { class: 'logo grown', 'aria-label': 'Obscura' });
+  const fill = art => {
+    box.style.aspectRatio = art.w + ' / ' + art.h;
+    box.replaceChildren(h('img', { class: 'lw', src: art.src, alt: '', draggable: 'false' }),
+      ...art.vines.map(v => h('img', { class: 'vine', src: v.src, alt: '', draggable: 'false', style: `left:${v.x * 100}%;top:${v.y * 100}%;width:${v.w * 100}%;height:${v.h * 100}%;animation-delay:${v.d}s;animation-duration:${v.s}s` })));
+  };
+  if (LOGO.art) fill(LOGO.art); else drawLogo().then(fill, () => box.replaceChildren(document.createTextNode('OBSCURA')));
+  return box;
 }
 const yPct = d => Math.sqrt(Math.min(d, MAX_DEPTH) / MAX_DEPTH) * 100;
 function gaugeEl() {
@@ -1096,7 +1259,7 @@ function renderDive() {
     h('form', { class: 'ans', onsubmit: submit },
       h('div', { id: 'ring', class: 'ring', 'aria-hidden': 'true' }),
       h('div', { class: 'field' },
-        h('input', { id: 'answer', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'send', placeholder: 'type one answer…', 'aria-label': 'Your answer', oninput: e => window.__fx && window.__fx.type(e.target) }),
+        h('input', { id: 'answer', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'send', placeholder: 'type one answer…', 'aria-label': 'Your answer', oninput: e => window.__fx && window.__fx.type(e.target, e) }),
         h('div', { class: 'air', 'aria-hidden': 'true' }, h('div', { id: 'airbar' }))),
       h('button', { id: 'send', class: 'pink', text: 'Drop' })),
     h('div', { id: 'fb', class: 'fb', role: 'status' })];
@@ -1282,6 +1445,11 @@ function tick() {
   { const ni = $('nextin'); if (ni) { const n = new Date(), m = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1), sec = Math.max(0, Math.floor((m - n) / 1000)), tx = 'next descent in ' + String(Math.floor(sec / 3600)).padStart(2, '0') + ':' + String(Math.floor(sec / 60) % 60).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0'); if (ni.textContent !== tx) ni.textContent = tx; } }
   const r = S.room; if (!S.mode || !r) return;
   const now = Date.now(), lag = isHost() ? 0 : 2500 + S.jitter, clock = $('clock');
+  // the host closed their tab or left: the earliest remaining player takes over, so nobody is stuck in the lobby
+  if (S.mode === 'online') {
+    const live = ordered().filter(p => !gone(p, now));
+    if (live.length && !live.some(p => p.id === r.host) && live[0].id === S.me.id) once('host:' + r.host + ':' + r.g, () => { patchRoom({ host: S.me.id }); say('The host left, so you are hosting now.'); });
+  }
   if (r.phase === 'pick') {
     const left = Math.max(0, Math.ceil((r.pickEndsAt - now) / 1000));
     if (clock) clock.textContent = left ? left + ' s to choose, or the first topic is picked.' : 'Picking the first topic…';
@@ -1303,11 +1471,9 @@ function tick() {
       $('edge').classList.toggle('hot', low);
       if (now > d.until) lockIn(null);
     } else if (d.stage === 'sink') {
-      if (now > d.until) { setStage('landed', 7000); refresh(); }
-    } else if (d.stage === 'landed') {
-      if (now > d.until) advance();
-    }
-    const all = ordered().every(p => p.left || roundOf(p, r.round).a.length >= K);
+      if (now > d.until) { setStage('landed', 0); refresh(); }
+    } // a result stays up until you press Descend (or Enter); the round clock still ends the round in rooms
+    const all = ordered().every(p => gone(p, now) || roundOf(p, r.round).a.length >= K);
     if (all && d.stage === 'done') { if (!S.allAt) S.allAt = now; } else S.allAt = 0;
     if (!r.fixed && ((S.allAt && now > S.allAt + 2500 + lag) || now > r.endsAt + lag)) once('play:' + r.g + ':' + r.round, () => patchRoom({ phase: 'reveal', revealAt: Date.now() }));
   } else if (r.phase === 'reveal') {
@@ -1317,6 +1483,10 @@ function tick() {
   }
 }
 setInterval(tick, 250);
+// players check in every 20 s; anyone silent for 70 s (tab closed, phone locked) stops holding up the room
+const gone = (p, now) => p.left || (p.id !== S.me.id && p.seen && (now || Date.now()) - p.seen > 70000);
+function heartbeat() { if (S.mode === 'online' && S.meRef && S.mine) { S.mine.seen = Date.now(); saveMe(); } }
+setInterval(heartbeat, 20000);
 
 /* ---------- the descent: down through a rainforest, from the treetops to the caves under its roots ---------- */
 // Drawn every animation frame. Branches, vines and ledges are generated from their depth,
@@ -1332,17 +1502,22 @@ setInterval(tick, 250);
   const lerp3 = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
   const css = (c, a) => a == null ? 'rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')' : 'rgba(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ',' + a + ')';
   // the colour of the air at each depth: leaf light, green shade, dusk, then stone
-  const AIR = [[0, [122, 204, 132]], [120, [52, 128, 84]], [300, [22, 62, 44]], [600, [12, 34, 26]], [1200, [8, 24, 19]], [3000, [6, 18, 14]], [4000, [8, 15, 12]], [5200, [10, 12, 12]], [7500, [6, 7, 9]], [11000, [2, 3, 4]]];
+  const AIR = [[0, [122, 204, 132]], [150, [84, 172, 112]], [400, [52, 130, 92]], [700, [36, 104, 84]], [1050, [30, 82, 66]], [1500, [44, 66, 36]],
+    [1900, [44, 30, 20]], [2700, [36, 26, 20]], [2950, [16, 44, 58]], [3600, [12, 36, 50]], [3850, [8, 30, 46]], [4600, [8, 26, 40]], [4850, [40, 22, 64]], [5700, [34, 18, 58]],
+    [5950, [52, 44, 24]], [6900, [44, 38, 20]], [7150, [50, 16, 46]], [8300, [40, 12, 38]], [8550, [72, 20, 10]], [9900, [86, 24, 8]], [10150, [58, 42, 14]], [12000, [70, 52, 18]]];
   function air(m) {
     if (m <= 0) return AIR[0][1];
     for (let i = 1; i < AIR.length; i++) if (m <= AIR[i][0]) { const a = AIR[i - 1], b = AIR[i]; return lerp3(a[1], b[1], (m - a[0]) / (b[0] - a[0])); }
     return AIR[AIR.length - 1][1];
   }
-  const FLOOR = 4000; // below this you are under the forest, among roots and rock
-  const NOTES = [[60, 'the canopy closes overhead'], [200, 'THE UNDERSTORY', 1], [330, 'howler monkeys call from here'], [600, 'barely any sunlight gets this far'], [1000, 'THE DEEP SHADE', 1], [1500, 'jaguar country'], [2200, 'the air is thick and still'], [3000, 'nothing down here has seen the sky'], [4000, 'THE FOREST FLOOR', 1], [4400, 'roots drop away into the dark'], [6000, 'THE ROOT CAVES', 1], [8000, 'water is running somewhere below'], [10935, 'THE UNDERGROUND RIVER', 1]];
+  const FLOOR = 1500; // below this you are under the forest, falling through one world after another
+  const NOTES = [[60, 'the canopy closes overhead'], [150, 'THE UNDERSTORY', 1], [260, 'howler monkeys call from here'], [420, 'barely any sunlight gets this far'], [600, 'THE DEEP SHADE', 1], [880, 'jaguar country'], [1180, 'nothing down here has seen the sky'],
+    [1500, 'THE FOREST FLOOR', 1], [1750, 'roots drop away into the dark'], [2000, 'THE ROOT CAVES', 1], [2400, 'water is running somewhere below'], [2800, 'THE UNDERGROUND RIVER', 1], [3250, 'the current pulls everything down'],
+    [3700, 'THE GLOWWORM GROTTO', 1], [4200, 'a ceiling of living stars'], [4700, 'THE CRYSTAL CAVERNS', 1], [5250, 'the walls hum as you pass'], [5800, 'THE SUNKEN TEMPLE', 1], [6400, 'someone built this, long ago'],
+    [7000, 'THE FUNGAL DEEP', 1], [7700, 'the spores glow where they settle'], [8400, 'THE MAGMA VEINS', 1], [9200, 'the rock is warm to the touch'], [10000, 'THE OBSCURA', 1], [11000, 'no one has been deeper']];
   let W = 0, H = 0, DPR = 1, mpp = 1, AY = 0, cam = 0, camS = 0, vel = 0, time = 0, last = 0, linesId = null;
   let leavesA = [], leavesB = [], roam = [], parts = [], clouds = [], puffs = [], flash = 0, flashC = '#fff', lastCrank = 0, lastTrail = 0;
-  let orbit = null, burstT = 0, rings = [], sweeps = [], punch = 0, hold = 0, zoneAt = -1;
+  let orbit = null, burstT = 0, rings = [], sweeps = [], punch = 0, hold = 0, zoneAt = -1, ambT = 0;
   const frog = { x: -80, y: 200, rot: 0, emit: 0, hop: 0 };
   // sparks are more saturated than the tier labels, so bursts read against the forest
   const SPARK = ['#8fa3c4', '#4de3ff', '#ff5252', '#9d7bff', '#ffd166'];
@@ -1353,7 +1528,7 @@ setInterval(tick, 250);
   const tinted = {};
   const img = (art, color) => { const k = art + color; if (!tinted[k]) { const im = new Image(); im.src = sprite(art, color); tinted[k] = im; } return tinted[k]; };
   // ---- pixel art made once and reused ----
-  const BUCKETS = [0, 120, 300, 600, 1000, 1600, 2400, 3300, 4200], cache = {};
+  const BUCKETS = [0, 45, 110, 225, 375, 600, 900, 1240, 1575], cache = {};
   const bucketOf = m => { let b = 0; for (let i = 0; i < BUCKETS.length; i++) if (m >= BUCKETS[i]) b = i; return b; };
   const rng = seed => { let v = (seed * 9301 + 49297) % 233280; return () => (v = (v * 9301 + 49297) % 233280) / 233280; };
   // a mass of leaves: lit from above, shaded below, ragged at the edge, with a few hanging tips
@@ -1481,7 +1656,15 @@ setInterval(tick, 250);
     flash(color, times, ms) { const el = $('flash'); if (!el || reduce) return; let i = 0; const go = () => { el.style.transition = 'none'; el.style.background = 'radial-gradient(circle at 50% ' + Math.round(AY) + 'px, ' + color + ' 0, ' + color + ' 12%, rgba(0,0,0,0) 78%)'; el.style.opacity = '.7'; requestAnimationFrame(() => requestAnimationFrame(() => { el.style.transition = 'opacity ' + ms + 'ms ease-out'; el.style.opacity = '0'; })); if (++i < times) setTimeout(go, ms * 2.1); }; go(); },
     shake() { restart(app, 'shake'); },
     zap() { restart($('crt'), 'zap'); },
-    type(el) { snd('type'); const rc = el.getBoundingClientRect(), x = rc.left + Math.min(rc.width - 16, 16 + el.value.length * 13); fx.bubble(x + D(-3, 3), rc.top + D(4, 12), 1 + 2 * R()); if (R() < 0.3) fx.bubble(x + D(-8, 8), rc.top + D(2, 10), 1 + 1.6 * R()); },
+    // a bubble rises from the caret itself (measured, not guessed), with a tap that never machine-guns on a held key
+    type(el, ev) {
+      const del = ev && /^delete/.test(ev.inputType || ''), now = performance.now();
+      if (now - (fx._tk || 0) > 32) { fx._tk = now; snd(del ? 'erase' : 'type', el.value.length); }
+      if (del) return;
+      const rc = el.getBoundingClientRect(), cs = getComputedStyle(el), m = fx._mc || (fx._mc = document.createElement('canvas').getContext('2d'));
+      m.font = cs.fontSize + ' ' + cs.fontFamily;
+      const upto = el.value.slice(0, el.selectionStart == null ? el.value.length : el.selectionStart), ls = parseFloat(cs.letterSpacing) || 0;
+      const x = rc.left + Math.max(10, Math.min(rc.width - 14, parseFloat(cs.paddingLeft) + 2 + m.measureText(upto).width + ls * upto.length - el.scrollLeft)); fx.bubble(x + D(-3, 3), rc.top + D(4, 12), 1 + 2 * R()); if (R() < 0.3) fx.bubble(x + D(-8, 8), rc.top + D(2, 10), 1 + 1.6 * R()); },
     submit(rc) { fx.zap(); snd('submit'); for (let i = 0; i < 12; i++) fx.bubble(rc.left + D(0, rc.width), rc.top + D(0, rc.height), 2 + 3 * R()); fx.burst(W / 2, AY + 60, '#7dffb0', 12, 0.6); },
     reject() { fx.zap(); snd('reject'); fx.bubble(W / 2 + D(-40, 40), H - 120, 1.2 + 1.8 * R(), '150,170,150'); fx.bubble(W / 2 + D(-40, 40), H - 130, 1.2 + 1.8 * R(), '150,170,150'); },
     miss() { fx.shake(); fx.zap(); snd('miss'); fx.flash('rgba(60,80,62,.5)', 1, 200); },
@@ -1504,7 +1687,7 @@ setInterval(tick, 250);
   function trunks(z, n, w0, w1, k, dark) {
     for (let i = 0; i < n; i++) {
       const x = sn((i + 0.15 + hsh(i, k) * 0.7) / n * W), w = Math.round((w0 + hsh(i, k + 3) * w1) / AP) * AP;
-      const top = Math.max(0, AY + (0 - camS * z) / mpp - 30 - hsh(i, k + 5) * 60), bot = Math.min(H, AY + (FLOOR - camS * z) / mpp + 40);
+      const top = Math.max(0, AY + (0 - camS * z) / mpp - 30 - hsh(i, k + 5) * 60), bot = Math.min(H, AY + (FLOOR - camS) * z / mpp + 40); // far trunks end where the forest does
       if (bot < 0 || top > H) continue;
       const g = ctx.createLinearGradient(0, 0, 0, H);
       g.addColorStop(0, css(lerp3(air(camS - H * mpp * 0.3), [2, 8, 5], dark))); g.addColorStop(1, css(lerp3(air(camS + H * mpp * 0.7), [2, 8, 5], dark)));
@@ -1516,15 +1699,16 @@ setInterval(tick, 250);
     const cz = camS * z, i0 = Math.floor((cz - AY * mpp - 120) / SP), i1 = Math.ceil((cz + (H - AY) * mpp + 120) / SP);
     for (let i = Math.max(0, i0); i <= i1; i++) {
       const r1 = hsh(i, k), r2 = hsh(i, k + 4), r3 = hsh(i, k + 8), dep = (i + r1 * 0.6) * SP, y = sn(AY + (dep - cz) / mpp);
-      const real = dep / z, under = real > FLOOR, light = Math.max(0, 1 - real / 1500), left = r2 < 0.5;
-      const base = lerp3(air(real), under ? [22, 20, 18] : [2, 8, 5], dark), col = css(base), len = (0.16 + r3 * 0.3) * W * big, th = Math.round((7 + r1 * 9) * big / AP) * AP;
+      const real = dep / z, under = real > FLOOR, light = Math.max(0, 1 - real / 1300), left = r2 < 0.5, bio = biomeOf(real);
+      const base = lerp3(air(real), under ? rockAt(real) : [2, 8, 5], dark), col = css(base), len = (0.16 + r3 * 0.3) * W * big, th = Math.round((7 + r1 * 9) * big / AP) * AP;
       const x0 = left ? 0 : W - len, tip = left ? len : W - len;
       if (under) {
         // a ledge of rock with stalactites and hanging roots
         ctx.fillStyle = col; ctx.fillRect(x0, y, len, th * 2);
         for (let q = 0; q < 6; q++) { const sx = x0 + hsh(i * 9 + q, k) * (len - 12), sl = (8 + hsh(i * 9 + q, k + 2) * 34) * big; ctx.beginPath(); ctx.moveTo(sx, y + th * 2 - 1); ctx.lineTo(sx + 9 * big, y + th * 2 - 1); ctx.lineTo(sx + 4.5 * big, y + th * 2 + sl); ctx.closePath(); ctx.fill(); }
         const glow = 0.45 + 0.35 * Math.sin(time * 1.6 + i);
-        for (let q = 0; q < 5; q++) { const gx = x0 + hsh(i * 5 + q, k + 6) * len, c = q % 2 ? '125,255,176' : '111,214,255'; halo(sn(gx) + 1, y - 5, 20, 'rgb(' + c + ')', glow * 0.55); ctx.fillStyle = 'rgba(' + c + ',' + glow.toFixed(3) + ')'; ctx.fillRect(sn(gx), y - AP * 2, AP, AP * 2); ctx.fillRect(sn(gx) - AP, y - AP * 3, AP * 3, AP); }
+        ledgeDecor(bio.kind, x0, y, len, th, big, i, k, dark, base);
+        for (let q = 0; q < 5; q++) { const gx = x0 + hsh(i * 5 + q, k + 6) * len, c = q % 2 ? bio.glow.join(',') : lerp3(bio.glow, [255, 255, 255], 0.4).map(v => v | 0).join(','); halo(sn(gx) + 1, y - 5, 20, 'rgb(' + c + ')', glow * 0.55); ctx.fillStyle = 'rgba(' + c + ',' + glow.toFixed(3) + ')'; ctx.fillRect(sn(gx), y - AP * 2, AP, AP * 2); ctx.fillRect(sn(gx) - AP, y - AP * 3, AP * 3, AP); }
       } else {
         // the limb, drooping a little toward its tip
         ctx.fillStyle = col;
@@ -1611,6 +1795,7 @@ setInterval(tick, 250);
   }
   // a thin waterfall dropping through the far trees, with spray where it lands
   function waterfall() {
+    if (camS > FLOOR + 100) return;
     const z = 0.3, x = sn(W * 0.63), w = AP * 6, yTop = AY + (130 - camS * z) / mpp, yBot = AY + (960 - camS * z) / mpp;
     if (yBot < -40 || yTop > H + 40) return;
     const lit = Math.max(0, 1 - camS / 1500), a = lerp3(air(camS), [222, 246, 240], 0.2 + 0.5 * lit), b = lerp3(air(camS), [150, 214, 214], 0.14 + 0.42 * lit), d = lerp3(air(camS), [2, 8, 5], 0.55), S2 = AP * 2;
@@ -1627,18 +1812,197 @@ setInterval(tick, 250);
   }
   // glowing fungi on the far trunks, once it is dark enough for them to show
   function glowers(z, SP, k) {
-    if (camS < 1700) return;
-    const top = camS * z - AY * mpp, bot = top + H * mpp, on = Math.min(1, (camS - 1700) / 900);
+    if (camS < 700) return;
+    const top = camS * z - AY * mpp, bot = top + H * mpp, on = Math.min(1, (camS - 700) / 500);
     for (let i = Math.floor((top - 30) / SP); i <= Math.ceil((bot + 30) / SP); i++) {
       if (i < 0 || hsh(i, k) < 0.35) continue;
       const dep = (i + hsh(i, k + 1) * 0.8) * SP, x = sn(hsh(i, k + 2) * W), y = sn(AY + (dep - camS * z) / mpp), n = 2 + (hsh(i, k + 3) * 3 | 0);
-      const col = dep / z > 6200 ? [190, 160, 255] : dep / z > 4000 ? [120, 230, 255] : [125, 255, 190], pulse = 0.55 + 0.45 * Math.sin(time * (1.1 + hsh(i, k + 4)) + i);
+      const col = dep / z > FLOOR ? biomeOf(dep / z).glow : [125, 255, 190], pulse = 0.55 + 0.45 * Math.sin(time * (1.1 + hsh(i, k + 4)) + i);
       for (let m = 0; m < n; m++) {
         const mx = x + (m - n / 2) * AP * 4, my = y + ((m * 7) % 3) * AP * 2;
         ctx.fillStyle = css(col, (on * (0.25 + 0.3 * pulse)).toFixed(3)); ctx.fillRect(mx + AP, my + AP, AP, AP * 2);
         ctx.fillStyle = css(col, (on * (0.55 + 0.45 * pulse)).toFixed(3)); ctx.fillRect(mx, my, AP * 3, AP); ctx.fillRect(mx + AP, my - AP, AP, AP);
       }
       halo(x, y, 16 + n * 3, css(col), on * 0.32 * pulse);
+    }
+  }
+  // ---- below the forest: one world after another, each with its own rock, light and life ----
+  const BIOMES = [
+    { at: 0, kind: 'floor', rock: [26, 22, 16], glow: [125, 255, 176], mote: '232,255,122' },
+    { at: 2000, kind: 'roots', rock: [34, 24, 15], glow: [255, 190, 110], mote: '255,214,150' },
+    { at: 2800, kind: 'river', rock: [18, 30, 38], glow: [110, 214, 255], mote: '170,230,255' },
+    { at: 3700, kind: 'grotto', rock: [12, 22, 30], glow: [125, 240, 255], mote: '140,255,240' },
+    { at: 4700, kind: 'crystal', rock: [28, 18, 42], glow: [200, 140, 255], mote: '220,190,255' },
+    { at: 5800, kind: 'temple', rock: [42, 37, 25], glow: [255, 209, 102], mote: '255,226,150' },
+    { at: 7000, kind: 'fungal', rock: [32, 16, 30], glow: [255, 120, 200], mote: '255,170,220' },
+    { at: 8400, kind: 'magma', rock: [44, 14, 10], glow: [255, 110, 50], mote: '255,160,80' },
+    { at: 10000, kind: 'obscura', rock: [36, 28, 12], glow: [255, 230, 140], mote: '255,240,180' },
+  ];
+  function biomeOf(m) { let b = BIOMES[0]; for (const x of BIOMES) if (m >= x.at) b = x; return b; }
+  // the rock blends into the next world's over the last 300 m, so nothing changes with a hard cut
+  function rockAt(m) {
+    let i = 0; for (let j = 0; j < BIOMES.length; j++) if (m >= BIOMES[j].at) i = j;
+    const a = BIOMES[i], b = BIOMES[i + 1]; if (!b) return a.rock;
+    const f = Math.max(0, (m - (b.at - 300)) / 300); return f > 0 ? lerp3(a.rock, b.rock, f) : a.rock;
+  }
+  // what grows on a rock ledge in each world
+  function ledgeDecor(kind, x0, y, len, th, big, i, k, dark, base) {
+    const g = biomeOf(FLOOR + 1).glow, b = BIOMES.find(q => q.kind === kind) || BIOMES[0], gl = b.glow, pulse = 0.6 + 0.4 * Math.sin(time * 1.4 + i);
+    if (kind === 'crystal') for (let q = 0; q < 4; q++) {
+      const cx = x0 + (0.15 + hsh(i * 4 + q, k + 21) * 0.7) * len, ch = (10 + hsh(i * 4 + q, k + 22) * 22) * big, cw = (5 + hsh(i * 4 + q, k + 23) * 5) * big;
+      ctx.fillStyle = css(lerp3(gl, [12, 6, 22], 0.45 + dark * 0.4)); ctx.beginPath(); ctx.moveTo(cx - cw / 2, y); ctx.lineTo(cx - cw / 2, y - ch * 0.75); ctx.lineTo(cx, y - ch); ctx.lineTo(cx + cw / 2, y - ch * 0.75); ctx.lineTo(cx + cw / 2, y); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = css(lerp3(gl, [255, 255, 255], 0.4), 0.8 * (1 - dark * 0.6)); ctx.fillRect(sn(cx - cw / 2), sn(y - ch * 0.75), Math.max(1, cw / 3), ch * 0.75);
+      halo(cx, y - ch * 0.6, 10 + ch * 0.4, css(gl), 0.22 * pulse);
+    }
+    else if (kind === 'fungal') for (let q = 0; q < 3; q++) {
+      const cx = x0 + (0.15 + hsh(i * 3 + q, k + 24) * 0.7) * len, sh = (6 + hsh(i * 3 + q, k + 25) * 12) * big, cr = (6 + hsh(i * 3 + q, k + 26) * 9) * big;
+      ctx.fillStyle = css(base); ctx.fillRect(sn(cx - AP / 2), y - sh, AP, sh);
+      ctx.fillStyle = css(lerp3(gl, [24, 6, 20], 0.4 + dark * 0.4)); ctx.beginPath(); ctx.ellipse(cx, y - sh, cr, cr * 0.55, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = css(gl, 0.75 * pulse); ctx.fillRect(sn(cx - cr * 0.8), sn(y - sh), cr * 1.6, 2);
+      halo(cx, y - sh, cr * 1.4, css(gl), 0.2 * pulse);
+    }
+    else if (kind === 'temple') {
+      // dressed stone: block seams and a carved glyph picked out in gold
+      ctx.fillStyle = css(lerp3(base, [0, 0, 0], 0.45));
+      for (let sx = x0 + 22 * big; sx < x0 + len; sx += 30 * big) ctx.fillRect(sn(sx), y, 2, th * 2);
+      ctx.fillRect(x0, y + th, len, 2);
+      const gx = x0 + len * (0.3 + hsh(i, k + 27) * 0.4);
+      ctx.fillStyle = css(gl, 0.5 + 0.35 * pulse); ctx.fillRect(sn(gx), y + 3, AP * 3, AP); ctx.fillRect(sn(gx + AP), y + 3, AP, AP * 3); ctx.fillRect(sn(gx), y + 3 + AP * 2, AP * 3, AP);
+    }
+    else if (kind === 'magma') {
+      // a seam of molten rock glowing along the underside
+      ctx.fillStyle = css([255, 140 + 60 * pulse, 50], 0.85);
+      let yy = y + th * 2 - AP; for (let sx = x0; sx < x0 + len; sx += AP * 2) { yy += (hsh(i * 50 + sx, k + 28) - 0.5) * AP; ctx.fillRect(sn(sx), sn(Math.min(y + th * 2 - AP, Math.max(y + AP, yy))), AP * 2, AP); }
+      halo(x0 + len / 2, y + th * 2, len * 0.3, 'rgb(255,110,50)', 0.18 * pulse);
+    }
+    else if (kind === 'river') {
+      // drips falling from the stalactite tips
+      for (let q = 0; q < 3; q++) { const sx = x0 + hsh(i * 9 + q, k) * (len - 12) + 4.5 * big, u = mod(time * 0.7 + hsh(i, q + 40), 1); ctx.fillStyle = 'rgba(170,230,255,' + (0.8 * (1 - u)).toFixed(2) + ')'; ctx.fillRect(sn(sx), sn(y + th * 2 + 30 * big + u * 160), 2, 4); }
+    }
+    else if (kind === 'grotto') {
+      // glowworm threads beaded with light
+      for (let q = 0; q < 5; q++) { const tx = x0 + hsh(i * 5 + q, k + 29) * len, tl = (16 + hsh(i * 5 + q, k + 30) * 60) * big, a = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(time * 1.6 + q * 2 + i));
+        ctx.fillStyle = css(gl, 0.2 * a); ctx.fillRect(sn(tx), y + th * 2, 1, tl); ctx.fillStyle = css([220, 255, 255], a); ctx.fillRect(sn(tx) - 1, sn(y + th * 2 + tl), 3, 3); }
+    }
+    void g;
+  }
+  // the far wall of the cavern: giant stalactites and columns, faint with distance, so the space feels huge
+  function caveFar() {
+    if (camS < FLOOR - 200) return;
+    const z = 0.16, SP = 46, cz = camS * z, i0 = Math.floor((cz - AY * mpp - 120) / SP), i1 = Math.ceil((cz + (H - AY) * mpp + 120) / SP);
+    for (let i = Math.max(0, i0); i <= i1; i++) {
+      const dep = (i + hsh(i, 701) * 0.5) * SP, real = dep / z; if (real < FLOOR) continue;
+      const b = biomeOf(real), y = AY + (dep - cz) / mpp, x = hsh(i, 702) * W, w = (60 + hsh(i, 703) * 140), hgt = 200 + hsh(i, 704) * 420, kind = hsh(i, 705);
+      ctx.fillStyle = css(lerp3(air(camS), [b.rock[0] * 0.5, b.rock[1] * 0.5, b.rock[2] * 0.5], 0.32));
+      ctx.beginPath();
+      if (kind < 0.4) { ctx.moveTo(x - w / 2, y); ctx.lineTo(x + w / 2, y); ctx.lineTo(x + w * 0.06, y + hgt); ctx.lineTo(x - w * 0.04, y + hgt * 0.92); }
+      else if (kind < 0.75) { ctx.moveTo(x - w / 2, y + hgt); ctx.lineTo(x + w / 2, y + hgt); ctx.lineTo(x + w * 0.05, y); ctx.lineTo(x - w * 0.08, y + hgt * 0.1); }
+      else { ctx.moveTo(x - w * 0.5, y - hgt * 0.5); ctx.lineTo(x + w * 0.5, y - hgt * 0.5); ctx.lineTo(x + w * 0.22, y); ctx.lineTo(x + w * 0.5, y + hgt * 0.5); ctx.lineTo(x - w * 0.5, y + hgt * 0.5); ctx.lineTo(x - w * 0.2, y); }
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  // the big shapes of each world, placed down the shaft at one parallax depth
+  function deepFeatures(z, SP, k, dark) {
+    if (camS < FLOOR - 400) return;
+    const cz = camS * z, i0 = Math.floor((cz - AY * mpp - 500) / SP), i1 = Math.ceil((cz + (H - AY) * mpp + 200) / SP);
+    for (let i = Math.max(0, i0); i <= i1; i++) {
+      const dep = (i + hsh(i, k) * 0.6) * SP, real = dep / z; if (real < FLOOR + 150 || real > MAX_DEPTH + 300) continue;
+      const b = biomeOf(real), y = sn(AY + (dep - cz) / mpp), side = hsh(i, k + 1) < 0.5, x = sn((side ? 0.1 + hsh(i, k + 2) * 0.28 : 0.62 + hsh(i, k + 2) * 0.28) * W), r = hsh(i, k + 3);
+      const rockC = lerp3(lerp3(air(real), [b.rock[0] * 0.45, b.rock[1] * 0.45, b.rock[2] * 0.45], 0.75), [0, 0, 0], dark * 0.6), rock = css(rockC), g = b.glow, pulse = 0.6 + 0.4 * Math.sin(time * (0.9 + r) + i), s = (0.7 + r * 0.7) * (z < 0.5 ? 0.75 : 1.15), dim = 1 - dark * 0.5;
+      ctx.fillStyle = rock;
+      if (b.kind === 'floor' || b.kind === 'roots') {
+        // a bundle of roots hanging out of the dark, some carrying glowing bulbs
+        const n = 3 + (r * 4 | 0), len = (110 + r * 240) * s;
+        const lit = css(lerp3(rockC, [190, 140, 90], 0.22 * dim));
+        for (let q = 0; q < n; q++) { let px = x + (q - n / 2) * AP * 4 * s; const ql = len * (0.55 + 0.45 * hsh(i * 7 + q, k + 15)); for (let t = 0; t < ql; t += AP * 2) { px += Math.sin(t * 0.025 + q * 1.7 + i) * 1.4; const w = Math.max(AP, Math.round((1 - t / ql) * 5 * s) * AP); ctx.fillStyle = rock; ctx.fillRect(sn(px), y + t, w, AP * 2 + 1); if (q % 2 === 0) { ctx.fillStyle = lit; ctx.fillRect(sn(px), y + t, AP, AP * 2); } }
+          if (b.kind === 'roots' && hsh(i * 7 + q, k + 4) > 0.45) { const by = y + ql * (0.5 + hsh(q, i) * 0.45); ctx.fillStyle = css(g, 0.7 * pulse * dim); ctx.fillRect(sn(px) - AP, sn(by), AP * 3, AP * 3); halo(px, by + 3, 12, css(g), 0.3 * pulse * dim); ctx.fillStyle = rock; } }
+      } else if (b.kind === 'river') {
+        // water pouring out of a crack in the rock
+        const len = (180 + r * 280) * s, w = AP * (2 + (r * 3 | 0)), scroll = time * 150;
+        ctx.fillRect(x - AP * 7, y - AP * 3, w + AP * 14, AP * 4);
+        for (let t = 0; t < len; t += AP * 2) { const row = Math.floor((t - scroll) / (AP * 2)), h2 = hsh(row, k + 9); ctx.fillStyle = css(lerp3(rockC, [160, 225, 245], (0.3 + 0.35 * h2) * dim), 0.85 * (1 - (t / len) * 0.6)); ctx.fillRect(sn(x + (h2 > 0.5 ? AP : 0)), y + t, w, AP * 2); }
+        halo(x + w / 2, y + len, 10 + w, css(g), 0.22 * dim);
+      } else if (b.kind === 'grotto') {
+        // threads of glowworms hanging from the ceiling like strings of stars
+        const n = 6 + (r * 6 | 0);
+        for (let q = 0; q < n; q++) {
+          const tx = x + (hsh(i * 13 + q, k + 5) - 0.5) * 180 * s, tl = (40 + hsh(i * 13 + q, k + 6) * 170) * s, a = (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time * 1.3 + q * 1.9 + i))) * dim;
+          ctx.fillStyle = css(g, 0.16 * a); ctx.fillRect(sn(tx), y, 1, tl);
+          ctx.fillStyle = css(g, 0.55 * a); for (let d2 = 12; d2 < tl; d2 += 15 + (q % 3) * 7) ctx.fillRect(sn(tx) - 1, sn(y + d2), 2, 2);
+          ctx.fillStyle = css([225, 255, 255], a); ctx.fillRect(sn(tx) - 1, sn(y + tl), 3, 4); if (q % 2) halo(tx, y + tl, 9, css(g), a * 0.45);
+        }
+      } else if (b.kind === 'crystal') {
+        // a cluster of crystals growing up from a shelf, or down from the roof
+        const n = 3 + (r * 3 | 0), up = r < 0.5 ? -1 : 1;
+        ctx.fillRect(x - 46 * s, y - AP * 2, 92 * s, AP * 4);
+        for (let q = 0; q < n; q++) {
+          const cx = x + (q - (n - 1) / 2) * 17 * s, ch = (34 + hsh(i * 7 + q, k + 7) * 80) * s, cw = (9 + hsh(i * 7 + q, k + 8) * 9) * s, lean = (q - (n - 1) / 2) * 7 * s;
+          ctx.fillStyle = css(lerp3(g, [10, 6, 22], 0.35 + dark * 0.5)); ctx.beginPath(); ctx.moveTo(cx - cw / 2, y); ctx.lineTo(cx + lean - cw / 2, y + up * ch * 0.8); ctx.lineTo(cx + lean, y + up * ch); ctx.lineTo(cx + lean + cw / 2, y + up * ch * 0.8); ctx.lineTo(cx + cw / 2, y); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = css(lerp3(g, [255, 255, 255], 0.4), 0.8 * dim); ctx.beginPath(); ctx.moveTo(cx - cw / 2, y); ctx.lineTo(cx + lean - cw / 2, y + up * ch * 0.8); ctx.lineTo(cx + lean, y + up * ch); ctx.lineTo(cx + lean - cw * 0.15, y); ctx.closePath(); ctx.fill();
+          if (Math.sin(time * 1.7 + i * 3 + q * 5) > 0.97) halo(cx + lean, y + up * ch, 6, 'rgb(255,255,255)', 0.9);
+        }
+        halo(x, y + up * 40 * s, 34 * s, css(g), 0.3 * pulse * dim);
+      } else if (b.kind === 'temple') {
+        // a pillar of the old temple, cracked, wrapped in vine, some still watching
+        const ph = (150 + r * 230) * s, pw = (26 + r * 16) * s, broken = hsh(i, k + 9) < 0.35;
+        if (!broken) ctx.fillRect(x - pw / 2 - AP * 2, y - AP * 3, pw + AP * 4, AP * 3);
+        ctx.beginPath(); ctx.moveTo(x - pw / 2, y + ph); ctx.lineTo(x - pw / 2, broken ? y + 10 * s : y); ctx.lineTo(x - pw * 0.1, broken ? y - 6 * s : y); ctx.lineTo(x + pw * 0.15, broken ? y + 14 * s : y); ctx.lineTo(x + pw / 2, broken ? y + 4 * s : y); ctx.lineTo(x + pw / 2, y + ph); ctx.closePath(); ctx.fill();
+        ctx.fillRect(x - pw / 2 - AP * 3, y + ph, pw + AP * 6, AP * 4);
+        ctx.fillStyle = css(lerp3(rockC, [0, 0, 0], 0.4)); for (let q = 1; q < 4; q++) ctx.fillRect(sn(x - pw / 2 + q * pw / 4), y + 16 * s, 2, ph - 20 * s);
+        if (r > 0.5) { const fy = y + ph * 0.32; ctx.fillStyle = css(g, (0.45 + 0.45 * pulse) * dim); ctx.fillRect(sn(x - pw * 0.28), sn(fy), AP * 2, AP); ctx.fillRect(sn(x + pw * 0.28 - AP * 2), sn(fy), AP * 2, AP); halo(x, fy, pw * 0.7, css(g), 0.18 * pulse * dim); }
+        ctx.fillStyle = css(lerp3(rockC, [40, 110, 50], 0.45)); for (let t = 0; t < ph * 0.7; t += AP * 2) ctx.fillRect(sn(x - pw / 2 + pw * 0.5 * (0.5 + 0.5 * Math.sin(t * 0.045 + i))), y + t, AP, AP * 2);
+      } else if (b.kind === 'fungal') {
+        // a giant mushroom with a glowing underside
+        const sh = (70 + r * 170) * s, cw2 = (42 + r * 54) * s;
+        ctx.fillRect(sn(x - 5 * s), y, 10 * s, sh); ctx.fillRect(sn(x - 9 * s), y + sh - 6, 18 * s, 6);
+        ctx.fillStyle = css(lerp3(g, [20, 6, 18], 0.5 + dark * 0.4)); ctx.beginPath(); ctx.ellipse(x, y, cw2, cw2 * 0.46, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = css(g, (0.45 + 0.4 * pulse) * dim); ctx.fillRect(sn(x - cw2 * 0.9), y - 1, cw2 * 1.8, AP);
+        ctx.fillStyle = css(lerp3(g, [255, 255, 255], 0.55), 0.65 * dim); for (let q = 0; q < 5; q++) ctx.fillRect(sn(x + (hsh(i * 5 + q, k + 10) - 0.5) * cw2 * 1.3), sn(y - 4 - hsh(i * 5 + q, k + 11) * cw2 * 0.32), AP * 2, AP * 2);
+        halo(x, y + 6, cw2 * 0.9, css(g), 0.28 * pulse * dim);
+      } else if (b.kind === 'magma') {
+        // a dark spire with a vein of molten rock running down it
+        const len = (130 + r * 260) * s, hot = (0.55 + 0.45 * pulse) * (1 - dark * 0.4);
+        ctx.beginPath(); ctx.moveTo(x - 30 * s, y + len); ctx.lineTo(x - 6 * s, y - 50 * s); ctx.lineTo(x + 4 * s, y - 70 * s); ctx.lineTo(x + 30 * s, y + len); ctx.closePath(); ctx.fill();
+        let px = x; for (let t = -40 * s; t < len; t += AP * 2) { px += (hsh(i * 31 + (t | 0), k + 12) - 0.5) * AP * 1.6; px = Math.max(x - 12 * s, Math.min(x + 12 * s, px)); ctx.fillStyle = css([255, 110 + 120 * hsh((t | 0) + i, k + 13), 40], hot); ctx.fillRect(sn(px), y + t, AP * (r > 0.6 ? 2 : 1), AP * 2); }
+        halo(x, y + len * 0.4, 30 * s, 'rgb(255,110,50)', 0.24 * hot);
+      } else if (b.kind === 'obscura') {
+        // golden roots all leaning toward the heart below
+        const len = 300 * s, dir = x < W / 2 ? 1 : -1;
+        for (let t = 0; t < len; t += AP * 2) { const u = t / len, px = x + dir * u * u * W * 0.22, a = (0.25 + 0.55 * (0.5 + 0.5 * Math.sin(time * 2 - t * 0.04 + i))) * dim; ctx.fillStyle = css(rockC); ctx.fillRect(sn(px) - AP, y + t, AP * 4, AP * 2); ctx.fillStyle = css(g, a); ctx.fillRect(sn(px), y + t, AP * 2, AP * 2); }
+      }
+    }
+  }
+  // the moments you pass through: a river, the temple gate, and the heart at the bottom of everything
+  function deepLandmarks() {
+    // the underground river: you break its surface and sink through it
+    if (camS > 2500 && camS < 3400) {
+      const y = yOf(2800), yb = yOf(3080);
+      if (yb > -40 && y < H + 40) {
+        const t0 = Math.max(-10, y), t1 = Math.min(H + 10, yb);
+        ctx.fillStyle = 'rgba(30,96,128,0.32)'; ctx.fillRect(0, t0, W, t1 - t0);
+        for (let b2 = 0; b2 < 4; b2++) { ctx.fillStyle = 'rgba(' + (b2 % 2 ? '120,210,235' : '70,160,200') + ',' + (0.55 - b2 * 0.1) + ')'; for (let x = 0; x <= W; x += AP * 2) ctx.fillRect(x, sn(y + b2 * 12 + 4 * Math.sin(0.02 * x + time * (1.4 + b2 * 0.3))), AP * 2, AP); }
+        for (let q = 0; q < 26; q++) { const u = mod(hsh(q, 501) - time * (0.04 + hsh(q, 502) * 0.05), 1), by = y + (yb - y) * u; if (by < -4 || by > H + 4) continue; ctx.fillStyle = 'rgba(190,240,255,0.55)'; ctx.fillRect(sn(hsh(q, 503) * W + Math.sin(time * 2 + q) * 4), sn(by), 2, 2); }
+        if (yb > 0 && yb < H) { ctx.fillStyle = 'rgba(70,160,200,0.4)'; for (let x = 0; x <= W; x += AP * 2) ctx.fillRect(x, sn(yb + 3 * Math.sin(0.03 * x + time)), AP * 2, AP); }
+      }
+    }
+    // the temple gate: a stepped arch with a great carved face over the way down
+    if (near(5800, 320)) {
+      const y = yOf(5800), cx = W / 2, rockC = lerp3(air(5800), BIOMES[5].rock, 0.75), gw = Math.min(W * 0.9, 760), pulse = 0.6 + 0.4 * Math.sin(time * 1.2);
+      ctx.fillStyle = css(rockC);
+      for (let st = 0; st < 4; st++) { const w = gw * (1 - st * 0.14); ctx.fillRect(sn(cx - w / 2), sn(y - 120 + st * 22), w, 24); }
+      ctx.fillRect(sn(cx - gw / 2), y - 30, gw * 0.18, 260); ctx.fillRect(sn(cx + gw / 2 - gw * 0.18), y - 30, gw * 0.18, 260);
+      ctx.fillStyle = css(lerp3(rockC, [0, 0, 0], 0.45)); for (let q = 0; q < 6; q++) ctx.fillRect(sn(cx - gw / 2 + q * gw * 0.036), y - 30, 2, 260), ctx.fillRect(sn(cx + gw / 2 - q * gw * 0.036), y - 30, 2, 260);
+      ctx.fillStyle = css(BIOMES[5].glow, 0.55 + 0.4 * pulse); ctx.fillRect(sn(cx - 46), sn(y - 94), 22, 8); ctx.fillRect(sn(cx + 24), sn(y - 94), 22, 8); ctx.fillRect(sn(cx - 18), sn(y - 64), 36, 5);
+      halo(cx - 35, y - 90, 30, 'rgb(255,209,102)', 0.35 * pulse); halo(cx + 35, y - 90, 30, 'rgb(255,209,102)', 0.35 * pulse);
+    }
+    // the heart of the Obscura: something vast and old, beating slowly in the dark
+    if (near(11400, 600)) {
+      const y = yOf(11400), cx = W / 2, beat = Math.pow(Math.max(0, Math.sin(time * 2.2)), 8) + 0.6 * Math.pow(Math.max(0, Math.sin(time * 2.2 - 0.5)), 8), R0 = Math.min(W, 700) * 0.16 * (1 + beat * 0.06);
+      halo(cx, y, R0 * 2.4, 'rgb(255,214,120)', 0.3 + beat * 0.25);
+      ctx.fillStyle = 'rgb(58,40,14)'; ctx.beginPath(); ctx.moveTo(cx, y - R0 * 1.35); ctx.lineTo(cx + R0, y); ctx.lineTo(cx, y + R0 * 1.35); ctx.lineTo(cx - R0, y); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,214,120,' + (0.55 + beat * 0.4).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(cx, y - R0 * 1.05); ctx.lineTo(cx + R0 * 0.72, y); ctx.lineTo(cx, y + R0 * 1.05); ctx.lineTo(cx - R0 * 0.72, y); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,248,220,' + (0.6 + beat * 0.4).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(cx, y - R0 * 0.5); ctx.lineTo(cx + R0 * 0.3, y); ctx.lineTo(cx, y + R0 * 0.5); ctx.lineTo(cx - R0 * 0.3, y); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgb(46,32,12)'; for (let q = 0; q < 10; q++) { const a = (q / 10) * Math.PI * 2 + 0.3, len = R0 * (2 + hsh(q, 601) * 2.5); for (let t = R0 * 0.9; t < len; t += AP * 2) ctx.fillRect(sn(cx + Math.cos(a + Math.sin(t * 0.01 + q) * 0.25) * t), sn(y + Math.sin(a + Math.sin(t * 0.01 + q) * 0.25) * t * 0.8), AP * 2 + (len - t) / len * AP * 3, AP * 2); }
     }
   }
   function draw(dt) {
@@ -1671,7 +2035,7 @@ setInterval(tick, 250);
     if (!low) { farFoliage(0.24, 70, 201, 0.18, AP * 0.67, 0.5); mist(0.27, 62, 211, 0.2 * fog); waterfall(); }
     trunks(0.35, Math.max(4, Math.round(W / 150)), 14, 22, 1, 0.3);
     if (!low) limbs(0.42, 120, 40, 0.3, 0.6);
-    if (!low) { glowers(0.38, 46, 231); mist(0.46, 96, 221, 0.15 * fog); }
+    if (!low) { caveFar(); deepFeatures(0.4, 80, 301, 0.5); glowers(0.38, 46, 231); mist(0.46, 96, 221, 0.15 * fog); }
     // shafts of light
     const ra = 0.12 * Math.max(0, 1 - camS / 1400);
     if (ra > 0.004) for (let k = 0; k < 5; k++) {
@@ -1686,19 +2050,20 @@ setInterval(tick, 250);
     }
     if (!low) lianas(0.5, 210, 51, 0.4);
     limbs(0.6, 150, 20, 0.45, 0.8);
+    deepFeatures(0.72, 150, 331, 0.18);
     // things that live at particular depths
     if (near(85, 90)) for (let r = 0; r < 9; r++) spr('macaw', ['#ff5d5d', '#4d9bff', '#ffd34d'][r % 3], mod(34 * time + 52 * r + r * r * 7, W + 360) - 180, yOf(85) + 12 * Math.sin(2 * time + r) + (r % 3) * 16, 30, true, 0.12 * Math.sin(6 * time + r));
-    if (near(300, 120)) for (let r = 0; r < 10; r++) { const x = W * (0.1 + 0.085 * r) + 20 * Math.sin(time * 0.9 + r * 2), y = yOf(300) + 40 * Math.sin(time * 0.7 + r * 1.3), fl = Math.abs(Math.sin(time * 13 + r)), ww = 2 + fl * 6; ctx.fillStyle = ['#ffb347', '#6fd6ff', '#ff8fd0', '#fff07a'][r % 4]; ctx.fillRect(sn(x - ww), sn(y - 3), ww, 5); ctx.fillRect(sn(x + 1.5), sn(y - 3), ww, 5); }
-    if (near(600, 120)) { const y = yOf(600), x = W * 0.22; ctx.fillStyle = css(lerp3(air(600), [2, 8, 5], 0.6)); ctx.fillRect(0, y - 40, x + 60, 9); spr('sloth', '#b9a184', x, y - 6 + Math.sin(time * 0.8) * 2, 64, false, Math.sin(time * 0.8) * 0.04); }
-    if (near(800, 140)) for (let r = 0; r < 22; r++) { ctx.fillStyle = 'rgba(232,255,122,' + Math.max(0.06, 0.3 + 0.25 * Math.sin(3 * time + r)).toFixed(3) + ')'; ctx.beginPath(); ctx.arc(W * (0.12 + 0.034 * r), yOf(800) + 22 * Math.sin(0.7 * time + 0.55 * r), 2.2, 0, 7); ctx.fill(); }
-    if (near(1000, 90)) for (let r = 0; r < 4; r++) spr('toucan', '#ffc04d', mod(-22 * time + 150 * r, W + 220) - 110, yOf(1000) + 18 * Math.sin(time + 2 * r) + 9 * r, 34, false, 0);
-    if (near(1500, 120)) { const y = yOf(1500), x = W * 0.74, blink = Math.sin(time * 1.9) > 0.94 ? 0 : 1; ctx.fillStyle = css(lerp3(air(1500), [2, 8, 5], 0.7)); ctx.fillRect(x - 90, y + 8, W, 10); if (blink) { ctx.fillStyle = '#e4ff6a'; ctx.fillRect(x, y - 6, 6, 4); ctx.fillRect(x + 18, y - 6, 6, 4); ctx.fillStyle = '#0a1a08'; ctx.fillRect(x + 2, y - 6, 2, 4); ctx.fillRect(x + 20, y - 6, 2, 4); } }
-    if (near(2500, 100)) for (let r = 0; r < 7; r++) { const x = mod(60 * time + 90 * r, W + 200) - 100, y = yOf(2500) + 26 * Math.sin(1.4 * time + r), f = Math.sin(time * 16 + r) * 6; ctx.fillStyle = 'rgba(3,8,5,0.9)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 11, y - 4 - f); ctx.lineTo(x - 6, y + 2); ctx.lineTo(x, y + 4); ctx.lineTo(x + 6, y + 2); ctx.lineTo(x + 11, y - 4 - f); ctx.closePath(); ctx.fill(); }
-    if (near(3800, 220)) {
+    if (near(260, 120)) for (let r = 0; r < 10; r++) { const x = W * (0.1 + 0.085 * r) + 20 * Math.sin(time * 0.9 + r * 2), y = yOf(260) + 40 * Math.sin(time * 0.7 + r * 1.3), fl = Math.abs(Math.sin(time * 13 + r)), ww = 2 + fl * 6; ctx.fillStyle = ['#ffb347', '#6fd6ff', '#ff8fd0', '#fff07a'][r % 4]; ctx.fillRect(sn(x - ww), sn(y - 3), ww, 5); ctx.fillRect(sn(x + 1.5), sn(y - 3), ww, 5); }
+    if (near(420, 120)) { const y = yOf(420), x = W * 0.22; ctx.fillStyle = css(lerp3(air(420), [2, 8, 5], 0.6)); ctx.fillRect(0, y - 40, x + 60, 9); spr('sloth', '#b9a184', x, y - 6 + Math.sin(time * 0.8) * 2, 64, false, Math.sin(time * 0.8) * 0.04); }
+    if (near(680, 140)) for (let r = 0; r < 22; r++) { ctx.fillStyle = 'rgba(232,255,122,' + Math.max(0.06, 0.3 + 0.25 * Math.sin(3 * time + r)).toFixed(3) + ')'; ctx.beginPath(); ctx.arc(W * (0.12 + 0.034 * r), yOf(680) + 22 * Math.sin(0.7 * time + 0.55 * r), 2.2, 0, 7); ctx.fill(); }
+    if (near(780, 90)) for (let r = 0; r < 4; r++) spr('toucan', '#ffc04d', mod(-22 * time + 150 * r, W + 220) - 110, yOf(780) + 18 * Math.sin(time + 2 * r) + 9 * r, 34, false, 0);
+    if (near(900, 120)) { const y = yOf(900), x = W * 0.74, blink = Math.sin(time * 1.9) > 0.94 ? 0 : 1; ctx.fillStyle = css(lerp3(air(900), [2, 8, 5], 0.7)); ctx.fillRect(x - 90, y + 8, W, 10); if (blink) { ctx.fillStyle = '#e4ff6a'; ctx.fillRect(x, y - 6, 6, 4); ctx.fillRect(x + 18, y - 6, 6, 4); ctx.fillStyle = '#0a1a08'; ctx.fillRect(x + 2, y - 6, 2, 4); ctx.fillRect(x + 20, y - 6, 2, 4); } }
+    if (near(2250, 100)) for (let r = 0; r < 7; r++) { const x = mod(60 * time + 90 * r, W + 200) - 100, y = yOf(2250) + 26 * Math.sin(1.4 * time + r), f = Math.sin(time * 16 + r) * 6; ctx.fillStyle = 'rgba(3,8,5,0.9)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 11, y - 4 - f); ctx.lineTo(x - 6, y + 2); ctx.lineTo(x, y + 4); ctx.lineTo(x + 6, y + 2); ctx.lineTo(x + 11, y - 4 - f); ctx.closePath(); ctx.fill(); }
+    if (near(1320, 220)) {
       // an overgrown stone idol, long forgotten
-      const y = yOf(3800), x = W * 0.5; ctx.fillStyle = css(lerp3(air(3800), [3, 9, 6], 0.72));
+      const y = yOf(1320), x = W * 0.5; ctx.fillStyle = css(lerp3(air(1320), [3, 9, 6], 0.72));
       ctx.fillRect(x - 54, y - 60, 108, 150); ctx.fillRect(x - 72, y + 90, 144, 20); ctx.fillRect(x - 66, y - 78, 132, 20);
-      ctx.fillStyle = css(air(3800)); ctx.fillRect(x - 32, y - 30, 20, 12); ctx.fillRect(x + 12, y - 30, 20, 12); ctx.fillRect(x - 22, y + 20, 44, 10);
+      ctx.fillStyle = css(air(1320)); ctx.fillRect(x - 32, y - 30, 20, 12); ctx.fillRect(x + 12, y - 30, 20, 12); ctx.fillRect(x - 22, y + 20, 44, 10);
       ctx.fillStyle = 'rgba(125,255,176,' + (0.35 + 0.25 * Math.sin(time * 1.3)).toFixed(3) + ')'; ctx.fillRect(x - 26, y - 27, 8, 6); ctx.fillRect(x + 18, y - 27, 8, 6);
     }
     if (near(FLOOR, 160)) {
@@ -1707,8 +2072,8 @@ setInterval(tick, 250);
       ctx.fillStyle = css(lerp3(air(FLOOR), [34, 110, 52], 0.3));
       for (let i = 0; i < W / 70; i++) { const fx0 = i * 70 + hsh(i, 41) * 40; if (Math.abs(fx0 - W / 2) < W * 0.1) continue; for (let f = -3; f <= 3; f++) for (let q = 1; q < 8; q++) ctx.fillRect(sn(fx0 + f * q * AP * 0.9), y - q * AP * (2.2 - Math.abs(f) * 0.4), AP * 2, AP); }
     }
-    if (near(4400, 100)) for (let r = 0; r < 8; r++) { ctx.fillStyle = 'rgba(125,255,176,' + (0.2 + 0.25 * Math.sin(4 * time + 3 * r)).toFixed(3) + ')'; ctx.fillRect(sn((0.13 * r + 0.05) * W + 14 * Math.sin(0.8 * time + 2 * r)), sn(yOf(4400) + 18 * Math.sin(1.3 * time + r) + (r % 3) * 10), 3, 3); }
-    if (near(10935, 260)) { const y = yOf(10935); for (let b = 0; b < 4; b++) { ctx.fillStyle = 'rgba(' + (b % 2 ? '60,150,170' : '40,110,140') + ',' + (0.5 - b * 0.08) + ')'; ctx.beginPath(); ctx.moveTo(0, y + b * 16); for (let x = 0; x <= W + 8; x += 8) ctx.lineTo(x, y + b * 16 + 4 * Math.sin(0.02 * x + time * (1.4 + b * 0.3))); ctx.lineTo(W, H + 40); ctx.lineTo(0, H + 40); ctx.closePath(); ctx.fill(); } }
+    if (near(1750, 100)) for (let r = 0; r < 8; r++) { ctx.fillStyle = 'rgba(125,255,176,' + (0.2 + 0.25 * Math.sin(4 * time + 3 * r)).toFixed(3) + ')'; ctx.fillRect(sn((0.13 * r + 0.05) * W + 14 * Math.sin(0.8 * time + 2 * r)), sn(yOf(1750) + 18 * Math.sin(1.3 * time + r) + (r % 3) * 10), 3, 3); }
+    deepLandmarks();
     // butterflies (moths, deeper) that keep you company
     for (const b of roam) {
       b.x += b.sp * dt; if (b.sp > 0 && b.x > W + 60) { b.x = -60; b.off = D(-200, 200); } if (b.sp < 0 && b.x < -60) { b.x = W + 60; b.off = D(-200, 200); }
@@ -1732,17 +2097,17 @@ setInterval(tick, 250);
     if (!low) { lianas(0.85, 330, 57, 0.7); mist(0.9, 260, 241, 0.09 * fog); }
     limbs(1, 310, 60, 0.82, 1.35);
     // depth haze over everything behind the lens: the deep forest becomes quiet silhouettes, so the answer and the text stand out
-    const haze = Math.min(0.62, Math.max(0, (camS - 80) / 900));
+    const haze = Math.min(camS > FLOOR + 200 ? 0.22 : 0.3, Math.max(0, (camS - 80) / 1400));
     if (haze > 0.01) { ctx.fillStyle = css(air(camS + H * mpp * 0.1), haze.toFixed(3)); ctx.fillRect(-W, -H, W * 3, H * 3); }
     // spores and dust hanging in the still air: tiny, sparse, drifting up past you as you fall
-    if (!low) { const n = Math.round(W * H / 9000), drift = camS / mpp; for (let q = 0; q < n; q++) { const x = mod(hsh(q, 401) * W + Math.sin(time * 0.3 + q) * 6, W), y = mod(hsh(q, 402) * (H + 40) - drift * (0.6 + hsh(q, 403) * 0.5) - time * (3 + hsh(q, 404) * 5), H + 40) - 20, big = hsh(q, 405) > 0.85, warm = hsh(q, 406) > 0.9; ctx.fillStyle = (warm ? 'rgba(232,255,122,' : 'rgba(190,236,210,') + ((big ? 0.5 : 0.28) * (0.6 + 0.4 * Math.sin(time * 1.7 + q))).toFixed(2) + ')'; ctx.fillRect(sn(x), sn(y), big ? 2 : 1, big ? 2 : 1); } }
+    if (!low) { const n = Math.round(W * H / 9000), drift = camS / mpp; for (let q = 0; q < n; q++) { const x = mod(hsh(q, 401) * W + Math.sin(time * 0.3 + q) * 6, W), y = mod(hsh(q, 402) * (H + 40) - drift * (0.6 + hsh(q, 403) * 0.5) - time * (3 + hsh(q, 404) * 5), H + 40) - 20, big = hsh(q, 405) > 0.85, warm = hsh(q, 406) > 0.9; ctx.fillStyle = (camS > FLOOR ? 'rgba(' + (warm ? '255,255,255' : biomeOf(camS).mote) + ',' : warm ? 'rgba(232,255,122,' : 'rgba(190,236,210,') + ((big ? 0.5 : 0.28) * (0.6 + 0.4 * Math.sin(time * 1.7 + q))).toFixed(2) + ')'; ctx.fillRect(sn(x), sn(y), big ? 2 : 1, big ? 2 : 1); } }
     // the trunks you are climbing down between
     for (const side of [0, 1]) {
       const w = Math.max(26, Math.min(70, W * 0.06)), x = side ? W - w : 0, top = Math.max(0, sy - 20), bot = Math.min(H, yOf(FLOOR) + 30);
       if (bot > 0 && top < H) {
         fillBark(x, top, w, bot - top, camS / mpp, css(lerp3(air(camS + H * mpp * 0.2), [2, 7, 4], 0.86)), 90 + side);
       }
-      if (camS > FLOOR - 200) { ctx.fillStyle = css(lerp3(air(camS + H * mpp * 0.3), [20, 18, 16], 0.85)); const t2 = Math.max(0, yOf(FLOOR) + 20); ctx.beginPath(); ctx.moveTo(side ? W : 0, t2); for (let y = t2; y <= H + 30; y += 30) ctx.lineTo(side ? W - w * (0.7 + hsh((y + camS / mpp) / 30 | 0, 80 + side) * 0.9) : w * (0.7 + hsh((y + camS / mpp) / 30 | 0, 80 + side) * 0.9), y); ctx.lineTo(side ? W : 0, H + 30); ctx.closePath(); ctx.fill(); }
+      if (camS > FLOOR - 200) { ctx.fillStyle = css(lerp3(air(camS + H * mpp * 0.3), rockAt(camS + H * mpp * 0.3), 0.85)); const t2 = Math.max(0, yOf(FLOOR) + 20); ctx.beginPath(); ctx.moveTo(side ? W : 0, t2); for (let y = t2; y <= H + 30; y += 30) ctx.lineTo(side ? W - w * (0.7 + hsh((y + camS / mpp) / 30 | 0, 80 + side) * 0.9) : w * (0.7 + hsh((y + camS / mpp) / 30 | 0, 80 + side) * 0.9), y); ctx.lineTo(side ? W : 0, H + 30); ctx.closePath(); ctx.fill(); }
     }
     leafLayer(leavesB, dt); leafLayer.prev = camS;
     // big leaves right in front of the lens: they whip past as you fall
@@ -1942,6 +2307,7 @@ setInterval(tick, 250);
       cam = reduce ? target : cam + (target - cam) * (1 - Math.exp(-dt * 2));
       if (Math.abs(target - cam) < 0.05) cam = target;
     }
+    if (time - ambT > 0.5) { ambT = time; if (window.__amb) window.__amb(camS < 300 ? 'canopy' : camS < FLOOR ? 'forest' : biomeOf(camS).kind); }
     // the view trails the camera slightly and breathes when idle
     camS += (cam - camS) * (reduce ? 1 : 1 - Math.exp(-6 * dt)); if (Math.abs(cam - camS) < 0.02) camS = cam;
     camS += reduce ? 0 : 0.012 * Math.sin(0.45 * time);

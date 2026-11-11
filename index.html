@@ -775,6 +775,10 @@ body.low #bloom { display: none; }
 
 #conn { position: fixed; top: max(12px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 8px; padding: 6px 14px 4px; font-size: 16px; letter-spacing: 0.14em; text-transform: uppercase; color: #ffd166; background: rgba(5, 13, 8, 0.94); box-shadow: 0 0 0 2px #050d08, 0 0 0 4px #ff7a45; pointer-events: none; }
 #conn i { width: 8px; height: 8px; background: #ff7a45; animation: glow 0.6s steps(2) infinite; }
+
+/* skip: a quiet button tucked under Drop */
+.ans .skip { position: absolute; right: max(16px, calc(50% - 330px)); bottom: calc(2px + env(safe-area-inset-bottom, 0px)); margin: 0; font-size: 13px; padding: 3px 10px 2px; opacity: 0.85; }
+.ans:not(.play .ans) .skip { position: static; align-self: center; }
 </style>
 </head>
 <body>

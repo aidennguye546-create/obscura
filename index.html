@@ -742,6 +742,32 @@ button.go:active:not(:disabled) { transform: translateY(3px); }
 @keyframes omrays { 0% { opacity: 0; transform: translate(-50%, -50%) rotate(0) scale(0.3); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(40deg) scale(1); } }
 .rival.big { background: linear-gradient(90deg, rgba(40, 28, 6, 0.95), rgba(70, 50, 10, 0.95), rgba(40, 28, 6, 0.95)); box-shadow: 0 0 0 2px #050d08, 0 0 0 4px #ffd166, 0 0 30px rgba(255, 209, 102, 0.6); }
 body.low #obzmini .om-rays { display: none; }
+
+/* ---- party-room flair ---- */
+#bigcount { position: fixed; left: 0; right: 0; top: 34%; z-index: 30; pointer-events: none; text-align: center; font-size: clamp(110px, 34vw, 220px); line-height: 1; color: #f0f7e4;
+  text-shadow: 0 0 30px rgba(125, 255, 176, 0.7), -5px 0 0 rgba(255, 122, 69, 0.5), 5px 0 0 rgba(125, 255, 176, 0.5), 0 8px 0 #050d08; animation: cdslam 0.9s cubic-bezier(.2, 1.8, .4, 1) forwards; }
+#bigcount.go { color: #ffe08a; font-size: clamp(80px, 24vw, 170px); letter-spacing: 0.08em; text-shadow: 0 0 34px rgba(255, 209, 102, 0.85), -5px 0 0 rgba(255, 122, 69, 0.55), 5px 0 0 rgba(125, 255, 176, 0.5), 0 8px 0 #3a2408; }
+@keyframes cdslam { 0% { opacity: 0; transform: scale(2.6); filter: blur(6px); } 22% { opacity: 1; transform: scale(0.94); filter: none; } 34% { transform: scale(1.04); } 75% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.8) translateY(20px); } }
+#leadslam { position: fixed; left: 50%; top: 22%; z-index: 30; pointer-events: none; display: flex; align-items: center; gap: 14px; padding: 12px 24px 10px 14px; min-width: min(420px, 88vw);
+  background: linear-gradient(90deg, rgba(5, 13, 8, 0.96), rgba(17, 38, 26, 0.96)); box-shadow: 0 0 0 3px #050d08, 0 0 0 6px var(--lc), 0 6px 0 6px #0a1c10, 0 0 40px var(--lc);
+  transform: translateX(-50%); animation: leadin 2.5s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+#leadslam img { image-rendering: pixelated; animation: leadhop 0.5s steps(2) 3; }
+#leadslam small { display: block; font-size: 14px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--lc); }
+#leadslam strong { display: block; font-weight: 400; font-size: clamp(24px, 6.5vw, 36px); letter-spacing: 0.06em; text-transform: uppercase; color: #f0f7e4; text-shadow: 0 0 16px var(--lc); }
+@keyframes leadin { 0% { opacity: 0; transform: translateX(-160%) skewX(-12deg); } 14% { opacity: 1; transform: translateX(-46%) skewX(4deg); } 22% { transform: translateX(-50%) skewX(0); } 82% { opacity: 1; transform: translateX(-50%); } 100% { opacity: 0; transform: translateX(60%) skewX(-10deg); } }
+@keyframes leadhop { 50% { transform: translateY(-8px); } }
+.emotes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 10px 0 4px; }
+.emotes .small { margin: 0; font-size: 16px; padding: 7px 12px 5px; }
+#emos { position: fixed; left: 12px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 25; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.emo { display: flex; align-items: center; gap: 8px; padding: 6px 14px 4px 8px; background: rgba(7, 18, 11, 0.94); box-shadow: 0 0 0 2px #050d08, 0 0 0 4px var(--pc), 0 0 18px var(--pc);
+  animation: emoup 3.8s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+.emo img { image-rendering: pixelated; }
+.emo .who { font-size: 15px; letter-spacing: 0.1em; text-transform: uppercase; color: #8fae8f; }
+.emo b { font-weight: 400; font-size: 24px; letter-spacing: 0.08em; color: #f0f7e4; text-shadow: 0 0 10px var(--pc); }
+@keyframes emoup { 0% { opacity: 0; transform: translateY(30px) scale(0.6); } 10% { opacity: 1; transform: translateY(0) scale(1.08); } 16% { transform: scale(1); } 80% { opacity: 1; transform: translateY(-10px); } 100% { opacity: 0; transform: translateY(-40px); } }
+#obz.champ .obz-word span { background: linear-gradient(180deg, #ffffff 0%, #ffe08a 40%, #ff9a3a 100%); -webkit-background-clip: text; background-clip: text; }
+#obz.champ .obz-moth img { animation: leadhop 0.45s steps(2) infinite; }
+body.low #bigcount, body.low #leadslam, body.low .emo, body.low #leadslam img { animation: none; }
 </style>
 </head>
 <body>

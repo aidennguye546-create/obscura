@@ -20,10 +20,25 @@ const ART = {
   moth: ['................................', '................................', '..........7.7.......7.7.........', '...5.......5.........5......5...', '..525.......5.......5......525..', '..53255......5.....5.....55325..', '.5311325......555.5.....5331125.', '.531111255....5885....553111125.', '.5311177775...5885...5777711125.', '.531177447755588885557744771125.', '53111746447325822853374644711125', '53111744447113888831174444711225', '5211177447711182281117744771225.', '.52111777711118888111177771225..', '..521111111111822811111111225...', '...5211111222188881221111225....', '....52222255538228255322225.....', '.....555553331888813325555......', '.....5533311118228111133255.....', '....533111111188881111111325....', '....531111111182281111111125....', '....531117711188881117711125....', '....521177771182281177771125....', '.....5317777125885317777125.....', '.....5311771255885211771125.....', '.....531111125.55.531111225.....', '.....522211225....521112225.....', '......5552225......5222555......', '.........555........555.........', '................................', '................................', '................................'],
 };
 const ACC = {'krill':  ['#ff8fa3', '#2b6b3f'], 'macaw':  ['#ffd166', '#4d9bff'], 'toucan':  ['#ff8a2a', '#ffd166'], 'sloth':  ['#3b2a1a', '#5a3d22'], 'jaguar':  ['#1a1208', '#c8ff5a'], 'moth':  ['#fff3c4', '#5a4024']};
+// Shaded 32x32 creature icons for menus, results and the legend, each in its own colours (drawn by scratch icons2.py).
+const ICONS = {"krill":{"rows":["................................","................................","................................","................................",".......aaaaa........aaaaa.......","......abcccca......abcccca......",".....abcccccca....abcccccca.....","....abcddeedccaaaabcddeedcca....","....acddfffddgbccccddfffddga....","....acddfhhfdgcccgcddfhhfdga....","....acddfhhfggcddgcddfhhfgga....",".....agddffggbddddcgddffgga.....",".....abgggggbiddddcigggggba.....",".....acccccccddddddccccccga.....",".....accccccddddddddcccccga.....",".....acdddddddddddddddddgga.....","......adddjddddddddddjddga......",".....abddddjjjjjjjjjjjdddii.....",".....aiidddgggggggggdddddga.....","....abddddggklllllllgdddddca....","....acdddggklllllllllgddddga....","....acdddgklmmmmmmmmllddddgi....","...aaidddglmmmmmmmmmmncddggaa...",".aaoppdddglmmmmmmmmmmncddgoppaa.","aopppqcggglmmmmmmmmmnncgggpppppa","apprrrpgoppnmmmmmmmnnoppgorrrpqa","aprrrrppppqbnnnnnnnnbppppprrrrqa","apqrrrrprrqcccccccccgprrprrrqqqa",".aaqqqqrrrqaaaaaaaaaaprrqqqqqaa.","...aaaaqqqqa........apqqqaaaa...",".......aaaaa.........aaaaa......","................................"],"pal":["#2a0d05","#ffd0a8","#ff9a62","#ff7a45","#5a1a08","#ffffff","#b3401b","#141010","#3a1206","#7a2410","#fff4e6","#ffe2c4","#ffd0a0","#e0a070","#ffc59a","#ff8a52","#9c3514","#e8622f"]},"macaw":{"rows":["................................","................................","................................",".................aaaa...........","...............aabcccaa.........","..............abccccccca........","..............accddddceaa.......",".............abdddeeeeefgaa.....",".............acddeehihhgggga....",".............acddehhihjgkgla....","............aacddehmmmjgkkkga...","...........anoodddcjjjjgpkppa...","..........anooqcddcccccaappa....",".........anorrroeddeeaa..aa.....","........anorrrrqsedea...........","........aorrrrrqtteea...........",".......anrrrrrrqtttea...........",".......aorrrrrrqtuvca...........",".......aorrrrrrqtuvca...........",".......aorrrrrqqtuva............",".......aorrrrrqsuvva............",".......aorrrrqqtuva.............",".......aorrrqqsuvva.............",".......aorrqqstvva..............",".......aorqqstvva...............","...aaaaaoqqbcvvaaaaaaaaaaaaaa...","..awxxxxxxxxxxkkkxxxxxxxxxxxxa..","..axyyyyyyyyyyyyyyyyyyyyyyyyya..","...aaanooooaaaaaaaaaaaaaaaaaa...","....anooqqa.....................","....aorqqa......................","....aoqqa......................."],"pal":["#0e1a2c","#d7e8ff","#9cc2ee","#6f9fd8","#3d6ea8","#6b7380","#454b55","#ffffff","#14100c","#c6ccd6","#2b2f36","#8a94a3","#eef1f6","#b9d3f5","#7aa6dc","#16181c","#2f5a8f","#4f84c4","#fff4cf","#f8e29a","#f2d16b","#c9a33c","#c99a62","#a8743f","#5b3a1e"]},"toucan":{"rows":["................................","................................","..............aa................","............aabcaa..............","...........abccccca...aaaaa.....","..........abccddcecaaafggggaaa..",".........abcdddddehiiiggggggjfa.",".........acdddddkkiiilgmmmmnoooa",".........acdddddkpkqqlgmrrmnoosa",".........acddddddkiqqlgmmmrrrrsa","..........addddddeilllgmmnnngaa.",".........abdeedeeetaalgnnnaaa...","........abcdeteetuva.aaaaa......",".......abcddeuuuuuva............",".......acdddeuuuwwva............","......abddddeuwwwvva............","......acdddddcvvvvba............","......acdddddcccccea............","......acddddddccccea............","......acddddddddddea............","......acdddddddddeea............","......acdddddddddea.............","......acddddddddeea.............","......acddeeeeeeea..............",".......aeeejoooea...............","........aejoooooa...............","...aaaaaacosssssaaaaaaaaaaa.....","..axyyyyyyyyyyyyyyyyyyyyyyya....","..ayzzzzzzzzzzzzzzzzzzzzzzza....","...aaaaaabccaaaaaaaaaaaaaaa.....","........accea...................","........aceea..................."],"pal":["#05070b","#4e6688","#2c3a52","#1b2433","#0b0f16","#ffd6a0","#ffad5c","#c2f7d8","#78e0a6","#ffb0b8","#4de3ff","#2a8a5a","#ff8a2a","#c8561a","#ff6676","#0a0a0a","#46c27e","#7a3410","#9e1f2c","#fff6c8","#ffe58a","#d1a93a","#f6d35a","#c99a62","#a8743f","#5b3a1e"]},"sloth":{"rows":["...aa....................aa.....","..abca..................abca....","aabcccaaaaaaaaaaaaaaaaaabcccaaaa","decfgghiiideeeeeeeeehiiicfggdeee","eeeggdiiijeeeeeeeeekiiiiiggdeeek","ekkeekilmlekkkkkkkkkimlmldekkkkk","aaaaaaimmjaaaaaaaaaaimmjjaaaaaaa",".....aimmmia......ahmmmja.......",".....aimmmja......aimmmja.......",".....aimmmjaaaaaaaaimmjja.......","......ammmjahiiiiiimmmja........","......aimmmijjjjjjjmmmja........","......aimmmjjnooooojmmja........","......aimmjjnooooooojmja........",".......ammjnpqrrrrrpqjja........",".......aimjopsprrrpspia.........",".......aimjprrrrtrruupa.........","........ammiurrrrruuhja.........","........aimiiuvuuuvhimia........","........aimmiiivvviimmja........","........aimmmiiiiiimmmja........","........aimmmmmmmmmmmmja........","........aimmmmmmmmmmmmja........","........aimmmmmmmmmmmjja........",".........ammmmmmmmmmmja.........",".........aimmmmmmmmmmja.........","........ahmmmmmmmmmmmmia........","........aimmjjmmmjjjmmja........",".......ahmmjjajjjjaammmia.......",".......aimjja.aaaa.aimmja.......",".......aimja........ammmia......",".......aijja........aijjja......"],"pal":["#2a0a06","#a8eabb","#62c27c","#b88a5c","#946640","#3f9b5a","#2a6b3f","#f2a090","#d9685a","#7a2a1c","#4a2e17","#e8dccc","#b9473a","#fff8f0","#faeadc","#5a2a14","#ffffff","#f2dcc6","#141010","#3a1a10","#d8bca2","#7a3a28"]},"jaguar":{"rows":["................................","................................","................................","................................","................................","................................","................................",".....................a....a.....","....................abaaaaba....","...................abcddddca....","...aaaaaaa.........adeddddeda...","..abdddddda.......abeeeeeeedda..",".abddddddfa.......adeeeeeeeefa..",".adeefffffaaaaaaaabeeeeeeegeeda.","abeeffaaaabddddddddeeeeeehheefa.","adeffaabddddddddddeeeeeeeeeeefa.","adefaabdddeeiieeeeeiieeeeeeeeeda","adefabdeiieeeieeeeeeeeeeeeeeeejj","adeeddeeieeeeeeeiieeeeeeeeeeeffa","adeedeeeeeeeeeeeeieeeeeeffffkka.","adeeeeieeeeeeeeeeeeeeeeffaaaaa..","adeffeeeeeiieeiieeeeeeefa.......","adefafeeeeeeeeeeeeieeeefa.......","adffaaeeeeeeeeeeeeeeeeefa.......",".aaa.adeffeeeeeeeeeffeefa.......",".....adefaeefffffeefaeefa.......",".....adefadefaaaaeefadefa.......",".....adefadefa..adefadefa.......",".....adefadefa..adefadefa.......",".....aaeaaaeaa..aaeaaaeaa.......",".....adffadffa..adffadffa.......","......aaa.aaa....aaa.aaa........"],"pal":["#05030a","#6a5a9c","#7a6ab0","#3b2f5c","#231c36","#0d0a16","#f4ffd0","#c8ff5a","#56478a","#1a1424","#4a3d72"]},"moth":{"rows":["................................","................................","................................","...a........................a...","..aba.......c......c.......aba..",".abccaa.....d......d.....aabcca.",".aceccca...c.d....d.c...abccefa.",".acebccca.....d..d....aabccbefa.","abebeeeccaa....dd....abcceeebeca","aceeeeeeccca..agha..abcceeeeeffa",".aeeeeaaecccaaahiaaabceeaaeeefa.",".aceeejaeeecccahiabcceeeajeeffa.",".aceeeeeeeeecfchibcceeeeeeeefa..","..aeeeeeeeeeefgddheeeeeeeeeefa..","..aceeeeeeeeefhddiceeeeeeeeffa..","...affffffeeefhddiceefffffffa...","....aaaaaaffffhddicfffaaaaaa....",".....aaaaaklllhddikllaaaaaa.....","....aklllllllmhddillllllllla....","....alllllnnnmhddilnnlllllma....","....alnnnnnnnmhdiilnnnnnnnma....","...aknnnnnnnnnldiknnnnnnnnma....","...alnkonnnnnmmhilnnnnnnoknla...","...alnnonnnnmmahilnnnnnnonnma...","...alnnnnnnmmaahiamnnnnnnnmma...","....ammnnnmma..aa.amnnnnmmma....",".....aammmma.......amnmmmaa.....",".......aama.........ammaa.......",".........a...........aa.........","................................","................................","................................"],"pal":["#3a2408","#fff2c4","#ffd77a","#5e4422","#f0b84a","#b0782a","#a68250","#7e5e32","#3a2a14","#fff6d8","#ffd0a0","#ffaa5c","#a85a2a","#e8873a","#5a1a08"]}};
 const spriteCache = {};
 function sprite(art, color) {
   const key = art + color;
   if (spriteCache[key]) return spriteCache[key];
+  const I = ICONS[art];
+  if (I) {
+    // a locked companion shows as a flat silhouette in the colour it was given
+    // drawn in its own colours, unless it is asked for in another one (a player's frog, the frog turned gold):
+    // then every colour keeps its lightness but takes that hue, and the whites, blacks and outline stay as they are
+    let natural = !color; try { natural = natural || [...TIERS.filter(t => t.art === art).map(t => t.color), ...PALS.filter(p => p.art === art).map(p => p.color), ...TIER_COLOURS.cb].includes(color); } catch (e) { natural = true; }
+    const tint = c => { if (natural) return c; const v = parseInt(c.slice(1), 16), r = v >> 16, g2 = (v >> 8) & 255, b = v & 255, mx = Math.max(r, g2, b), mn = Math.min(r, g2, b), L = (mx + mn) / 510;
+      if (mx - mn < 26 || L < 0.13) return c; const t = parseInt(color.slice(1), 16), T = [t >> 16, (t >> 8) & 255, t & 255], f = L < 0.5 ? (0.5 - L) * 1.9 : (L - 0.5) * 0.85, to = L < 0.5 ? 0 : 255;
+      return 'rgb(' + T.map(x => Math.round(x + (to - x) * Math.min(0.9, f))).join(',') + ')'; };
+    const lock = color === '#3a4a3e', cv = document.createElement('canvas'); cv.width = cv.height = I.rows.length; const g = cv.getContext('2d'), ch = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    I.rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.') { g.fillStyle = lock ? color : tint(I.pal[ch.indexOf(row[x])]); g.fillRect(x, y, 1, 1); } });
+    return (spriteCache[key] = cv.toDataURL());
+  }
   const n = parseInt(color.slice(1), 16), rgb = [n >> 16, (n >> 8) & 255, n & 255];
   const mix = (to, f) => 'rgb(' + rgb.map(c => Math.round(c + (to - c) * f)).join(',') + ')';
   const acc = ACC[art] || ACC.krill;
@@ -108,6 +123,9 @@ function buildTopic(t) {
   if (!star && fix.k) { star = { name: fix.k[0], tier: 3, toks: [] }; list.push(star); map.set(norm(star.name), star); }
   if (!star) star = list.filter(e => e.tier === 3).pop() || list[list.length - 1] || { name: '', tier: 4, toks: [] };
   star.tier = 4; star.fact = fix.k ? fix.k[1] : '';
+  // up to four Obscuras a prompt: the hand-picked one with its fact, and up to three from the very end of the deep tail
+  const deep = list.filter(e => e.tier === 3);
+  for (const e of deep.slice(deep.length - Math.min(3, Math.floor(deep.length / 8)))) e.tier = 4;
   return { id: t.id, name: t.name, blurb: t.blurb, map, words, lmap, list, star };
 }
 const RAW = {}, TOPICS = {};
@@ -404,6 +422,7 @@ const Sound = (() => {
       noise({ dur: 2.2, lp: 9000, hp: 4000, peak: 0.035, delay: 0.1, send: 0.7 });
     },
     // the score counting up: a run of soft clicks that climbs with it
+    slam(i) { const f = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1318.51][i] || 880; tone({ f0: 120 - i * 6, f1: 50, dur: 0.18, peak: 0.16, lp: 600 }); noise({ dur: 0.05, lp: 4000, hp: 900, peak: 0.07 }); bell(f, { peak: 0.09 + i * 0.01, dur: 0.9, send: 0.6 }); if (i === 6) { bell(f * 1.5, { peak: 0.08, dur: 1.6, delay: 0.08, send: 0.8 }); bell(f * 2, { peak: 0.06, dur: 1.8, delay: 0.16, send: 0.9 }); } },
     tally(u) { tone({ type: 'triangle', f0: 700 + u * 900, dur: 0.035, peak: 0.05 }); },
     ding() { bell(C.E6, { peak: 0.1, dur: 0.8 }); },
     best() { [C.G5, C.C6, C.E6].forEach((f, i) => bell(f, { peak: 0.1, dur: 1, delay: i * 0.09 })); },
@@ -692,7 +711,7 @@ function pickSeven(pool, rnd) {
 const dayNoOf = key => { const p = key.split('-').map(Number); return Math.max(1, Math.floor((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
 // No repeats: the pool is shuffled once per cycle and dealt out seven a day until it runs out, then reshuffled.
 function dealSeven(pool, tag, n) { const ids = pool.filter(usable).sort(), per = Math.floor(ids.length / 7); if (!per) return []; const cyc = Math.floor((n - 1) / per), rnd = seeded('obscura:' + tag + ':' + cyc); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } const k = ((n - 1) % per) * 7; return ids.slice(k, k + 7); }
-window.__dbg = { S: () => S, topic: id => TOPICS[id] };
+window.__dbg = { sprite, S: () => S, topic: id => TOPICS[id], rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
 window.__deal = (tag, n) => dealSeven(tag === 'daily' ? TOPIC_IDS : packPool(tag), tag, n);
 const dailySaved = () => { try { return JSON.parse(ls.get('daily_' + dayKey()) || 'null'); } catch (e) { return null; } };
 const dailyKey = kind => 'daily_' + kind + '_' + dayKey();
@@ -1072,6 +1091,14 @@ function rivalToast(kids, color, big) {
   const el = h('div', { id: 'rival', class: 'rival' + (big ? ' big' : ''), style: '--rc:' + (color || '#7dffb0'), role: 'status' }, kids);
   document.body.append(el); clearTimeout(rivalToast._t); rivalToast._t = setTimeout(() => el.remove(), big ? 3300 : 2700);
 }
+// someone else in the room found an Obscura: the edges of your screen flare gold and rays open behind the news,
+// without covering your own game
+function rivalGold() {
+  const old = $('obzmini'); if (old) old.remove();
+  const el = h('div', { id: 'obzmini', 'aria-hidden': 'true' }, h('div', { class: 'om-edge' }), h('div', { class: 'om-rays' }));
+  document.body.append(el); setTimeout(() => el.remove(), 2200);
+  snd('best'); [4, 5, 6].forEach((i, k) => setTimeout(() => snd('slam', i), 120 + k * 110));
+}
 function rivalWatch() {
   const r = S.room; if (S.mode !== 'online' || !r || r.phase !== 'play') return;
   const ps = ordered(); if (ps.length < 2) return;
@@ -1084,7 +1111,7 @@ function rivalWatch() {
     S._seen[p.id] = a.length;
     if (a.length > was) {
       const best = a.slice(was).reduce((m, x) => (x[1] > m[1] ? x : m), ['', -1]);
-      if (best[1] >= 2) { const T = TIERS[best[1]]; rivalToast([icon(T.art, T.color, 28), h('span', { text: nameOf(p) + (best[1] === 4 ? ' found the Obscura' : ' found a ' + T.name) }), h('b', { text: '+' + T.pts })], T.color, best[1] === 4); snd(best[1] === 4 ? 'best' : 'ding'); }
+      if (best[1] >= 2) { const T = TIERS[best[1]]; rivalToast([icon(T.art, T.color, 28), h('span', { text: nameOf(p) + (best[1] === 4 ? ' found an Obscura' : ' found a ' + T.name) }), h('b', { text: '+' + T.pts })], T.color, best[1] === 4); if (best[1] === 4) rivalGold(); else snd('ding'); }
     }
   }
   const sorted = ps.slice().sort((a, b) => total(b) - total(a)), lead = sorted[0];
@@ -1116,6 +1143,21 @@ function modal(id, label, title, ...kids) {
       kids));
   document.body.append(m); m.close = close; return m;
 }
+// The Obscura moment: the forest goes dark, gold rays turn behind the moth, rings break outward,
+// and the name slams down letter by letter, each with its own rising note, before the result card arrives.
+window.__obscura = y => {
+  const old = $('obz'); if (old) old.remove();
+  const word = 'OBSCURA', low = SET.low || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const el = h('div', { id: 'obz', class: low ? 'low' : '', 'aria-hidden': 'true', style: '--y:' + Math.round(y) + 'px' },
+    h('div', { class: 'obz-dim' }), h('div', { class: 'obz-rays' }), h('div', { class: 'obz-core' }),
+    [0, 1, 2].map(i => h('div', { class: 'obz-ring', style: '--d:' + (0.05 + i * 0.22) + 's' })),
+    h('div', { class: 'obz-moth' }, icon('moth', '#ffe08a', 128)),
+    h('div', { class: 'obz-word' }, [...word].map((c, i) => h('span', { style: '--i:' + i, text: c }))),
+    h('div', { class: 'obz-sub', text: 'the rarest find in the forest' }));
+  document.body.append(el);
+  if (!low) [...word].forEach((c, i) => setTimeout(() => snd('slam', i), 640 + i * 90));
+  setTimeout(() => el.remove(), 3300);
+};
 const goHome = () => { if (S.mode) leave(); document.querySelectorAll('.modal').forEach(m => m.remove()); };
 function openMenu() {
   const here = !S.mode ? 'home' : S.room && S.room.fixed ? S.room.kind : S.mode;
@@ -1282,7 +1324,7 @@ function renderDive() {
     if (hit) {
       const T = TIERS[hit.tier];
       kids = [h('div', { class: 'landed t-' + T.key }, tierIcon(hit.tier, 72, 'bigicon'),
-        h('h2', { class: 'tname', 'aria-label': hit.tier === 4 ? 'Pure Obscura' : T.name, style: '--n:' + (hit.tier === 4 ? 12 : T.name.length) }, [...(hit.tier === 4 ? 'Pure Obscura' : T.name)].map((ch, i) => h('span', { 'aria-hidden': 'true', style: 'animation-delay:' + (0.28 + i * 0.055).toFixed(3) + 's', text: ch === ' ' ? '\u00a0' : ch }))),
+        h('h2', { class: 'tname', 'aria-label': hit.tier === 4 ? 'Pure Obscura' : T.name, style: '--n:' + (hit.tier === 4 ? 12 : T.name.length) }, [...(hit.tier === 4 ? 'Pure Obscura' : T.name)].map((ch, i) => h('span', { 'aria-hidden': 'true', style: 'animation-delay:' + ((hit.tier === 4 && !SET.low ? 3.05 : 0.28) + i * 0.055).toFixed(3) + 's', text: ch === ' ' ? '\u00a0' : ch }))),
         h('p', { class: 'tans', text: '“' + hit.name + '”' }),
         h('p', { class: 'tpts' }, h('b', { class: 'ptsup', 'data-pts': String(T.pts), text: '+0 PTS' }), ' · drop ' + fmt(T.pts * M_PER_PT) + 'm'),
         h('p', { class: 'note', text: hit.fact || T.line }), btn)];
@@ -1294,7 +1336,7 @@ function renderDive() {
       if (tags.length) { kids[0].insertBefore(h('p', { class: 'badges' }, tags.map(tx => h('span', { text: tx }))), kids[0].children[1]); setTimeout(() => snd('best'), 650); }
       // the points leave the card and land in the score
       const sc = $('hud-score');
-      const nL = hit.tier === 4 ? 12 : T.name.length, tUp = 150;
+      const nL = hit.tier === 4 ? 12 : T.name.length, tUp = hit.tier === 4 && !SET.low ? 3300 : 150;
       // the points tick up on the card, then lift off and land in the score
       setTimeout(() => {
         const b = document.querySelector('.landed .ptsup'); if (!b) return;
@@ -2222,7 +2264,7 @@ setInterval(heartbeat, 20000);
     const sad = frog.mood === 'sad', loop = frog.mood === 'loop' ? 1 - Math.max(0, frog.moodT) / 1.25 : 0;
     const bob = (sad ? Math.sin(2.2 * time) * 3 + 8 : Math.sin(1.7 * time) * 6) - Math.sin(frog.hop * Math.PI) * 46 - Math.sin(loop * Math.PI) * 40;
     if (gold) halo(frog.x, frog.y + bob, 46, '#ffd166', 0.5 + 0.2 * Math.sin(time * 2.4));
-    spr(pal.art, gold ? '#ffd166' : pal.color, frog.x, frog.y + bob, 48, false, frog.rot + (sad ? 0.5 : 0) + Math.sin(1.1 * time) * 0.07 + frog.hop * frog.hop * 6.283 - loop * 6.283);
+    spr(pal.art, gold ? '#ffc23a' : pal.color, frog.x, frog.y + bob, 48, false, frog.rot + (sad ? 0.5 : 0) + Math.sin(1.1 * time) * 0.07 + frog.hop * frog.hop * 6.283 - loop * 6.283);
     if (gold && !reduce && time - (frog.gs || 0) > 0.55) { frog.gs = time; fx.burst(frog.x + D(-10, 10), frog.y + bob + D(-6, 10), R() < 0.5 ? '#ffd166' : '#ffe9a8', 1, 0.15); }
     if (!reduce && time - frog.emit > 2.2 + R()) { frog.emit = time; fx.bubble(frog.x + 20, frog.y + bob - 8, 1.5 + 2 * R()); }
     // depth ruler, notes, vignette
@@ -2312,6 +2354,9 @@ setInterval(heartbeat, 20000);
         else if (tr === 3) fx.burst(W / 2, AY, SPARK[3], 18, 0.7);
         else {
           frog.mood = 'loop'; frog.moodT = 1.25; fx.flash('rgba(255,209,102,.35)', 1, 220); if (orbit) orbit.keep = true;
+          if (window.__obscura) window.__obscura(AY);
+          // a burst of gold as each letter of the name slams down
+          if (!reduce) for (let q = 0; q < 7; q++) setTimeout(() => { fx.burst(W / 2 + (q - 3) * Math.min(64, W * 0.12), AY + 118, ['#ffd166', '#ffe9a8', '#fff6d8'][q % 3], 9, 0.55); if (q === 0 || q === 6) fx.shake(); }, 640 + q * 90);
           setTimeout(() => { window.__gold = true; burstT = 0.0001; fx.burst(W / 2, AY, '#ffd166', 16, 0.7); for (let k = 0; k < 12; k++) fx.burst(W / 2 + D(-18, 18), AY + D(-18, 18), ['#ffd166', '#ffe9a8', '#ff7a45', '#7dffb0'][k % 4], 1, 0.2); }, 1000);
         }
       }

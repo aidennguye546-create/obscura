@@ -563,7 +563,12 @@ const zoneOf = d => { let z = 'Canopy'; for (const [m, name] of ZONES) if (m > 0
 const isHost = () => S.mode === 'solo' || (S.room && S.room.host === S.me.id);
 const nameOf = p => (p && p.name) || 'Diver';
 
-function say(msg) { S.msg = msg; const n = $('msg'); if (n) { n.textContent = msg; n.hidden = !msg; } }
+function say(msg) {
+  S.msg = msg; const n = $('msg'); if (n) { n.textContent = msg; n.hidden = !msg; }
+  // the reconnecting note shows on every screen, not just the lobby
+  let c = $('conn'); const on = msg === 'Reconnecting…' && S.mode === 'online';
+  if (on && !c) { c = h('div', { id: 'conn', role: 'status' }, h('i'), h('span', { text: 'Reconnecting…' })); document.body.append(c); } else if (!on && c) c.remove();
+}
 
 /* ---------- writes ---------- */
 let roomQ = Promise.resolve();
@@ -579,12 +584,20 @@ let saving = false, dirty = false;
 async function saveMe() {
   S.players[S.me.id] = S.mine;
   if (S.mode !== 'online') return;
+  S.mine.seen = Date.now(); // anything you do counts as being here
   dirty = true;
   if (saving) return;
   saving = true;
-  while (dirty) {
+  let fails = 0;
+  while (dirty && S.meRef) {
     dirty = false;
-    try { await S.meRef.set(clone(S.mine)); } catch (e) { say('Your answers are not saving. Check your connection.'); break; }
+    try { await S.meRef.set(clone(S.mine)); if (fails) { fails = 0; if (S.msg === 'Reconnecting…') say(''); } }
+    catch (e) {
+      // a dropped connection is not the end: keep the answers and try again, a little longer each time
+      dirty = true; fails++;
+      if (fails >= 2) say('Reconnecting…');
+      await new Promise(r => setTimeout(r, Math.min(15000, 1000 * 2 ** fails)));
+    }
   }
   saving = false;
 }
@@ -652,24 +665,43 @@ async function joinRoom(code, silent) {
     await withTimeout(meRef.set(clone(mine)));
     if (S.mode) return; // started something else while this was loading
     S.mode = 'online'; S.code = code; S.room = room; S.mine = mine;
-    S.players = { [S.me.id]: mine }; S.roomRef = ref; S.meRef = meRef;
+    S.players = { [S.me.id]: mine }; S.roomRef = ref; S.meRef = meRef; S._joinedAt = Date.now(); S._plOk = false;
     ls.set('code', code); say(''); heartbeat();
-    S.unsub.push(
-      ref.onSnapshot(s => {
-        if (!s.exists || S.roomRef !== ref) return;
+    // live links to the room; if either drops (shaky wifi, a phone asleep) both are re-made, sooner then less often
+    let live = [], tries = 0, retryT = 0;
+    const stop = () => { live.forEach(u => { try { u(); } catch (e) { /* already closed */ } }); live = []; clearTimeout(retryT); };
+    const lost = () => {
+      if (S.roomRef !== ref) return;
+      stop(); tries++; say('Reconnecting…');
+      retryT = setTimeout(listen, Math.min(15000, 800 * 2 ** Math.min(tries, 5)));
+    };
+    const ok = () => { if (tries) { tries = 0; if (S.msg === 'Reconnecting…') say(''); heartbeat(); } };
+    function listen() {
+      if (S.roomRef !== ref) return;
+      stop();
+      live.push(ref.onSnapshot(s => {
+        if (S.roomRef !== ref) return;
+        if (!s.exists) return;
+        ok();
         S.room = clone(s.data());
         if (S.room.g !== S.mine.g) { S.mine = freshMine(S.room.g, S.mine.joinedAt); saveMe(); }
         render();
-      }, () => say('Lost contact with the room. Leave and join again.')),
-      ref.collection('players').onSnapshot(q => {
+      }, lost));
+      live.push(ref.collection('players').onSnapshot(q => {
         if (S.roomRef !== ref) return;
-        const m = {};
+        ok();
+        // a list served from the offline cache can be missing people: add to what we know, never drop anyone on it
+        const m = q.fromCache ? Object.assign({}, S.players) : {};
+        if (!q.fromCache) S._plOk = true;
         q.docs.forEach(d => { m[d.id] = d.data(); });
         m[S.me.id] = S.mine;
         S.players = m;
         render();
-      }, () => {})
-    );
+      }, lost));
+    }
+    S.relisten = () => { if (S.roomRef === ref) { tries = 0; listen(); } };
+    S.unsub.push(stop);
+    listen();
     render();
   } catch (e) {
     if (!silent) say(e && e.code === 'invalid_argument'
@@ -686,7 +718,7 @@ function leave() {
   S.unsub = [];
   if (S.mode === 'online' && S.room.phase === 'lobby' && S.meRef) S.meRef.delete().catch(() => {});
   else if (S.mode === 'online' && S.meRef && S.mine) { S.mine.left = true; S.meRef.set(clone(S.mine)).catch(() => {}); } // gone mid-game: do not hold the others up
-  S.mode = null; S.room = null; S.roomRef = null; S.meRef = null; S.code = null; S.players = {}; S.fb = null; S.dive = null; S.shown = null; S.allAt = 0;
+  S.relisten = null; S.done = null; S.mode = null; S.room = null; S.roomRef = null; S.meRef = null; S.code = null; S.players = {}; S.fb = null; S.dive = null; S.shown = null; S.allAt = 0;
   S._lead = undefined; S._seenKey = null; S._ranks = null; S._fan = null; const rv = $('rival'); if (rv) rv.remove();
   ls.set('code', null); S.msg = '';
   render();
@@ -1550,7 +1582,9 @@ function tick() {
   // the host closed their tab or left: the earliest remaining player takes over, so nobody is stuck in the lobby
   if (S.mode === 'online') {
     const live = ordered().filter(p => !gone(p, now));
-    if (live.length && !live.some(p => p.id === r.host) && live[0].id === S.me.id) once('host:' + r.host + ':' + r.g, () => { patchRoom({ host: S.me.id }); say('The host left, so you are hosting now.'); });
+    // only once the real player list has arrived, and never in your first moments in the room
+    const hostP = S.players[r.host], hostAway = S._plOk && Date.now() - (S._joinedAt || 0) > 15000 && (!hostP || hostP.left || (hostP.seen && Date.now() - hostP.seen > 180000));
+    if (live.length && hostAway && !live.some(p => p.id === r.host) && live[0].id === S.me.id) once('host:' + S.code + ':' + r.host + ':' + r.g, () => { patchRoom({ host: S.me.id }); say('The host left, so you are hosting now.'); });
   }
   if (r.phase === 'pick') {
     const left = Math.max(0, Math.ceil((r.pickEndsAt - now) / 1000));
@@ -1586,9 +1620,12 @@ function tick() {
 }
 setInterval(tick, 250);
 // players check in every 20 s; anyone silent for 70 s (tab closed, phone locked) stops holding up the room
-const gone = (p, now) => p.left || (p.id !== S.me.id && p.seen && (now || Date.now()) - p.seen > 70000);
+const gone = (p, now) => p.left || (p.id !== S.me.id && p.seen && (now || Date.now()) - p.seen > 120000);
 function heartbeat() { if (S.mode === 'online' && S.meRef && S.mine) { S.mine.seen = Date.now(); saveMe(); } }
 setInterval(heartbeat, 20000);
+const checkIn = () => { if (S.mode !== 'online') return; heartbeat(); if (S.relisten) S.relisten(); };
+addEventListener('visibilitychange', () => { if (!document.hidden) checkIn(); });
+addEventListener('online', checkIn);
 
 /* ---------- the descent: down through a rainforest, from the treetops to the caves under its roots ---------- */
 // Drawn every animation frame. Branches, vines and ledges are generated from their depth,

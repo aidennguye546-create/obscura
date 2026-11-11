@@ -1597,6 +1597,7 @@ setInterval(heartbeat, 20000);
 (function scene() {
   const cv = $('sea'); if (!cv) return;
   const ctx = cv.getContext('2d');
+  const bloomC = $('bloom'), bloomX = bloomC && bloomC.getContext('2d'); let bloomN = 0;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ruler = $('ruler'), over = $('tierlines'), notes = $('notes'), vig = $('vig');
   const MPS = 230, AP = 3; // metres per screen height, CSS px per art pixel
@@ -1882,7 +1883,7 @@ setInterval(heartbeat, 20000);
   // low cloud caught between the trees: lumpy bands of blocks that drift sideways
   function mist(z, SP, k, a) {
     if (a < 0.012) return;
-    const top = camS * z - AY * mpp, bot = top + H * mpp, c = lerp3(air(camS), [206, 238, 212], 0.6), B = AP * 2;
+    const top = camS * z - AY * mpp, bot = top + H * mpp, c = camS > FLOOR ? lerp3(air(camS), biomeOf(camS).glow, 0.42) : lerp3(air(camS), [206, 238, 212], 0.6), B = AP * 2;
     const cols = [1, 0.72, 0.45].map(f => css(c, (a * f).toFixed(3)));
     for (let i = Math.floor((top - 60) / SP); i <= Math.ceil((bot + 60) / SP); i++) {
       if (i < 1) continue;
@@ -1988,6 +1989,31 @@ setInterval(heartbeat, 20000);
         ctx.fillStyle = css(gl, 0.2 * a); ctx.fillRect(sn(tx), y + th * 2, 1, tl); ctx.fillStyle = css([220, 255, 255], a); ctx.fillRect(sn(tx) - 1, sn(y + th * 2 + tl), 3, 3); }
     }
     void g;
+  }
+  // right in front of the lens in the deep worlds: huge dark shapes sweep past, rim-lit by the world's own glow
+  function foreDeep() {
+    if (camS < FLOOR - 100) return;
+    const z = 1.9, SP = 260, cz = camS * z, i0 = Math.floor((cz - AY * mpp - 700) / SP), i1 = Math.ceil((cz + (H - AY) * mpp + 200) / SP);
+    for (let i = Math.max(0, i0); i <= i1; i++) {
+      if (hsh(i, 801) < 0.35) continue;
+      const dep = (i + hsh(i, 802) * 0.5) * SP, real = dep / z; if (real < FLOOR + 80) continue;
+      const b = biomeOf(real), y = AY + (dep - cz) / mpp, left = hsh(i, 803) < 0.5, x0 = left ? 0 : W, dir = left ? 1 : -1;
+      const reach = Math.min(W * 0.42, 90 + hsh(i, 804) * 220), len = 240 + hsh(i, 805) * 420, kind = b.kind;
+      const pts = [];
+      if (kind === 'crystal') { // a cluster of crystal spears jutting in from the side
+        pts.push([x0, y - len * 0.4], [x0 + dir * reach * 0.55, y - len * 0.15], [x0 + dir * reach, y - len * 0.05], [x0 + dir * reach * 0.6, y + len * 0.05], [x0 + dir * reach * 0.8, y + len * 0.22], [x0, y + len * 0.4]);
+      } else if (kind === 'fungal') { // a giant mushroom cap seen from below
+        for (let a = 0; a <= 12; a++) { const t = a / 12; pts.push([x0 + dir * reach * Math.sin(t * Math.PI), y - len * 0.18 + t * len * 0.36 + Math.sin(t * 9 + i) * 6]); }
+      } else { // a ragged spur of rock, root or ruin
+        const n = 9; for (let a = 0; a <= n; a++) { const t = a / n, bulge = Math.sin(t * Math.PI), jag = (hsh(i * 13 + a, 806) - 0.5) * 34; pts.push([x0 + dir * (reach * bulge * (0.6 + 0.4 * hsh(i * 7 + a, 807)) + jag * bulge), y - len / 2 + t * len]); }
+      }
+      ctx.fillStyle = css(lerp3(air(real), [0, 0, 0], 0.82));
+      ctx.beginPath(); pts.forEach(([px, py], k) => k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); ctx.fill();
+      // rim light along the edge that faces the open shaft
+      ctx.strokeStyle = css(b.glow, (0.28 + 0.18 * Math.sin(time * 1.3 + i)).toFixed(3)); ctx.lineWidth = AP;
+      ctx.beginPath(); pts.slice(1, -1).forEach(([px, py], k) => k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.stroke();
+      if (kind === 'magma' || kind === 'crystal' || kind === 'grotto' || kind === 'fungal' || kind === 'obscura') { const [tx, ty] = pts[Math.floor(pts.length / 2)]; halo(tx, ty, 26, css(b.glow), 0.35); }
+    }
   }
   // the far wall of the cavern: giant stalactites and columns, faint with distance, so the space feels huge
   function caveFar() {
@@ -2133,7 +2159,7 @@ setInterval(heartbeat, 20000);
       ctx.lineTo(W, sy + 4); ctx.closePath(); ctx.fill();
     }
     const low = !!window.__low;
-    const fog = Math.min(1, camS / 220) * Math.max(0.25, 1 - camS / 5200);
+    const fog = camS > FLOOR ? 0.75 : Math.min(1, camS / 220) * Math.max(0.25, 1 - camS / 5200);
     if (!low) trunks(0.2, Math.max(5, Math.round(W / 110)), 8, 10, 31, 0.12);
     if (!low) { farFoliage(0.24, 70, 201, 0.18, AP * 0.67, 0.5); mist(0.27, 62, 211, 0.2 * fog); waterfall(); }
     trunks(0.35, Math.max(4, Math.round(W / 150)), 14, 22, 1, 0.3);
@@ -2150,6 +2176,18 @@ setInterval(heartbeat, 20000);
       ctx.globalCompositeOperation = 'source-over';
       // dust catching the light
       for (let q = 0; q < 5; q++) { const u = mod(hsh(k * 9 + q, 55) + time * 0.02 * (1 + q * 0.3), 1), dx = x0 + w0 / 2 + (sl + w0) * u + Math.sin(time + q * 2) * w0 * 0.5, dy = top + len * u; halo(dx, dy, 5, 'rgb(255,250,210)', a * 5 * (0.5 + 0.5 * Math.sin(time * 2.4 + q * 1.9 + k)) * (1 - u)); }
+    }
+    // deep down, shafts of the world's own light pour through the cavern
+    if (!low && camS > FLOOR - 200) {
+      const g = biomeOf(camS + H * mpp * 0.2).glow, on = Math.min(1, (camS - FLOOR + 200) / 600);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 4; k++) {
+        const a = 0.075 * on * (0.55 + 0.45 * Math.sin(time * 0.45 + k * 1.9)), x0 = W * (0.08 + k * 0.26) + Math.sin(time * 0.17 + k * 2.3) * 30, w0 = 30 + k * 14, sl = H * (0.18 + 0.1 * (k % 2)), len = H * 1.2;
+        const gr = ctx.createLinearGradient(0, -20, 0, len); gr.addColorStop(0, css(g, a.toFixed(3))); gr.addColorStop(1, css(g, 0));
+        ctx.fillStyle = gr;
+        for (const f of [1, 0.55]) { ctx.beginPath(); ctx.moveTo(x0 - w0 * f / 2, -20); ctx.lineTo(x0 + w0 * f / 2, -20); ctx.lineTo(x0 + sl + w0 * 2.2 * f, len); ctx.lineTo(x0 + sl - w0 * 2.2 * f, len); ctx.closePath(); ctx.fill(); }
+      }
+      ctx.globalCompositeOperation = 'source-over';
     }
     if (!low) lianas(0.5, 210, 51, 0.4);
     limbs(0.6, 150, 20, 0.45, 0.8);
@@ -2199,6 +2237,7 @@ setInterval(heartbeat, 20000);
     }
     if (!low) { lianas(0.85, 330, 57, 0.7); mist(0.9, 260, 241, 0.09 * fog); }
     limbs(1, 310, 60, 0.82, 1.35);
+    if (!low) foreDeep();
     // depth haze over everything behind the lens: the deep forest becomes quiet silhouettes, so the answer and the text stand out
     const haze = Math.min(camS > FLOOR + 200 ? 0.22 : 0.3, Math.max(0, (camS - 80) / 1400));
     if (haze > 0.01) { ctx.fillStyle = css(air(camS + H * mpp * 0.1), haze.toFixed(3)); ctx.fillRect(-W, -H, W * 3, H * 3); }
@@ -2438,6 +2477,7 @@ setInterval(heartbeat, 20000);
     if (burstT > 0) { burstT += dt / 1.5; if (burstT >= 1) { burstT = 0; orbit = null; } }
     if (orbit && !orbit.keep && !window.__sink && !window.__lines && burstT === 0) orbit = null;
     draw(dt);
+    if (bloomX && !window.__low && (bloomN++ & 1) === 0) { const bw = Math.max(1, Math.ceil(W / 4)), bh = Math.max(1, Math.ceil(H / 4)); if (bloomC.width !== bw || bloomC.height !== bh) { bloomC.width = bw; bloomC.height = bh; } bloomX.drawImage(cv, 0, 0, bw, bh); const bo = (camS > FLOOR ? 0.78 : 0.5).toFixed(2); if (bloomC.style.opacity !== bo) bloomC.style.opacity = bo; }
   }
   addEventListener('pointerdown', e => { if (frog.hop > 0 || Math.hypot(e.clientX - frog.x, e.clientY - frog.y) > 36 || (e.target.closest && e.target.closest('button, input, select'))) return; frog.hop = 1; snd('ribbit'); { const pop = h('span', { class: 'ribbit', 'aria-hidden': 'true', text: (window.__pal && window.__pal.id !== 'frog') ? 'hey!' : 'ribbit!', style: 'left:' + Math.round(frog.x) + 'px;top:' + Math.round(frog.y - 34) + 'px' }); document.body.append(pop); setTimeout(() => pop.remove(), 1000); } for (let q = 0; q < 6; q++) fx.bubble(frog.x + D(-16, 26), frog.y - 16, 1 + 3 * R()); fx.burst(frog.x, frog.y, '#ff7a45', 10, 0.5); });
   // deep down, the pointer leaves a trail of sparks
@@ -2449,6 +2489,7 @@ setInterval(heartbeat, 20000);
   build();
   window.__rebuild = () => { for (const k2 in tinted) delete tinted[k2]; build(); };
   window.__sea = () => {};
+  window.__jump = d => { window.__depth = d; cam = camS = d; };
   requestAnimationFrame(frame);
 })();
 

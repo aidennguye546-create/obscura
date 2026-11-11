@@ -46,7 +46,7 @@ const PICK_MS = 25000, COUNTDOWN_MS = 4000;
 
 /* ---------- answer matching ---------- */
 function norm(s) {
-  s = String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  s = String(s).toLowerCase().replace(/ø/g, 'o').replace(/ł/g, 'l').replace(/ß/g, 'ss').replace(/æ/g, 'ae').replace(/œ/g, 'oe').replace(/ı/g, 'i').replace(/đ/g, 'd').replace(/þ/g, 'th').normalize('NFD').replace(/[̀-ͯ]/g, '');
   s = s.replace(/\+\+/g, 'plusplus').replace(/#/g, 'sharp').replace(/&/g, ' and ');
   s = s.replace(/^\s*the\s+/, '').replace(/\bst\.?\s/g, 'saint ');
   return s.replace(/[^a-z0-9]/g, '');
@@ -192,11 +192,24 @@ const TOPIC_IDS = Object.keys(RAW).filter(id => !HIDDEN.has(id)).concat(DERIVED.
 const typoBudget = n => n >= 12 ? 3 : n >= 7 ? 2 : n >= 4 ? 1 : 0;
 // A first name on its own points at nobody in particular, so it is never completed into a full answer.
 const GIVEN = new Set('james john joe joseph robert michael mike william will bill david dave richard rick thomas tom charles charlie chris christopher daniel dan matthew matt anthony tony mark donald don steven steve stephen paul andrew andy joshua josh kenneth ken kevin brian george edward ed ronald ron timothy tim jason jeffrey jeff ryan jacob jake gary nicholas nick eric jonathan jon larry justin scott brandon ben benjamin samuel sam frank gregory greg raymond ray alexander alex patrick jack dennis jerry tyler aaron jose henry adam douglas doug nathan peter pete zachary zach kyle walter harry harold carl arthur roger keith jeremy terry sean shawn austin noah liam ethan mason logan lucas oliver elijah aiden max leo luke harry oscar mary patricia jennifer jen linda elizabeth liz barbara susan sue jessica jess sarah karen nancy lisa betty margaret sandra ashley kimberly kim emily donna michelle carol amanda melissa deborah debbie stephanie rebecca laura sharon cynthia kathleen kathy amy angela anna anne ann emma olivia ava sophia isabella mia charlotte amelia harper evelyn abigail ella grace chloe lily hannah zoe kate katie rachel megan julia julie maria marie rose ruby alice jane jean joan helen diana victoria taylor jordan morgan casey jamie lee kelly dr mr mrs ms sir lord lady king queen prince princess captain doctor saint'.split(' '));
+// The way people actually say things: "Nile River", "Mt Everest", "Yellowstone National Park",
+// "King Henry the 8th", "New York City". Each is tried only when the words as typed match nothing.
+const ORDW = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth', 'thirteenth', 'fourteenth', 'fifteenth', 'sixteenth', 'seventeenth', 'eighteenth', 'nineteenth', 'twentieth'];
+const roman = n => { let r = '', v = n; for (const [d, s] of [[10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']]) while (v >= d) { r += s; v -= d; } return r; };
+const TITLE = /^(?:mount|mt\.?|lake|river|the river|king|queen|president|vice president|prince|princess|emperor|empress|tsar|czar|pope|saint|st\.?|sir|lord|lady|dr\.?|doctor|planet)\s+/;
+const PLACE = /\s+(?:river|rivers|mountains?|mountain range|range|national park|national monument|np|lake|island|islands|city|falls|waterfall|sea|ocean|desert|volcano|glacier|peninsula|canyon|bay|state|province|county|province|region|dynasty|empire|family|band|game|games|movie|film|series|show|the movie)$/;
+function sayings(s) {
+  const t = String(s).toLowerCase().replace(/\s+/g, ' ').trim(), out = new Set();
+  const ord = t.replace(/\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b/g, (m, n) => roman(+n)).replace(new RegExp('\\b(?:the\\s+)?(' + ORDW.slice(1).join('|') + ')\\b', 'g'), (m, w) => roman(ORDW.indexOf(w)));
+  for (const b of new Set([t, ord])) { const p = b.replace(TITLE, ''); out.add(b); out.add(p); out.add(p.replace(PLACE, '')); out.add(b.replace(PLACE, '')); }
+  out.delete(t); return [...out].filter(x => x && x.length >= 3);
+}
 function match(topicId, input) {
   const T = TOPICS[topicId], k = norm(input);
   if (!T || !k) return null;
   if (T.map.has(k)) return { e: T.map.get(k), fix: false };
   if (k.length >= 4) for (const x of [k + 's', k + 'es', k.replace(/s$/, ''), k.replace(/es$/, ''), k.replace(/ies$/, 'y')]) if (x && x !== k && T.map.has(x)) return { e: T.map.get(x), fix: false };
+  for (const v of sayings(input)) { const kv = norm(v); if (kv && kv !== k && T.map.has(kv)) return { e: T.map.get(kv), fix: false }; }
   if (k.length < 4) return null;
   const one = set => set.size === 1 ? { e: [...set][0], fix: true } : set.size ? { amb: true } : null;
   // A bare name or word shared by several answers is a lucky dip: it always resolves to the same

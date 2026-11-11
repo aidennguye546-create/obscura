@@ -916,7 +916,13 @@ function setStage(stage, ms, extra) {
   renderDive();
 }
 // Lock one answer in (or a timeout when hit is null) and play its descent.
-function lockIn(hit) {
+// giving up on an answer: no points, straight to the next one instead of waiting out the clock
+function skipAnswer() {
+  const d = diveState();
+  if (!S.room || S.room.phase !== 'play' || d.stage !== 'ask') return;
+  lockIn(null, true);
+}
+function lockIn(hit, skipped) {
   const r = S.room, d = diveState();
   if (S.mine.g !== r.g) S.mine = freshMine(r.g, S.mine.joinedAt);
   const rd = S.mine.rounds[r.round] || (S.mine.rounds[r.round] = { a: [], pts: 0 });
@@ -931,8 +937,9 @@ function lockIn(hit) {
     window.__depth = to;
     window.__sink = { to, dur, start: performance.now() };
     window.__lines = { id: Date.now() + Math.random(), base: to - TIERS[hit.tier].pts * M_PER_PT, tier: hit.tier, label: '“' + hit.name + '” ▼' };
-    setStage('sink', dur * 1000 + 450, { hit });
-  } else { if (window.__fx) window.__fx.miss(); setStage('landed', landedMs(null), { hit: null }); }
+    setStage('sink', dur * 1000 + 450, { hit, skipped: false });
+  } else if (skipped) { snd('descend'); setStage('landed', landedMs(null), { hit: null, skipped: true }); }
+  else { if (window.__fx) window.__fx.miss(); setStage('landed', landedMs(null), { hit: null, skipped: false }); }
   refresh();
 }
 function advance() {
@@ -1396,7 +1403,8 @@ function renderDive() {
       h('div', { class: 'field' },
         h('input', { id: 'answer', autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'send', placeholder: 'type one answer…', 'aria-label': 'Your answer', oninput: e => window.__fx && window.__fx.type(e.target, e) }),
         h('div', { class: 'air', 'aria-hidden': 'true' }, h('div', { id: 'airbar' }))),
-      h('button', { id: 'send', class: 'pink', text: 'Drop' })),
+      h('button', { id: 'send', class: 'pink', text: 'Drop' }),
+      h('button', { id: 'skip', class: 'small skip', type: 'button', text: 'Skip', title: 'Give up this answer for 0 points and move on', onclick: skipAnswer })),
     h('div', { id: 'fb', class: 'fb', role: 'status' })];
   else if (d.stage === 'sink') return;
   else if (d.stage === 'landed') {
@@ -1432,8 +1440,8 @@ function renderDive() {
         document.body.append(fly); setTimeout(() => { fly.remove(); if (sc.isConnected) restart(sc, 'slam'); }, 820);
       }, tUp + 750);
       
-    } else kids = [h('div', { class: 'landed' }, h('h2', { class: 'tname miss', text: 'Lost your grip' }), h('p', { class: 'tans', text: '—' }),
-      h('p', { class: 'tpts', text: '+0 PTS' }), h('p', { class: 'note', text: 'the clock beat you to it.' }), btn)];
+    } else kids = [h('div', { class: 'landed' }, h('h2', { class: 'tname miss', text: d.skipped ? 'Skipped' : 'Lost your grip' }), h('p', { class: 'tans', text: '—' }),
+      h('p', { class: 'tpts', text: '+0 PTS' }), h('p', { class: 'note', text: d.skipped ? 'on to the next one.' : 'the clock beat you to it.' }), btn)];
   } else kids = [h('div', { class: 'landed' }, h('h2', { class: 'tname miss', text: 'Descent complete' }),
     h('ul', { class: 'chips', style: 'justify-content:center' }, roundOf(S.mine, r.round).a.filter(x => x[1] >= 0).map(([n, t]) => chip(n, t, '+' + TIERS[t].pts))),
     h('p', { class: 'note', text: 'waiting for the other explorers to climb out.' }))];
@@ -2520,7 +2528,7 @@ addEventListener('online', checkIn);
     if (burstT > 0) { burstT += dt / 1.5; if (burstT >= 1) { burstT = 0; orbit = null; } }
     if (orbit && !orbit.keep && !window.__sink && !window.__lines && burstT === 0) orbit = null;
     draw(dt);
-    if (bloomX && !window.__low && (bloomN++ & 1) === 0) { const bw = Math.max(1, Math.ceil(W / 4)), bh = Math.max(1, Math.ceil(H / 4)); if (bloomC.width !== bw || bloomC.height !== bh) { bloomC.width = bw; bloomC.height = bh; } bloomX.drawImage(cv, 0, 0, bw, bh); const bo = (camS > FLOOR ? 0.78 : 0.5).toFixed(2); if (bloomC.style.opacity !== bo) bloomC.style.opacity = bo; }
+    if (bloomX && !window.__low && cv.width > 0 && cv.height > 0 && W > 0 && H > 0 && (bloomN++ & 1) === 0) { const bw = Math.max(1, Math.ceil(W / 4)), bh = Math.max(1, Math.ceil(H / 4)); if (bloomC.width !== bw || bloomC.height !== bh) { bloomC.width = bw; bloomC.height = bh; } bloomX.drawImage(cv, 0, 0, bw, bh); const bo = (camS > FLOOR ? 0.78 : 0.5).toFixed(2); if (bloomC.style.opacity !== bo) bloomC.style.opacity = bo; }
   }
   addEventListener('pointerdown', e => { if (frog.hop > 0 || Math.hypot(e.clientX - frog.x, e.clientY - frog.y) > 36 || (e.target.closest && e.target.closest('button, input, select'))) return; frog.hop = 1; snd('ribbit'); { const pop = h('span', { class: 'ribbit', 'aria-hidden': 'true', text: (window.__pal && window.__pal.id !== 'frog') ? 'hey!' : 'ribbit!', style: 'left:' + Math.round(frog.x) + 'px;top:' + Math.round(frog.y - 34) + 'px' }); document.body.append(pop); setTimeout(() => pop.remove(), 1000); } for (let q = 0; q < 6; q++) fx.bubble(frog.x + D(-16, 26), frog.y - 16, 1 + 3 * R()); fx.burst(frog.x, frog.y, '#ff7a45', 10, 0.5); });
   // deep down, the pointer leaves a trail of sparks

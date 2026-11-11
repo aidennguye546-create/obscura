@@ -900,6 +900,8 @@ function diveState() {
   if (!S.dive || S.dive.key !== key) S.dive = { key, stage: 'wait', i: roundOf(S.mine, r.round).a.length, until: 0, hit: null };
   return S.dive;
 }
+// solo: the result waits for Descend or Enter. In a room it moves on by itself (longer after an Obscura, so its moment can play)
+const landedMs = hit => S.mode === 'online' ? (hit && hit.tier === 4 && !SET.low ? 8500 : 5500) : 0;
 function setStage(stage, ms, extra) {
   Object.assign(diveState(), extra || {}, { stage, until: ms ? Date.now() + ms : 0 });
   document.body.classList.toggle('sinking', stage === 'sink');
@@ -930,7 +932,7 @@ function lockIn(hit) {
     window.__sink = { to, dur, start: performance.now() };
     window.__lines = { id: Date.now() + Math.random(), base: to - TIERS[hit.tier].pts * M_PER_PT, tier: hit.tier, label: '“' + hit.name + '” ▼' };
     setStage('sink', dur * 1000 + 450, { hit });
-  } else { if (window.__fx) window.__fx.miss(); setStage('landed', 0, { hit: null }); }
+  } else { if (window.__fx) window.__fx.miss(); setStage('landed', landedMs(null), { hit: null }); }
   refresh();
 }
 function advance() {
@@ -1607,8 +1609,13 @@ function tick() {
       $('edge').classList.toggle('hot', low);
       if (now > d.until) lockIn(null);
     } else if (d.stage === 'sink') {
-      if (now > d.until) { setStage('landed', 0); refresh(); }
-    } // a result stays up until you press Descend (or Enter); the round clock still ends the round in rooms
+      if (now > d.until) { setStage('landed', landedMs(d.hit)); refresh(); }
+    } else if (d.stage === 'landed' && d.until) {
+      // in a room the result moves on by itself, so nobody can sit on it and look answers up; the button counts down
+      const go = document.querySelector('.landed .go');
+      if (go) { if (!go.dataset.label) go.dataset.label = go.textContent; const left = Math.max(0, Math.ceil((d.until - now) / 1000)), tx = go.dataset.label + ' ' + left; if (go.textContent !== tx) go.textContent = tx; }
+      if (now > d.until) advance();
+    }
     const all = ordered().every(p => gone(p, now) || roundOf(p, r.round).a.length >= K);
     if (all && d.stage === 'done') { if (!S.allAt) S.allAt = now; } else S.allAt = 0;
     if (!r.fixed && ((S.allAt && now > S.allAt + 2500 + lag) || now > r.endsAt + lag)) once('play:' + r.g + ':' + r.round, () => patchRoom({ phase: 'reveal', revealAt: Date.now() }));

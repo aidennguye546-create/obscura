@@ -880,7 +880,7 @@ function choose(topicId) {
   const now = Date.now();
   patchRoom({
     phase: 'play', topic: topicId, used: [...(r.used || []), topicId],
-    startsAt: now + COUNTDOWN_MS, endsAt: now + COUNTDOWN_MS + (r.dives || 5) * (r.secs + 9) * 1000,
+    startsAt: now + COUNTDOWN_MS, endsAt: now + COUNTDOWN_MS + (r.dives || 5) * (r.secs + 14) * 1000 + 4000, // room for the fall and the timed result after every answer, and an Obscura's longer moment
   });
 }
 function next() {

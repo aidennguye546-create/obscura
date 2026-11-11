@@ -670,6 +670,20 @@ body::after { background: radial-gradient(circle at 50% 30%, rgba(2, 8, 5, 0) va
 .awards li:last-child { border-bottom: 0; }
 .awards .k { min-width: 110px; color: #8fae8f; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
 .awards strong { font-weight: 400; color: #f0f7e4; text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* the overgrown title: pixel art shown big, vines swaying from where they hang */
+.logo.grown { position: relative; width: min(94vw, 640px); margin: 0 auto -6%; text-shadow: none; animation: none; color: transparent; font-size: 0; line-height: 0; filter: drop-shadow(0 0 22px rgba(120, 230, 110, 0.22)); }
+.logo.grown img { position: absolute; image-rendering: pixelated; pointer-events: none; -webkit-user-drag: none; }
+.logo.grown .lw { inset: 0; width: 100%; height: 100%; }
+.logo.grown .vine { transform-origin: 50% 0; animation: vinesway 4s ease-in-out infinite alternate; }
+@keyframes vinesway { from { transform: rotate(-3.5deg); } to { transform: rotate(3.5deg); } }
+body.low .logo.grown .vine { animation: none; }
+@media (prefers-reduced-motion: reduce) { .logo.grown .vine { animation: none; } }
+/* answer box: Krillion's pink caret, a lit border while focused, and a rejected answer that shakes */
+.ans input { caret-color: var(--pink); }
+.ans input:focus { border-color: rgba(125, 255, 176, 0.65); }
+.ans.low input:focus { border-color: #ff7a45; }
+.fb.shake p { animation: jolt 0.4s linear; }
 </style>
 </head>
 <body>
@@ -713,6 +727,10 @@ body::after { background: radial-gradient(circle at 50% 30%, rgba(2, 8, 5, 0) va
 <script src="bank-s1.js"></script>
 <script src="bank-s2.js"></script>
 <script src="bank-k1.js"></script>
+<script src="bank-m1.js"></script>
+<script src="bank-m2.js"></script>
+<script src="bank-m3.js"></script>
+<script src="bank-m4.js"></script>
 <script src="tiers-base.js"></script>
 <script src="tiers-all.js"></script>
 <script src="firebase-config.js"></script><script src="online.js"></script><script src="game.js"></script>

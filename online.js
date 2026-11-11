@@ -16,7 +16,7 @@
   function enc(d) { return nested(d, false) ? { j: JSON.stringify(d) } : d; }
   function dec(d) { if (d && typeof d.j === 'string' && Object.keys(d).length === 1) { try { return JSON.parse(d.j); } catch (e) { return d; } } return d; }
   function snap(s) { return { id: s.id, exists: s.exists, data: function () { return dec(s.data()); } }; }
-  function query(q) { return { docs: q.docs.map(snap) }; }
+  function query(q) { return { docs: q.docs.map(snap), fromCache: !!(q.metadata && q.metadata.fromCache) }; }
   function doc(ref) {
     return {
       id: ref.id,
@@ -40,6 +40,8 @@
   var ready = load(V + 'firebase-app-compat.js').then(function () { return load(V + 'firebase-firestore-compat.js'); }).then(function () {
     firebase.initializeApp(cfg);
     var fs = firebase.firestore();
+    // school and office networks often block the live streaming connection; detect that and fall back to one that works
+    try { fs.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* settings already fixed */ }
     return { doc: function (p) { return doc(fs.doc(p)); }, collection: function (p) { return col(fs.collection(p)); } };
   });
   window.claude = { use: function (what) { return what === 'db' ? ready : Promise.resolve(null); } };

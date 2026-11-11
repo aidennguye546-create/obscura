@@ -124,7 +124,7 @@ function buildTopic(t) {
   if (!star) star = list.filter(e => e.tier === 3).pop() || list[list.length - 1] || { name: '', tier: 4, toks: [] };
   star.tier = 4; star.fact = fix.k ? fix.k[1] : '';
   // up to four Obscuras a prompt: the one with its fact, and up to three more chosen by hand for being genuinely rare
-  for (const n of ((window.OBX || {})[t.id] || []).slice(0, 3)) { const e = map.get(norm(n)); if (e && e !== star) e.tier = 4; }
+  for (const n of ((window.OBX || {})[t.id] || t.ob || []).slice(0, 3)) { const e = map.get(norm(n)); if (e && e !== star) e.tier = 4; }
   return { id: t.id, name: t.name, blurb: t.blurb, map, words, lmap, list, star };
 }
 const RAW = {}, TOPICS = {};

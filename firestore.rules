@@ -10,6 +10,13 @@ service cloud.firestore {
         allow write: if pid.size() < 64;
       }
     }
+    // "that should count": a player flags a rejected answer for review; nobody can read or change them from the game
+    match /reports/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['topic', 'text', 'at'])
+        && request.resource.data.topic is string && request.resource.data.topic.size() < 40
+        && request.resource.data.text is string && request.resource.data.text.size() <= 60
+        && request.resource.data.at is number;
+    }
     // daily ranking: one score sheet per player per day, written once
     match /daily/{day}/scores/{pid} {
       allow read: if true;

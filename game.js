@@ -456,10 +456,12 @@ const Sound = (() => {
     descend() { noise({ dur: 0.7, lp: 1600, to: 260, peak: 0.08, send: 0.3 }); tone({ f0: 130, f1: 60, dur: 0.7, peak: 0.16 }); },
     ribbit() { tone({ type: 'sawtooth', f0: 190, f1: 140, dur: 0.09, peak: 0.14, lp: 900 }); tone({ type: 'sawtooth', f0: 210, f1: 150, dur: 0.11, peak: 0.14, lp: 900, delay: 0.13 }); },
     surface() { noise({ dur: 1.8, lp: 300, to: 3200, peak: 0.13, send: 0.5 }); tone({ f0: 80, f1: 620, dur: 1.7, peak: 0.07, send: 0.4 }); },
+    whistle() { tone({ type: 'square', f0: 2650, f1: 2700, dur: 0.16, peak: 0.05, lp: 4200 }); tone({ type: 'square', f0: 2650, f1: 2750, dur: 0.42, peak: 0.05, lp: 4200, delay: 0.2 }); },
+    compass() { [C.G5, C.C6, C.E6].forEach((f, i) => bell(f, { peak: 0.08, dur: 1.2, delay: i * 0.09 })); },
     fanfare() { [C.C5, C.E5, C.G5, C.C6].forEach((f, i) => bell(f, { peak: 0.14, dur: 1.4, delay: i * 0.12 })); pad([C.C4, C.E4, C.G4], { dur: 1.8, peak: 0.035 }); tone({ f0: 98, dur: 1, peak: 0.16 }); },
   };
   // ambience: a quiet bed of filtered noise shaped to each place, and now and then the sound of something living there
-  const AMB = { canopy: [1400, 0.014, 'lowpass'], forest: [700, 0.016, 'lowpass'], floor: [420, 0.02, 'lowpass'], roots: [260, 0.026, 'lowpass'], river: [1000, 0.034, 'bandpass'], grotto: [380, 0.015, 'lowpass'], crystal: [2400, 0.008, 'bandpass'], temple: [300, 0.02, 'lowpass'], fungal: [520, 0.015, 'lowpass'], magma: [140, 0.05, 'lowpass'], obscura: [190, 0.032, 'lowpass'] };
+  const AMB = { stadium: [520, 0.03, 'bandpass'], atlas: [900, 0.013, 'lowpass'], canopy: [1400, 0.014, 'lowpass'], forest: [700, 0.016, 'lowpass'], floor: [420, 0.02, 'lowpass'], roots: [260, 0.026, 'lowpass'], river: [1000, 0.034, 'bandpass'], grotto: [380, 0.015, 'lowpass'], crystal: [2400, 0.008, 'bandpass'], temple: [300, 0.02, 'lowpass'], fungal: [520, 0.015, 'lowpass'], magma: [140, 0.05, 'lowpass'], obscura: [190, 0.032, 'lowpass'] };
   const pan = () => Math.random() * 1.4 - 0.7;
   const drip = () => { const f = 1000 + Math.random() * 700; tone({ f0: f, f1: f * 2.1, dur: 0.07, a: 0.002, peak: 0.035, pan: pan(), send: 0.9 }); };
   const CRITTERS = {
@@ -472,6 +474,10 @@ const Sound = (() => {
     fungal() { tone({ f0: 280 + Math.random() * 120, f1: 760, dur: 0.06, peak: 0.022, pan: pan(), send: 0.6 }); },
     magma() { const p = pan(); for (let i = 0; i < 3 + (Math.random() * 3 | 0); i++) noise({ dur: 0.03, bp: true, lp: 1600 + Math.random() * 1600, q: 2, peak: 0.04, pan: p, delay: i * 0.05 + Math.random() * 0.04 }); },
     obscura() { tone({ f0: 58, f1: 40, dur: 0.28, peak: 0.1 }); tone({ f0: 52, f1: 38, dur: 0.3, peak: 0.08, delay: 0.32 }); },
+    // a crowd somewhere in the stands: a swell of cheering, now and then a whistle or a drum
+    stadium() { const p = pan(), r = Math.random(); if (r < 0.55) noise({ dur: 1.4, bp: true, lp: 700 + Math.random() * 500, q: 0.8, peak: 0.05, pan: p, send: 0.6 }); else if (r < 0.8) { tone({ f0: 2900, f1: 3100, dur: 0.18, peak: 0.018, pan: p, send: 0.5 }); tone({ f0: 2900, f1: 3150, dur: 0.12, peak: 0.016, pan: p, delay: 0.24, send: 0.5 }); } else for (let i = 0; i < 3; i++) tone({ f0: 90, f1: 55, dur: 0.12, peak: 0.07, pan: p, delay: i * 0.22, send: 0.4 }); },
+    // the open sea under an atlas: gulls, a ship's bell, rigging in the wind
+    atlas() { const p = pan(), r = Math.random(); if (r < 0.45) { tone({ f0: 1700, f1: 1250, dur: 0.22, peak: 0.016, pan: p, send: 0.7 }); tone({ f0: 1650, f1: 1150, dur: 0.18, peak: 0.013, pan: p, delay: 0.28, send: 0.7 }); } else if (r < 0.7) bell(523.25 + Math.random() * 40, { peak: 0.02, dur: 2.4, pan: p, send: 0.95 }); else noise({ dur: 1.6, lp: 500, to: 1400, peak: 0.03, pan: p, send: 0.5 }); },
   };
   function ambient(kind) {
     if (!ac || ac.state !== 'running' || !NB || muted || !kind) { if (amb && ac) { amb.g.gain.setTargetAtTime(0, ac.currentTime, 0.4); amb.kind = null; } return; }
@@ -767,7 +773,7 @@ function pickSeven(pool, rnd) {
 const dayNoOf = key => { const p = key.split('-').map(Number); return Math.max(1, Math.floor((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
 // No repeats: the pool is shuffled once per cycle and dealt out seven a day until it runs out, then reshuffled.
 function dealSeven(pool, tag, n) { const ids = pool.filter(usable).sort(), per = Math.floor(ids.length / 7); if (!per) return []; const cyc = Math.floor((n - 1) / per), rnd = seeded('obscura:' + tag + ':' + cyc); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } const k = ((n - 1) % per) * 7; return ids.slice(k, k + 7); }
-window.__dbg = { sprite, S: () => S, render: () => render(), topic: id => TOPICS[id], champ: name => moment(Math.round(innerHeight * 0.3), 'CHAMPION', name + ' · 1,240 pts', icon('krill', '#ffc23a', 128), 'champ'), lead: (name, kind) => leadSlam({ id: 'x', name }, kind), emote: e => showEmote(S.me.id, e), count: t => { const m = S.mode; S.mode = 'online'; bigCount(t); S.mode = m; }, rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
+window.__dbg = { sprite, S: () => S, render: () => render(), run: k => startRun(k), topic: id => TOPICS[id], champ: name => moment(Math.round(innerHeight * 0.3), 'CHAMPION', name + ' · 1,240 pts', icon('krill', '#ffc23a', 128), 'champ'), lead: (name, kind) => leadSlam({ id: 'x', name }, kind), emote: e => showEmote(S.me.id, e), count: t => { const m = S.mode; S.mode = 'online'; bigCount(t); S.mode = m; }, rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
 window.__deal = (tag, n) => dealSeven(tag === 'daily' ? TOPIC_IDS : packPool(tag), tag, n);
 const dailySaved = () => { try { return JSON.parse(ls.get('daily_' + dayKey()) || 'null'); } catch (e) { return null; } };
 const dailyKey = kind => 'daily_' + kind + '_' + dayKey();
@@ -989,7 +995,7 @@ function submit(ev) {
   if (!m || m.amb) wrong();
   if ((!m || m.amb) && SET.clear) input.value = '';
   if (m && m.amb) { restart(form, 'jolt'); restart($('fb'), 'shake'); return say2({ kind: 'miss', text: typed + ' fits more than one answer', sub: 'be more specific' }); }
-  if (!m) { restart(form, 'jolt'); if (window.__fx) window.__fx.reject(); say2({ kind: 'miss', text: typed + ': no trace of that. try again' }); return restart($('fb'), 'shake'); }
+  if (!m) { restart(form, 'jolt'); if (window.__fx) window.__fx.reject(); say2({ kind: 'miss', text: typed + ': no trace of that. try again', report: { topic: r.topic, text: text.slice(0, 60) } }); return restart($('fb'), 'shake'); }
   const hit = m.e;
   if (roundOf(S.mine, r.round).a.some(x => x[0] === hit.name)) { restart(form, 'jolt'); return say2({ kind: 'dup', text: '“' + hit.name + '” is already in your notebook' }); }
   const changed = norm(text) !== norm(hit.name);
@@ -1003,9 +1009,19 @@ function submit(ev) {
   S.shown = null;
   lockIn(hit);
 }
+// A player who knows a rejected answer is right can flag it; flagged answers are reviewed and added to the bank.
+function reportAnswer(rp) {
+  if (rp.sent) return; rp.sent = true; renderFb(); snd('click');
+  let mine = []; try { mine = JSON.parse(ls.get('reported') || '[]'); } catch (e) { mine = []; }
+  mine.push({ topic: rp.topic, text: rp.text, at: Date.now() }); ls.set('reported', JSON.stringify(mine.slice(-200)));
+  try { if (S.db) S.db.collection('reports').doc(Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)).set({ topic: rp.topic, text: rp.text, at: Date.now() }).catch(() => {}); } catch (e) { /* reporting is best-effort */ }
+  const inp = $('answer'); if (inp) inp.focus();
+}
 function renderFb() {
   const fb = $('fb'); if (!fb) return;
-  fb.replaceChildren(...(S.fb ? [h('p', { text: S.fb.text }), S.fb.sub && h('small', { text: S.fb.sub })].filter(Boolean) : []));
+  const rp = S.fb && S.fb.report;
+  fb.replaceChildren(...(S.fb ? [h('p', { text: S.fb.text }), S.fb.sub && h('small', { text: S.fb.sub }),
+    rp && h('button', { class: 'report', type: 'button', text: rp.sent ? '✓ reported, thanks' : 'that should count ↗', disabled: !!rp.sent, onmousedown: e => e.preventDefault(), onclick: () => reportAnswer(rp) })].filter(Boolean) : []));
   fb.className = 'fb ' + (S.fb ? 'f-' + S.fb.kind : '');
 }
 function restart(el, cls) { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
@@ -1297,9 +1313,9 @@ function openHowto() { modal('howto', 'Obscura', 'How to play', h('ul', { class:
 function openPacks() {
   modal('packs', 'Seven prompts', 'Themed packs',
     h('div', { class: 'ph' }, h('span', { text: 'Today’s' })),
-    h('div', { class: 'tiles' }, Object.keys(PACKS).map(k => h('button', { class: 'tile' + (dailyDone(k) ? ' on' : ''), type: 'button', disabled: packPool(k).length < 7, onclick: () => { goHome(); startRun(k, null, true); } }, h('i', { text: dailyDone(k) ? '✓' : '↓' }), h('span', { text: 'Daily ' + PACKS[k].label.toLowerCase() }), h('small', { text: dailyDone(k) ? 'see result' : 'same seven for everyone' })))),
+    h('div', { class: 'tiles' }, Object.keys(PACKS).map(k => h('button', { class: 'tile pk-' + k + (dailyDone(k) ? ' on' : ''), type: 'button', disabled: packPool(k).length < 7, onclick: () => { goHome(); startRun(k, null, true); } }, h('i', { text: dailyDone(k) ? '✓' : '↓' }), h('span', { text: 'Daily ' + PACKS[k].label.toLowerCase() }), h('small', { text: dailyDone(k) ? 'see result' : 'same seven for everyone' })))),
     h('div', { class: 'ph' }, h('span', { text: 'Unlimited' })),
-    h('div', { class: 'tiles' }, Object.keys(PACKS).map(k => { const n = packPool(k).length; return h('button', { class: 'tile', type: 'button', disabled: n < 7, onclick: () => { goHome(); startRun(k); } }, h('i', { text: k === 'geo' ? '◍' : '◆' }), h('span', { text: PACKS[k].label }), h('small', { text: n < 7 ? 'being stocked' : n + ' prompts' })); })),
+    h('div', { class: 'tiles' }, Object.keys(PACKS).map(k => { const n = packPool(k).length; return h('button', { class: 'tile pk-' + k, type: 'button', disabled: n < 7, onclick: () => { goHome(); startRun(k); } }, h('i', { text: k === 'geo' ? '◍' : '⚑' }), h('span', { text: PACKS[k].label }), h('small', { text: n < 7 ? 'being stocked' : n + ' prompts' })); })),
     h('p', { class: 'note', text: 'One answer per prompt, 25 seconds each. Play as often as you like.' }));
 }
 // past daily descents: play any you missed (they do not count towards your streak)
@@ -1683,6 +1699,10 @@ function render() {
     const dive = !!S.mode && r.phase !== 'lobby';
     if (document.body.classList.contains('dive') !== dive) { document.body.classList.toggle('dive', dive); if (window.__sea) window.__sea(); }
     document.body.classList.toggle('trek', !!S.mode && r.phase === 'play');
+    // the Geography and Sports packs dress the whole forest up as an atlas or a floodlit stadium
+    const th = S.mode && r.fixed && (r.kind === 'geo' || r.kind === 'sports') ? r.kind : null;
+    if (window.__theme !== th) { window.__theme = th; if (th) snd(th === 'sports' ? 'whistle' : 'compass'); }
+    document.body.classList.toggle('th-geo', th === 'geo'); document.body.classList.toggle('th-sports', th === 'sports');
     document.body.classList.toggle('run', !!S.mode && !!r.fixed);
     const scr = !S.mode ? buildHome() : (BUILD[r.phase] || buildLobby)();
     scr.classList.add('enter');
@@ -2298,6 +2318,239 @@ addEventListener('online', checkIn);
       ctx.fillStyle = 'rgb(46,32,12)'; for (let q = 0; q < 10; q++) { const a = (q / 10) * Math.PI * 2 + 0.3, len = R0 * (2 + hsh(q, 601) * 2.5); for (let t = R0 * 0.9; t < len; t += AP * 2) ctx.fillRect(sn(cx + Math.cos(a + Math.sin(t * 0.01 + q) * 0.25) * t), sn(y + Math.sin(a + Math.sin(t * 0.01 + q) * 0.25) * t * 0.8), AP * 2 + (len - t) / len * AP * 3, AP * 2); }
     }
   }
+
+  // ---- themed packs: the Geography pack turns the forest into an explorer's atlas, Sports into a floodlit stadium
+  const confetti = []; let lastLineId = null;
+  const COLOURS_SPORT = ['#ff4d4d', '#ffd23f', '#3bceac', '#4d8dff', '#ffffff', '#ff7ad9'];
+  function themeBack(th) {
+    if (th === 'geo') {
+      // lines of latitude drifting up as you descend, each with its degree
+      const step = 150, par = 0.55, off = mod(camS / mpp * par, step);
+      ctx.font = Math.round(13 * AP / 3 + 5) + 'px VT323, monospace'; ctx.textBaseline = 'middle';
+      for (let y = -off - step, i = 0; y < H + step; y += step, i++) {
+        const lat = Math.round(60 - ((camS / mpp * par + y) / step) * 7.5), ly = sn(y);
+        ctx.fillStyle = 'rgba(250,236,200,0.26)';
+        for (let x = 0; x < W; x += AP * 4) ctx.fillRect(x, ly + Math.round(Math.sin(x / W * Math.PI) * 10), AP * 2, 1.5);
+        ctx.fillStyle = 'rgba(250,236,200,0.55)';
+        const t = Math.abs(lat) + '°' + (lat === 0 ? '' : lat > 0 ? 'N' : 'S');
+        ctx.fillText(t, 12 + Math.max(26, Math.min(70, W * 0.06)), ly - 8); ctx.fillText(t, W - 70 - Math.max(26, Math.min(70, W * 0.06)), ly - 8);
+      }
+      // meridians bowing outwards like a globe
+      ctx.strokeStyle = 'rgba(250,236,200,0.16)'; ctx.lineWidth = 1.5;
+      for (let k = -3; k <= 3; k++) { if (!k) continue; ctx.beginPath(); for (let y = 0; y <= H; y += 24) { const x = W / 2 + k * W * 0.13 * (1 + 0.25 * Math.sin((y / H) * Math.PI)); y ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+      // a flight route with a little plane, looping across the map
+      for (let q = 0; q < 2; q++) {
+        const u = mod(time * (0.035 + q * 0.012) + q * 0.5, 1), x0 = -40, x1 = W + 40, yb = H * (0.25 + q * 0.42), arc = H * 0.12;
+        const px = x0 + (x1 - x0) * u, py = yb - Math.sin(u * Math.PI) * arc;
+        ctx.fillStyle = 'rgba(255,240,200,0.35)';
+        for (let s = 0; s < u; s += 0.012) { const sx = x0 + (x1 - x0) * s, sy2 = yb - Math.sin(s * Math.PI) * arc; ctx.fillRect(sn(sx), sn(sy2), 2, 2); }
+        const ang = Math.atan2(-Math.cos(u * Math.PI) * arc * Math.PI, x1 - x0);
+        ctx.save(); ctx.translate(px, py); ctx.rotate(ang); ctx.fillStyle = 'rgba(255,248,230,0.85)';
+        ctx.fillRect(-7, -1.5, 14, 3); ctx.fillRect(-2, -7, 4, 14); ctx.fillRect(-7, -4, 3, 8); ctx.restore();
+      }
+    } else if (th === 'sports') {
+      // mown pitch stripes far behind the forest
+      const band = 70, off = mod(camS / mpp * 0.3, band * 2);
+      for (let y = -off; y < H; y += band * 2) { ctx.fillStyle = 'rgba(160,255,160,0.035)'; ctx.fillRect(0, sn(y), W, band); }
+      // a halfway line and centre circle that scroll past once
+      const cy = yOf(600) * 0.4 + H * 0.3;
+      if (cy > -200 && cy < H + 200) { ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = AP; ctx.beginPath(); ctx.arc(W / 2, cy, Math.min(W, H) * 0.18, 0, 6.283); ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(0, sn(cy) - AP / 2, W, AP); }
+      // camera flashes popping in the stands
+      ctx.globalCompositeOperation = 'lighter';
+      for (let q = 0; q < 14; q++) { const ph = mod(time * (0.5 + hsh(q, 71)) + hsh(q, 72) * 7, 1); if (ph > 0.06) continue; const a = (1 - ph / 0.06) * 0.8, x = hsh(q, 73 + Math.floor(time * (0.5 + hsh(q, 71)))) * W, y = H * (0.1 + 0.8 * hsh(q, 74 + Math.floor(time * 0.7))); halo(x, y, 18, '255,255,255', a * 0.5); ctx.fillStyle = 'rgba(255,255,255,' + a.toFixed(2) + ')'; ctx.fillRect(sn(x) - 1, sn(y) - 1, 3, 3); }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+  function themeFront(th, dt) {
+    if (th === 'geo') {
+      // the compass rose, turning slowly in a corner
+      const cx = W - Math.max(26, Math.min(70, W * 0.06)) - 70, cy = H - 250, r = Math.min(52, W * 0.08), a = time * 0.08 + Math.sin(time * 0.7) * 0.06;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(a); ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.75; ctx.strokeStyle = 'rgba(70,48,24,0.85)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, r * 0.72, 0, 6.283); ctx.stroke();
+      for (let k = 0; k < 8; k++) { const big = k % 2 === 0, L = big ? r * 0.95 : r * 0.55, w = big ? r * 0.16 : r * 0.1; ctx.rotate(Math.PI / 4); ctx.fillStyle = k === 6 ? '#a33a12' : big ? 'rgba(70,48,24,0.9)' : 'rgba(120,90,50,0.8)'; ctx.beginPath(); ctx.moveTo(0, -L); ctx.lineTo(w, 0); ctx.lineTo(0, w * 0.6); ctx.lineTo(-w, 0); ctx.closePath(); ctx.fill(); }
+      ctx.rotate(-a); ctx.fillStyle = 'rgba(70,48,24,0.95)'; ctx.font = Math.round(r * 0.42) + 'px VT323, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('N', Math.sin(a) * r * 1.22, -Math.cos(a) * r * 1.22); ctx.textAlign = 'left'; ctx.restore(); ctx.globalAlpha = 1;
+      // the colour of old paper and open sea over everything
+
+    } else if (th === 'sports') {
+      // floodlights: two towers up top throwing cones of light down onto the pitch
+      ctx.globalCompositeOperation = 'lighter';
+      for (const side of [0, 1]) {
+        const sy0 = yOf(0), tx = side ? W * 0.72 : W * 0.28, ty = Math.min(18, sy0 - 90), fade = Math.max(0.3, 1 - Math.max(0, camS) / 1500), flick = (0.9 + 0.1 * Math.sin(time * 9 + side * 3)) * fade;
+        const cone = ctx.createLinearGradient(tx, ty, W / 2, H); cone.addColorStop(0, 'rgba(230,240,255,' + (0.3 * flick).toFixed(3) + ')'); cone.addColorStop(1, 'rgba(230,240,255,0)');
+        ctx.fillStyle = cone; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(side ? W * 0.18 : W * 0.55, H); ctx.lineTo(side ? W * 0.45 : W * 0.82, H); ctx.closePath(); ctx.fill();
+        halo(tx, ty, 70, '235,242,255', 0.35 * flick);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      for (const side of [0, 1]) { const tx = side ? W * 0.72 : W * 0.28, ty = Math.min(18, yOf(0) - 90); if (ty < -80) continue; ctx.fillStyle = '#10161e'; ctx.fillRect(tx - 2, ty, 4, 60); ctx.fillStyle = '#1a222c'; ctx.fillRect(tx - 22, ty - 12, 44, 16); ctx.fillStyle = '#f4f8ff'; for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) ctx.fillRect(tx - 19 + i * 10, ty - 9 + j * 6, 7, 4); }
+      // confetti for a rare answer
+      const L = window.__lines;
+      if (L && L.id !== lastLineId) { lastLineId = L.id; if (L.tier >= 2 && !reduce) { const n = L.tier === 4 ? 240 : L.tier === 3 ? 150 : 80; for (let i = 0; i < n; i++) confetti.push({ x: W * (0.2 + 0.6 * R()), y: -10 - R() * H * 0.3, vx: D(-40, 40), vy: 60 + R() * 120, r: R() * 6.283, vr: D(-8, 8), c: COLOURS_SPORT[i % COLOURS_SPORT.length], life: 3 + R() * 2 }); } }
+      for (let i = confetti.length - 1; i >= 0; i--) { const p = confetti[i]; p.life -= dt; p.x += (p.vx + Math.sin(time * 3 + i) * 30) * dt; p.y += p.vy * dt; p.r += p.vr * dt; if (p.life <= 0 || p.y > H + 20) { confetti.splice(i, 1); continue; } ctx.fillStyle = p.c; ctx.globalAlpha = Math.min(1, p.life); const w = 10 * Math.abs(Math.cos(p.r)) + 2; ctx.fillRect(sn(p.x - w / 2), sn(p.y - 3), w, 6); }
+      ctx.globalAlpha = 1;
+      // night under the lights
+      ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+
+  // ---- whole new worlds for the themed packs (they replace the forest entirely)
+  const sheetCache = new Map(); let sheetW = 0;
+  const PLACE = ['Terra Incognita', 'Mare Tenebrosum', 'Here be Dragons', 'The Unknown Sea', 'Isles of Mist', 'Cape Obscura', 'Mare Glaciale', 'The Far Reaches', 'Coast of Whispers', 'Sea of Serpents', 'The Lost Archipelago', 'Mare Incognitum', 'Bay of Storms', 'The Drowned Kingdom', 'Hic Sunt Leones', 'The Last Shore'];
+  const SHEET = 1100;
+  function mapSheet(k) {
+    if (sheetW !== W) { sheetCache.clear(); sheetW = W; }
+    if (sheetCache.has(k)) return sheetCache.get(k);
+    const c = document.createElement('canvas'); c.width = W; c.height = SHEET; const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    const cell = Math.max(6, AP * 3), ink = 'rgba(70,48,24,', sea = 'rgba(40,78,92,';
+    // sea hatching: little waves all over the open water
+    x.fillStyle = sea + '0.28)';
+    for (let i = 0; i < 70; i++) { const wx = hsh(k * 131 + i, 601) * W, wy = hsh(k * 131 + i, 602) * SHEET; for (let s = 0; s < 3; s++) { x.fillRect(Math.round(wx + s * 9), Math.round(wy + (s % 2 ? -2 : 0)), 6, 2); } }
+    // one or two landmasses, pixel-cut, with an inked coast
+    const nLand = 1 + (hsh(k, 610) < 0.55 ? 1 : 0);
+    for (let n = 0; n < nLand; n++) {
+      const cx = W * (n ? 0.75 : 0.25) + (hsh(k * 7 + n, 611) - 0.5) * W * 0.35, cy = SHEET * (0.25 + 0.5 * hsh(k * 7 + n, 612)), R0 = Math.min(W * 0.28, 240) * (0.6 + 0.6 * hsh(k * 7 + n, 613));
+      const p1 = hsh(k * 7 + n, 614) * 6.28, p2 = hsh(k * 7 + n, 615) * 6.28, p3 = hsh(k * 7 + n, 616) * 6.28;
+      const rad = a => R0 * (1 + 0.32 * Math.sin(3 * a + p1) + 0.18 * Math.sin(5 * a + p2) + 0.09 * Math.sin(11 * a + p3));
+      const inside = (px, py) => { const dx = px - cx, dy = (py - cy) * 1.15, d = Math.hypot(dx, dy); return d < rad(Math.atan2(dy, dx)); };
+      for (let py = cy - R0 * 1.7; py < cy + R0 * 1.7; py += cell) for (let px = cx - R0 * 1.7; px < cx + R0 * 1.7; px += cell) {
+        if (!inside(px, py)) continue;
+        const edge = !inside(px - cell, py) || !inside(px + cell, py) || !inside(px, py - cell) || !inside(px, py + cell);
+        x.fillStyle = edge ? ink + '0.85)' : (hsh(Math.round(px / cell) * 31 + Math.round(py / cell), 617 + k) < 0.08 ? 'rgba(150,120,70,0.55)' : 'rgba(201,172,112,0.75)');
+        x.fillRect(Math.round(px), Math.round(py), cell, cell);
+        // mountains and forests drawn on the land
+        if (!edge && hsh(Math.round(px / cell) * 17 + Math.round(py / cell) * 3, 618 + k) < 0.035) { x.fillStyle = ink + '0.6)'; x.fillRect(Math.round(px) - 4, Math.round(py) + 4, 2, 2); x.fillRect(Math.round(px) - 2, Math.round(py) + 2, 2, 2); x.fillRect(Math.round(px), Math.round(py), 2, 2); x.fillRect(Math.round(px) + 2, Math.round(py) + 2, 2, 2); x.fillRect(Math.round(px) + 4, Math.round(py) + 4, 2, 2); }
+      }
+      // the coast ripples out into the sea
+      x.strokeStyle = sea + '0.22)'; x.lineWidth = 1.5;
+      for (const f of [1.12, 1.24]) { x.beginPath(); for (let a = 0; a <= 6.3; a += 0.08) { const r = rad(a) * f, px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r / 1.15; a ? x.lineTo(px, py) : x.moveTo(px, py); } x.stroke(); }
+      // a name for it
+      x.fillStyle = ink + '0.8)'; x.font = Math.round(18 + 6 * hsh(k, 619 + n)) + 'px VT323, monospace'; x.textAlign = 'center';
+      x.fillText(PLACE[Math.floor(hsh(k * 3 + n, 620) * PLACE.length)].toUpperCase().split('').join(' '), cx, cy + 6);
+    }
+    // rhumb lines from a wind rose somewhere on the sheet
+    const rx = W * hsh(k, 630), ry = SHEET * hsh(k, 631); x.strokeStyle = ink + '0.12)'; x.lineWidth = 1;
+    for (let a = 0; a < 16; a++) { x.beginPath(); x.moveTo(rx, ry); x.lineTo(rx + Math.cos(a * Math.PI / 8) * W * 1.5, ry + Math.sin(a * Math.PI / 8) * W * 1.5); x.stroke(); }
+    x.textAlign = 'left';
+    sheetCache.set(k, c); if (sheetCache.size > 8) sheetCache.delete(sheetCache.keys().next().value);
+    return c;
+  }
+  let paper = null;
+  function paperPattern() {
+    if (paper) return paper;
+    const c = document.createElement('canvas'); c.width = c.height = 160; const x = c.getContext('2d');
+    for (let i = 0; i < 900; i++) { x.fillStyle = 'rgba(90,60,25,' + (0.03 + 0.07 * Math.random()).toFixed(3) + ')'; x.fillRect(Math.random() * 160 | 0, Math.random() * 160 | 0, 1 + (Math.random() * 2 | 0), 1); }
+    for (let i = 0; i < 6; i++) { x.fillStyle = 'rgba(120,80,30,0.05)'; x.beginPath(); x.arc(Math.random() * 160, Math.random() * 160, 8 + Math.random() * 20, 0, 6.283); x.fill(); }
+    return (paper = ctx.createPattern(c, 'repeat'));
+  }
+  function atlasWorld(dt, sy) {
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    const px = camS / mpp, age = Math.min(1, Math.max(0, camS) / 9000);
+    // the parchment, browning with depth
+    const top = [236, 219, 178], deep = [120, 92, 58], col = top.map((v, i) => Math.round(v + (deep[i] - v) * age));
+    ctx.fillStyle = 'rgb(' + col.join(',') + ')'; ctx.fillRect(0, Math.max(0, sy), W, H);
+    if (!window.__low) { ctx.save(); ctx.translate(0, -mod(px, 160)); ctx.fillStyle = paperPattern(); ctx.fillRect(0, Math.max(0, sy) + mod(px, 160), W, H + 160); ctx.restore(); }
+    // map sheets
+    const k0 = Math.floor((px - AY) / SHEET) - 1, k1 = Math.floor((px + H - AY) / SHEET) + 1;
+    for (let k = Math.max(0, k0); k <= k1; k++) { const y = Math.round(AY + k * SHEET - px); if (y > H || y + SHEET < 0) continue; ctx.drawImage(mapSheet(k), 0, y); }
+    // latitude lines and their degrees
+    const step = 150; ctx.font = Math.round(13 * AP / 3 + 7) + 'px VT323, monospace'; ctx.textBaseline = 'middle';
+    for (let m = Math.floor((px - AY) / step) * step; m < px - AY + H + step; m += step) {
+      if (m < 0) continue; const y = Math.round(AY + m - px), lat = 80 - Math.round(m / step) * 5 % 170;
+      ctx.fillStyle = 'rgba(70,48,24,0.16)'; for (let x = 0; x < W; x += 10) ctx.fillRect(x, y, 6, 1);
+      ctx.fillStyle = 'rgba(70,48,24,0.5)'; const t = Math.abs(lat) + '°' + (lat === 0 ? '' : lat > 0 ? 'N' : 'S'); ctx.fillText(t, 34, y - 8); ctx.fillText(t, W - 84, y - 8);
+    }
+    // little ships sailing the chart, and the odd sea serpent
+    for (let q = 0; q < 5; q++) {
+      const m = (Math.floor(px / 900) + q - 1) * 900 + hsh(q + Math.floor(px / 900), 640) * 900, y = Math.round(AY + m - px); if (y < -40 || y > H + 40 || m < 60) continue;
+      const dir = hsh(q + Math.floor(px / 900), 641) < 0.5 ? 1 : -1, xx = mod(hsh(q, 642) * W + dir * time * (10 + 8 * hsh(q, 643)), W + 80) - 40, bob = Math.round(Math.sin(time * 1.6 + q) * 2);
+      ctx.fillStyle = 'rgba(70,48,24,0.85)';
+      if (hsh(q + Math.floor(px / 900), 644) < 0.75) { ctx.fillRect(xx - 12, y + bob, 24, 4); ctx.fillRect(xx - 9, y + 4 + bob, 18, 3); ctx.fillRect(xx - 1, y - 18 + bob, 2, 18); ctx.fillStyle = 'rgba(245,232,200,0.95)'; ctx.fillRect(xx + 1, y - 16 + bob, 9 * dir > 0 ? 9 : 9, 12); ctx.fillStyle = '#a33a12'; ctx.fillRect(xx - 1, y - 21 + bob, 6, 3); }
+      else { for (let s = 0; s < 4; s++) { const hx = xx + s * 12 * dir, hy = y + Math.round(Math.sin(time * 2 + s) * 3); ctx.fillRect(hx - 4, hy - 4, 8, 4); ctx.fillRect(hx - 2, hy - 7, 4, 3); } ctx.fillRect(xx - 10 * dir, y - 10, 5, 8); ctx.fillStyle = '#a33a12'; ctx.fillRect(xx - 10 * dir + (dir > 0 ? 0 : 3), y - 9, 2, 2); }
+    }
+    // above the map: the edge of the sheet lying on an explorer's desk, lit by a lamp
+    if (sy > -80) {
+      const g = ctx.createLinearGradient(0, 0, 0, Math.max(1, sy)); g.addColorStop(0, '#24170c'); g.addColorStop(1, '#3d2716'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, sy);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let y = 6; y < sy; y += 14) ctx.fillRect(0, y, W, 2);
+      const lamp = ctx.createRadialGradient(W * 0.78, sy * 0.4, 0, W * 0.78, sy * 0.4, 260); lamp.addColorStop(0, 'rgba(255,214,140,0.22)'); lamp.addColorStop(1, 'rgba(255,214,140,0)'); ctx.fillStyle = lamp; ctx.fillRect(0, 0, W, sy + 200);
+      ctx.fillStyle = '#6b4a22'; ctx.fillRect(0, sy - 6, W, 6); ctx.fillStyle = '#a07a3e'; ctx.fillRect(0, sy - 4, W, 2);
+      ctx.fillStyle = 'rgba(70,48,24,0.8)'; ctx.fillRect(14, sy + 10, W - 28, 2); ctx.fillRect(20, sy + 16, W - 40, 1);
+      ctx.fillStyle = 'rgba(70,48,24,0.85)'; ctx.font = Math.round(Math.min(30, W / 30)) + 'px VT323, monospace'; ctx.textAlign = 'center'; ctx.fillText(W < 600 ? 'ATLAS OF THE KNOWN WORLD' : '— A T L A S   O F   T H E   K N O W N   W O R L D —', W / 2, sy + 44); ctx.textAlign = 'left';
+    }
+    // edges of the sheet, darker as it ages
+    // the map's double border runs the whole way down
+    { const t0 = Math.max(0, sy + 10); ctx.fillStyle = 'rgba(70,48,24,0.8)'; ctx.fillRect(14, t0, 2, H); ctx.fillRect(W - 16, t0, 2, H); ctx.fillRect(20, t0 + 6, 1, H); ctx.fillRect(W - 21, t0 + 6, 1, H); }
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.72); vg.addColorStop(0, 'rgba(60,35,10,0)'); vg.addColorStop(1, 'rgba(60,35,10,' + (0.25 + 0.3 * age).toFixed(2) + ')'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  }
+  // the stadium: tiers of stands, a crowd doing the wave, LED boards and the odd big screen
+  const bandCache = new Map(); let bandW = 0;
+  const BAND = 300, CROWD = 220, TEAM = [['#c8102e', '#ffffff'], ['#003da5', '#ffd23f'], ['#00843d', '#ffffff'], ['#6a0dad', '#ffb000'], ['#111111', '#ff4d4d'], ['#ff6a00', '#002b5c']], SKIN = ['#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#ffdbac', '#a0522d'];
+  function crowdBand(k) {
+    if (bandW !== W) { bandCache.clear(); bandW = W; }
+    if (bandCache.has(k)) return bandCache.get(k);
+    const c = document.createElement('canvas'); c.width = W; c.height = CROWD; const x = c.getContext('2d');
+    x.fillStyle = '#141b26'; x.fillRect(0, 0, W, CROWD);
+    const rowH = 11, seatW = 9;
+    for (let r = 0; r * rowH < CROWD; r++) {
+      x.fillStyle = 'rgba(255,255,255,0.04)'; x.fillRect(0, r * rowH + rowH - 2, W, 2);
+      for (let s = 0; s * seatW < W; s++) {
+        const sec = Math.floor(s * seatW / 180), team = TEAM[(sec + k) % TEAM.length], q = hsh(k * 977 + r * 131 + s, 700);
+        const sx = s * seatW + (r % 2 ? 4 : 0), syy = r * rowH;
+        x.fillStyle = team[0]; x.globalAlpha = 0.55; x.fillRect(sx + 1, syy + 5, seatW - 2, 5); x.globalAlpha = 1;
+        if (q < 0.12) continue;
+        x.fillStyle = hsh(s * 7 + r, 701 + k) < 0.7 ? team[0] : team[1]; x.fillRect(sx + 2, syy + 4, 5, 5);
+        x.fillStyle = SKIN[Math.floor(hsh(s * 13 + r * 5, 702 + k) * SKIN.length)]; x.fillRect(sx + 3, syy, 3, 4);
+        if (q > 0.93) { x.fillStyle = team[1]; x.fillRect(sx + 1, syy - 3, 2, 3); x.fillRect(sx + 6, syy - 3, 2, 3); }
+      }
+    }
+    bandCache.set(k, c); if (bandCache.size > 8) bandCache.delete(bandCache.keys().next().value);
+    return c;
+  }
+  const BOARD = ['OBSCURA', 'GO DEEPER', 'RARE ANSWERS SCORE MORE', 'NAME IT TO WIN IT', 'DIVE  DIVE  DIVE', 'THE CROWD GOES WILD', 'FIND THE OBSCURA', 'HALF TIME SOON'];
+  function stadiumWorld(dt, sy) {
+    const px = camS / mpp; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#0b1019'; ctx.fillRect(0, Math.max(0, sy), W, H);
+    const k0 = Math.floor((px - AY) / BAND) - 1, k1 = Math.floor((px + H - AY) / BAND) + 1;
+    for (let k = Math.max(0, k0); k <= k1; k++) {
+      const y = Math.round(AY + k * BAND - px); if (y > H || y + BAND < 0) continue;
+      const big = k % 6 === 5;
+      if (big) {
+        // the big screen
+        ctx.fillStyle = '#05070b'; ctx.fillRect(W * 0.12, y + 10, W * 0.76, BAND - 20); ctx.fillStyle = '#1d2533'; ctx.fillRect(W * 0.12, y + 10, W * 0.76, 6);
+        const sw = W * 0.72, sh = BAND - 60; ctx.fillStyle = '#0a1a33'; ctx.fillRect(W * 0.14, y + 30, sw, sh);
+        ctx.fillStyle = 'rgba(94,224,255,0.9)'; ctx.font = Math.round(sh * 0.32) + 'px VT323, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(Math.floor(time) % 4 < 2 ? 'O B S C U R A' : Math.round(Math.max(0, cam)).toLocaleString('en-US') + ' m', W / 2, y + 30 + sh * 0.45);
+        ctx.font = Math.round(sh * 0.14) + 'px VT323, monospace'; ctx.fillStyle = '#ffd23f'; ctx.fillText('★ MAKE SOME NOISE ★', W / 2, y + 30 + sh * 0.8); ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; for (let yy = y + 30; yy < y + 30 + sh; yy += 3) ctx.fillRect(W * 0.14, yy, sw, 1);
+        continue;
+      }
+      // the crowd, sliced into columns that rise and fall with the wave
+      const band = crowdBand(k), sl = 24, wavePos = mod(time * 0.28 + k * 0.13, 1.4) - 0.2;
+      for (let x = 0; x < W; x += sl) {
+        const d = x / W - wavePos, up = reduce ? 0 : Math.max(0, 1 - Math.abs(d) * 9), jig = reduce ? 0 : Math.sin(time * 8 + x * 0.3 + k) * 0.6;
+        ctx.drawImage(band, x, 0, sl, CROWD, x, Math.round(y - up * 9 + jig), sl, CROWD);
+        if (up > 0.3) { ctx.fillStyle = 'rgba(255,255,255,' + (0.06 * up).toFixed(3) + ')'; ctx.fillRect(x, y - 9, sl, CROWD); }
+      }
+      // the LED board under each tier
+      const by = y + CROWD + 6, bh = 34; ctx.fillStyle = '#05070b'; ctx.fillRect(0, by, W, bh); ctx.fillStyle = '#1d2533'; ctx.fillRect(0, by - 2, W, 2);
+      ctx.font = '26px VT323, monospace'; ctx.textBaseline = 'middle'; ctx.fillStyle = k % 2 ? '#ffb000' : '#5ee0ff';
+      const msg = (BOARD[k % BOARD.length] + '   •   ').repeat(6), off = mod(time * 70 + k * 200, 900);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, by, W, bh); ctx.clip(); ctx.fillText(msg, -off, by + bh / 2 + 1); ctx.fillStyle = 'rgba(0,0,0,0.45)'; for (let xx = 0; xx < W; xx += 3) ctx.fillRect(xx, by, 1, bh); ctx.restore();
+      // walkway, rail and a section sign
+      ctx.fillStyle = '#2a313d'; ctx.fillRect(0, by + bh, W, BAND - CROWD - bh - 6); ctx.fillStyle = '#8b97a8'; ctx.fillRect(0, by + bh + 4, W, 2);
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(16, by + bh + 8, 70, 16); ctx.fillStyle = '#0b1019'; ctx.font = '16px VT323, monospace'; ctx.textBaseline = 'middle'; ctx.fillText('SEC ' + (100 + k * 7), 22, by + bh + 16); ctx.textBaseline = 'alphabetic';
+    }
+    // above the stands: the night sky, the roof and its floodlights
+    if (sy > -80) {
+      const g = ctx.createLinearGradient(0, 0, 0, Math.max(1, sy)); g.addColorStop(0, '#04060c'); g.addColorStop(1, '#15203a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, sy);
+      for (let i = 0; i < 60; i++) { const tw = 0.4 + 0.6 * Math.abs(Math.sin(time * (0.5 + hsh(i, 720)) + i)); ctx.fillStyle = 'rgba(255,255,255,' + (0.5 * tw).toFixed(2) + ')'; ctx.fillRect(Math.round(hsh(i, 721) * W), Math.round(hsh(i, 722) * sy * 0.8), 2, 2); }
+      ctx.fillStyle = '#1a222c'; ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(0, sy - 30); ctx.quadraticCurveTo(W / 2, sy - 70, W, sy - 30); ctx.lineTo(W, sy); ctx.fill();
+      ctx.fillStyle = '#8b97a8'; for (let x = 10; x < W; x += 34) ctx.fillRect(x, sy - 30 - 30 * Math.sin(Math.PI * x / W), 2, 30 * Math.sin(Math.PI * x / W) + 30);
+    }
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    // keep the middle calm so the falling answer reads
+    const cv = ctx.createLinearGradient(0, 0, W, 0); cv.addColorStop(0, 'rgba(5,8,14,0)'); cv.addColorStop(0.35, 'rgba(5,8,14,0.45)'); cv.addColorStop(0.65, 'rgba(5,8,14,0.45)'); cv.addColorStop(1, 'rgba(5,8,14,0)'); ctx.fillStyle = cv; ctx.fillRect(0, Math.max(0, sy), W, H);
+  }
   function draw(dt) {
     const pz = 1 + punch * punch * 0.04;
     ctx.setTransform(DPR * pz, 0, 0, DPR * pz, -W * (pz - 1) / 2 * DPR, -AY * (pz - 1) * DPR);
@@ -2307,6 +2560,8 @@ addEventListener('online', checkIn);
     const bg = ctx.createLinearGradient(0, 0, 0, H);
     bg.addColorStop(0, css(air(camS - H * mpp * 0.3))); bg.addColorStop(0.5, css(air(camS + H * mpp * 0.2))); bg.addColorStop(1, css(air(camS + H * mpp * 0.7)));
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    const TH = window.__theme;
+    if (TH === 'geo') atlasWorld(dt, sy); else if (TH === 'sports') stadiumWorld(dt, sy); else {
     // sky above the treetops
     if (sy > -60) {
       const g = ctx.createLinearGradient(0, 0, 0, Math.max(1, sy));
@@ -2427,6 +2682,7 @@ addEventListener('online', checkIn);
         if (!left) ctx.scale(-1, 1); ctx.drawImage(im, 0, -hh2 / 2, w, hh2); ctx.restore();
       }
     }
+    }
     // spore puffs, motes and sparks
     for (const q of puffs) { const i = q.t / q.life; pglow(F(q.x), F(yOf(q.m)), F(q.r * (0.5 + i)), 0.9 * (1 - i), DARK, 3); }
     // speed: thin dashed streaks up the edges of the frame while you plunge
@@ -2520,11 +2776,12 @@ addEventListener('online', checkIn);
     if (gold && !reduce && time - (frog.gs || 0) > 0.55) { frog.gs = time; fx.burst(frog.x + D(-10, 10), frog.y + bob + D(-6, 10), R() < 0.5 ? '#ffd166' : '#ffe9a8', 1, 0.15); }
     }
     if (!reduce && time - frog.emit > 2.2 + R()) { frog.emit = time; fx.bubble(frog.x + 20, frog.y + bob - 8, 1.5 + 2 * R()); }
+    if (TH) themeFront(TH, dt);
     // depth ruler, notes, vignette
     const trek = bc.contains('trek');
     if (vig) { const o = Math.min(0.4, 0.25 + Math.max(0, camS) / 8000).toFixed(2); if (vig.style.opacity !== o) vig.style.opacity = o; }
     if (ruler) ruler.hidden = !trek;
-    if (notes) notes.hidden = !trek || bc.contains('quiet');
+    if (notes) notes.hidden = !trek || bc.contains('quiet') || !!window.__theme;
     if (trek) {
       const rx = W - 16;
       ctx.strokeStyle = 'rgba(190,214,184,.55)'; ctx.fillStyle = 'rgba(190,214,184,.55)'; ctx.lineWidth = 2;
@@ -2620,14 +2877,14 @@ addEventListener('online', checkIn);
       cam = reduce ? target : cam + (target - cam) * (1 - Math.exp(-dt * 2));
       if (Math.abs(target - cam) < 0.05) cam = target;
     }
-    if (time - ambT > 0.5) { ambT = time; if (window.__amb) window.__amb(camS < 300 ? 'canopy' : camS < FLOOR ? 'forest' : biomeOf(camS).kind); }
+    if (time - ambT > 0.5) { ambT = time; if (window.__amb) window.__amb(window.__theme === 'sports' ? 'stadium' : window.__theme === 'geo' ? 'atlas' : camS < 300 ? 'canopy' : camS < FLOOR ? 'forest' : biomeOf(camS).kind); }
     // the view trails the camera slightly and breathes when idle
     camS += (cam - camS) * (reduce ? 1 : 1 - Math.exp(-6 * dt)); if (Math.abs(cam - camS) < 0.02) camS = cam;
     camS += reduce ? 0 : 0.012 * Math.sin(0.45 * time);
     vel = dt ? (camS - prevS) / dt : 0;
     { let z = -1; for (let i = 0; i < NOTES.length; i++) if (NOTES[i][2] && cam >= NOTES[i][0]) z = i;
       if (zoneAt === -1 && !document.body.classList.contains('trek')) zoneAt = z;
-      else if (z > zoneAt && document.body.classList.contains('trek')) { zoneAt = z; const el = $('zone'); if (el) { el.firstChild.textContent = ''; el.lastChild.textContent = '── ' + NOTES[z][1]; restart(el, 'show'); } snd('zone'); }
+      else if (z > zoneAt && document.body.classList.contains('trek') && !window.__theme) { zoneAt = z; const el = $('zone'); if (el) { el.firstChild.textContent = ''; el.lastChild.textContent = '── ' + NOTES[z][1]; restart(el, 'show'); } snd('zone'); }
       else if (z < zoneAt) zoneAt = z; }
     for (const q of parts) {
       q.t += dt; q.px = q.x; q.pm = q.m; q.x += q.vx * dt; q.m += q.vm * dt;
@@ -2645,7 +2902,7 @@ addEventListener('online', checkIn);
     if (burstT > 0) { burstT += dt / 1.5; if (burstT >= 1) { burstT = 0; orbit = null; } }
     if (orbit && !orbit.keep && !window.__sink && !window.__lines && burstT === 0) orbit = null;
     draw(dt);
-    if (bloomX && !window.__low && cv.width > 0 && cv.height > 0 && W > 0 && H > 0 && (bloomN++ & 1) === 0) { const bw = Math.max(1, Math.ceil(W / 4)), bh = Math.max(1, Math.ceil(H / 4)); if (bloomC.width !== bw || bloomC.height !== bh) { bloomC.width = bw; bloomC.height = bh; } bloomX.drawImage(cv, 0, 0, bw, bh); const bo = (camS > FLOOR ? 0.78 : 0.5).toFixed(2); if (bloomC.style.opacity !== bo) bloomC.style.opacity = bo; }
+    if (bloomX && !window.__low && cv.width > 0 && cv.height > 0 && W > 0 && H > 0 && (bloomN++ & 1) === 0) { const bw = Math.max(1, Math.ceil(W / 4)), bh = Math.max(1, Math.ceil(H / 4)); if (bloomC.width !== bw || bloomC.height !== bh) { bloomC.width = bw; bloomC.height = bh; } bloomX.drawImage(cv, 0, 0, bw, bh); const bo = (window.__theme === 'geo' ? 0.08 : window.__theme === 'sports' ? 0.55 : camS > FLOOR ? 0.78 : 0.5).toFixed(2); if (bloomC.style.opacity !== bo) bloomC.style.opacity = bo; }
   }
   addEventListener('pointerdown', e => { if (frog.hop > 0 || Math.hypot(e.clientX - frog.x, e.clientY - frog.y) > 36 || (e.target.closest && e.target.closest('button, input, select'))) return; frog.hop = 1; snd('ribbit'); { const pop = h('span', { class: 'ribbit', 'aria-hidden': 'true', text: (window.__pal && window.__pal.id !== 'frog') ? 'hey!' : 'ribbit!', style: 'left:' + Math.round(frog.x) + 'px;top:' + Math.round(frog.y - 34) + 'px' }); document.body.append(pop); setTimeout(() => pop.remove(), 1000); } for (let q = 0; q < 6; q++) fx.bubble(frog.x + D(-16, 26), frog.y - 16, 1 + 3 * R()); fx.burst(frog.x, frog.y, '#ff7a45', 10, 0.5); });
   // deep down, the pointer leaves a trail of sparks

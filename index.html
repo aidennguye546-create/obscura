@@ -792,6 +792,14 @@ body.low #bloom { display: none; }
 
 @media (min-width: 1280px) and (min-height: 800px) { #tierlines .chip2 { font-size: 34px; padding: 13px 30px 11px; } #tierlines .lab { font-size: 18px; } #tierlines .lab img { width: 20px; height: 20px; } #zone, #notes span { font-size: 18px; } }
 @media (min-width: 1700px) and (min-height: 1000px) { #tierlines .chip2 { font-size: 40px; padding: 15px 34px 13px; } #tierlines .lab { font-size: 21px; } #tierlines .lab img { width: 24px; height: 24px; } #zone, #notes span { font-size: 21px; } }
+
+/* an Obscura: the companion perches on the result card, gold, with a halo breathing behind it */
+.landed .perch { position: relative; display: grid; place-items: center; width: 132px; height: 112px; }
+.landed .perch::before { content: ""; position: absolute; inset: -18px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 209, 102, 0.55) 0, rgba(255, 209, 102, 0.18) 38%, rgba(255, 209, 102, 0) 68%); animation: perchhalo 2.6s cubic-bezier(.65, 0, .35, 1) infinite; }
+.landed .perch .perched { position: relative; image-rendering: pixelated; filter: drop-shadow(0 0 14px rgba(255, 209, 102, 0.85)); animation: perchin 0.7s cubic-bezier(.2, 1.7, .4, 1) 2.9s backwards, iconbob 2.6s ease-in-out 3.6s infinite; }
+@keyframes perchhalo { 0%, 100% { transform: scale(0.92); opacity: 0.75; } 50% { transform: scale(1.06); opacity: 1; } }
+@keyframes perchin { 0% { opacity: 0; transform: translateY(70px) scale(0.4) rotate(-20deg); } 60% { opacity: 1; transform: translateY(-14px) scale(1.15) rotate(6deg); } 100% { transform: none; } }
+body.low .landed .perch .perched { animation: none; }
 </style>
 </head>
 <body>

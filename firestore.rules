@@ -12,7 +12,8 @@ service cloud.firestore {
     }
     // "that should count": a player flags a rejected answer for review; nobody can read or change them from the game
     match /reports/{id} {
-      allow create: if request.resource.data.keys().hasOnly(['topic', 'text', 'at'])
+      allow create: if request.resource.data.keys().hasOnly(['topic', 'text', 'at', 'who'])
+        && request.resource.data.who is string && request.resource.data.who.size() < 16
         && request.resource.data.topic is string && request.resource.data.topic.size() < 40
         && request.resource.data.text is string && request.resource.data.text.size() <= 60
         && request.resource.data.at is number;

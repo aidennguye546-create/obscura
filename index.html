@@ -785,6 +785,13 @@ body.low #bloom { display: none; }
 #tierlines .chip2.gold.bump { animation: chipbump 0.32s cubic-bezier(.2, 1.8, .4, 1), goldchip 1s cubic-bezier(.65, 0, .35, 1) 0.32s infinite; }
 @keyframes chipbump { 0% { scale: 1; filter: brightness(1); } 30% { scale: 1.22; filter: brightness(1.9); } 100% { scale: 1; filter: brightness(1); } }
 .launch { position: fixed; z-index: 7; pointer-events: none; font-size: 26px; letter-spacing: 0.06em; color: #f0f7e4; text-shadow: 0 0 12px rgba(125, 255, 176, 0.8), 0 2px 0 #050d08; white-space: nowrap; }
+
+/* big screens: scale the whole interface up so it isn't lost in the middle of a large monitor */
+@media (min-width: 1280px) and (min-height: 800px) { #app, #emos, #leadslam, #bigcount, #conn, .rival, .modal, #mute, #burger, #gear { zoom: 1.2; } }
+@media (min-width: 1700px) and (min-height: 1000px) { #app, #emos, #leadslam, #bigcount, #conn, .rival, .modal, #mute, #burger, #gear { zoom: 1.4; } }
+
+@media (min-width: 1280px) and (min-height: 800px) { #tierlines .chip2 { font-size: 34px; padding: 13px 30px 11px; } #tierlines .lab { font-size: 18px; } #tierlines .lab img { width: 20px; height: 20px; } #zone, #notes span { font-size: 18px; } }
+@media (min-width: 1700px) and (min-height: 1000px) { #tierlines .chip2 { font-size: 40px; padding: 15px 34px 13px; } #tierlines .lab { font-size: 21px; } #tierlines .lab img { width: 24px; height: 24px; } #zone, #notes span { font-size: 21px; } }
 </style>
 </head>
 <body>

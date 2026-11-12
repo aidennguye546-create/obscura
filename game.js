@@ -222,7 +222,27 @@ function sayings(s) {
   for (const b of new Set([t, ord])) { const p = b.replace(TITLE, ''); out.add(b); out.add(p); out.add(p.replace(PLACE, '')); out.add(b.replace(PLACE, '')); }
   out.delete(t); return [...out].filter(x => x && x.length >= 3);
 }
+// Players often pad an answer with words from the prompt ("lori loud" for a Loud House character) or say
+// where it's from ("neo from the matrix"). Only when nothing else matched, try again without that padding;
+// whatever it finds is offered as a correction, so the player still confirms it.
+const PROMPT_SKIP = new Set(['name', 'a', 'an', 'the', 'of', 'or', 'and', 'that', 'is', 'in', 'from', 'with', 'who', 'has', 'have', 'famous', 'something', 'thing', 'you', 'your', 'its', 'it', 'by', 'to', 'for', 'one', 'not', 'usually', 'can']);
 function match(topicId, input) {
+  const r = matchCore(topicId, input);
+  if (r && !r.amb) return r;
+  const T = TOPICS[topicId]; if (!T) return r;
+  const raw = String(input).trim(), tries = [];
+  const pw = new Set(String(T.name).split(/[\s\-\/,“”"'’.()]+/).concat(String(T.name).split(/[\s\/,“”"()]+/)).map(norm).filter(w => w && !PROMPT_SKIP.has(w)));
+  const words = raw.split(/\s+/), kept = words.filter(w => !pw.has(norm(w)));
+  if (kept.length && kept.length < words.length) tries.push(kept.join(' '));
+  const cut = raw.match(/^(.+?)\s+(?:from|in|on|off|of the film|of the show)\s+.+$/i); if (cut) tries.push(cut[1]);
+  const as = raw.match(/^.+?\s+as\s+(.+)$/i); if (as) tries.push(as[1]);
+  const lead = raw.replace(/^(?:a|an|the|my|some|play|playing)\s+/i, ''); if (lead !== raw) tries.push(lead);
+  const mine = raw.replace(/\b(?:my|your|his|her|their)\b/gi, 'the'); if (mine !== raw) tries.push(mine);
+  if (kept.length > 1) { const tidy = kept.filter(w => !/^(?:the|a|an|my)$/i.test(w)); if (tidy.length && tidy.length < kept.length) tries.push(tidy.join(' ')); }
+  for (const t of tries) { if (norm(t).length < 3) continue; const r2 = matchCore(topicId, t); if (r2 && !r2.amb) return Object.assign({}, r2, { fix: true }); }
+  return r;
+}
+function matchCore(topicId, input) {
   const T = TOPICS[topicId], k = norm(input);
   if (!T || !k) return null;
   if (T.map.has(k)) return { e: T.map.get(k), fix: false };

@@ -744,7 +744,7 @@ function pickSeven(pool, rnd) {
 const dayNoOf = key => { const p = key.split('-').map(Number); return Math.max(1, Math.floor((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
 // No repeats: the pool is shuffled once per cycle and dealt out seven a day until it runs out, then reshuffled.
 function dealSeven(pool, tag, n) { const ids = pool.filter(usable).sort(), per = Math.floor(ids.length / 7); if (!per) return []; const cyc = Math.floor((n - 1) / per), rnd = seeded('obscura:' + tag + ':' + cyc); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } const k = ((n - 1) % per) * 7; return ids.slice(k, k + 7); }
-window.__dbg = { sprite, S: () => S, topic: id => TOPICS[id], champ: name => moment(Math.round(innerHeight * 0.3), 'CHAMPION', name + ' · 1,240 pts', icon('krill', '#ffc23a', 128), 'champ'), lead: (name, kind) => leadSlam({ id: 'x', name }, kind), emote: e => showEmote(S.me.id, e), count: t => { const m = S.mode; S.mode = 'online'; bigCount(t); S.mode = m; }, rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
+window.__dbg = { sprite, S: () => S, render: () => render(), topic: id => TOPICS[id], champ: name => moment(Math.round(innerHeight * 0.3), 'CHAMPION', name + ' · 1,240 pts', icon('krill', '#ffc23a', 128), 'champ'), lead: (name, kind) => leadSlam({ id: 'x', name }, kind), emote: e => showEmote(S.me.id, e), count: t => { const m = S.mode; S.mode = 'online'; bigCount(t); S.mode = m; }, rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
 window.__deal = (tag, n) => dealSeven(tag === 'daily' ? TOPIC_IDS : packPool(tag), tag, n);
 const dailySaved = () => { try { return JSON.parse(ls.get('daily_' + dayKey()) || 'null'); } catch (e) { return null; } };
 const dailyKey = kind => 'daily_' + kind + '_' + dayKey();
@@ -928,7 +928,10 @@ function lockIn(hit, skipped) {
   const r = S.room, d = diveState();
   if (S.mine.g !== r.g) S.mine = freshMine(r.g, S.mine.joinedAt);
   const rd = S.mine.rounds[r.round] || (S.mine.rounds[r.round] = { a: [], pts: 0 });
-  rd.a.push(hit ? [hit.name, hit.tier] : ['', -1]);
+  rd.tp = r.topic;
+  // seconds taken on this answer, for the end-of-game rundown
+  const took = d.until ? Math.max(0, Math.round((r.secs * 1000 - (d.until - Date.now())) / 100) / 10) : null;
+  rd.a.push(hit ? [hit.name, hit.tier, took] : ['', skipped ? -2 : -1, took]);
   if (hit) rd.pts += TIERS[hit.tier].pts;
   d.i = rd.a.length; S.fb = null;
   $('edge').classList.remove('hot');
@@ -958,6 +961,9 @@ function submit(ev) {
   if (!text) return;
   const m = match(r.topic, text), form = input.closest('form'), typed = '“' + text.slice(0, 30) + '”';
   const say2 = (fb) => { S.fb = fb; renderFb(); };
+  // wrong guesses are kept for the rundown at the end
+  const wrong = () => { if (S.mine.g !== r.g) S.mine = freshMine(r.g, S.mine.joinedAt); const rw = S.mine.rounds[r.round] || (S.mine.rounds[r.round] = { a: [], pts: 0 }); rw.tp = r.topic; rw.w = rw.w || []; if (rw.w.length < 20) rw.w.push(text.slice(0, 28)); };
+  if (!m || m.amb) wrong();
   if ((!m || m.amb) && SET.clear) input.value = '';
   if (m && m.amb) { restart(form, 'jolt'); restart($('fb'), 'shake'); return say2({ kind: 'miss', text: typed + ' fits more than one answer', sub: 'be more specific' }); }
   if (!m) { restart(form, 'jolt'); if (window.__fx) window.__fx.reject(); say2({ kind: 'miss', text: typed + ': no trace of that. try again' }); return restart($('fb'), 'shake'); }
@@ -1523,9 +1529,83 @@ function buildFinal() {
         h('div', { id: 'podium', class: 'podium' }),
         panel('Final depths', null, h('ol', { id: 'ranks', class: 'ranks' })),
         h('div', { id: 'awards' }),
+        h('div', { id: 'rundown' }),
         isHost() ? h('button', { class: 'go', type: 'button', onclick: again, text: S.mode === 'solo' ? '▼ Drop again ▼' : '▼ Back to the lobby ▼' })
                  : h('p', { class: 'note', style: 'text-align:center', text: 'The host can start another expedition.' }), emoteBar()),
       h('aside', null, gaugeEl())));
+}
+// The full rundown: everyone's game at a glance, then every round answer by answer.
+function rundown(ps) {
+  const box = $('rundown'); if (!box) return;
+  const mine = p => p.g === S.room.g && p.rounds ? p.rounds : {};
+  const ks = [...new Set(ps.flatMap(p => Object.keys(mine(p))))].map(Number).filter(k => k > 0).sort((a, b) => a - b);
+  if (!ks.length) return box.replaceChildren();
+  const multi = ps.length > 1, used = S.room.used || [], last = Math.max(S.room.round || 0, ...ks);
+  const topicAt = k => ps.map(p => roundOf(p, k).tp).find(Boolean) || used[used.length - 1 - (last - k)];
+  const said = {}; ps.forEach(p => ks.forEach(k => roundOf(p, k).a.forEach(x => { if (x[1] >= 0) said[k + '|' + x[0]] = (said[k + '|' + x[0]] || 0) + 1; })));
+  const secs = v => v == null ? '' : (v < 10 ? v.toFixed(1) : Math.round(v)) + 's';
+  const pill = (txt, cls) => h('span', { class: 'rdpill' + (cls ? ' ' + cls : ''), text: txt });
+  // per-player totals
+  const stat = p => {
+    const all = ks.flatMap(k => roundOf(p, k).a.map(x => ({ n: x[0], t: x[1], s: x[2], k })));
+    const hits = all.filter(x => x.t >= 0), times = hits.map(x => x.s).filter(v => v != null);
+    const tiers = [0, 1, 2, 3, 4].map(t => hits.filter(x => x.t === t).length);
+    const best = hits.reduce((m, x) => (!m || x.t > m.t || (x.t === m.t && (x.s || 99) < (m.s || 99)) ? x : m), null);
+    const rounds = ks.map(k => ({ k, pts: roundOf(p, k).pts })), br = rounds.reduce((m, x) => x.pts > m.pts ? x : m, { pts: -1 });
+    const fast = hits.filter(x => x.s != null).reduce((m, x) => (!m || x.s < m.s ? x : m), null);
+    return { p, pts: total(p), hits: hits.length, tries: all.length, tiers, best, br, fast,
+      avg: times.length ? times.reduce((a, b) => a + b, 0) / times.length : null,
+      solo: hits.filter(x => said[x.k + '|' + x.n] === 1).length,
+      skips: all.filter(x => x.t === -2).length, outs: all.filter(x => x.t === -1).length,
+      wrong: ks.reduce((s, k) => s + ((roundOf(p, k).w || []).length), 0) };
+  };
+  const st = ps.map(stat);
+  const card = s => h('div', { class: 'rdcard' + (s.p.id === S.me.id ? ' me' : '') },
+    h('div', { class: 'rdwho' }, h('span', { class: 'dot', style: 'background:' + colorOf(s.p.id) }), h('strong', { text: nameOf(s.p) + (s.p.id === S.me.id ? ' (you)' : '') }), h('span', { class: 'rdpts', text: fmt(s.pts) + ' pts' })),
+    h('div', { class: 'rdtiers' }, ...[4, 3, 2, 1, 0].map(t => h('span', { class: 'rdtier t-' + TIERS[t].key + (s.tiers[t] ? '' : ' none'), title: TIERS[t].name }, tierIcon(t, 18), h('b', { text: '×' + s.tiers[t] })))),
+    h('dl', { class: 'rdstats' },
+      ...[['Found', s.hits + ' of ' + s.tries + ' tries'],
+        ['Hit rate', s.tries ? Math.round(s.hits / s.tries * 100) + '%' : '—'],
+        multi && ['Nobody else said', String(s.solo)],
+        ['Wrong guesses', String(s.wrong)],
+        ['Skipped', String(s.skips)], ['Ran out of time', String(s.outs)],
+        ['Avg answer time', s.avg == null ? '—' : secs(s.avg)],
+        ['Fastest', s.fast ? '“' + s.fast.n + '” in ' + secs(s.fast.s) : '—'],
+        ['Rarest find', s.best ? '“' + s.best.n + '” · ' + (s.best.t === 4 ? 'Obscura' : TIERS[s.best.t].name) : '—'],
+        ['Best round', s.br.pts > 0 ? 'Round ' + s.br.k + ' · ' + s.br.pts + ' pts' : '—']].filter(Boolean)
+        .flatMap(([a, b]) => [h('dt', { text: a }), h('dd', { text: b })])));
+  // round by round
+  const round = k => {
+    const tp = topicAt(k), T = tp && TOPICS[tp];
+    const rows = ps.map(p => ({ p, rd: roundOf(p, k) })).sort((a, b) => b.rd.pts - a.rd.pts);
+    const top = rows[0] && rows[0].rd.pts, won = multi && top > 0 && rows.filter(x => x.rd.pts === top).length === 1;
+    const saidHere = new Set(); rows.forEach(x => x.rd.a.forEach(y => { if (y[1] >= 0) saidHere.add(y[0]); }));
+    const obs = T ? T.list.filter(e => e.tier === 4) : [];
+    const popular = T ? T.list.filter(e => e.tier === 0 && !saidHere.has(e.name)).slice(0, 6) : [];
+    const counts = {}; rows.forEach(x => x.rd.a.forEach(y => { if (y[1] >= 0) counts[y[0]] = (counts[y[0]] || 0) + 1; }));
+    const crowd = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    return h('div', { class: 'rd' },
+      h('div', { class: 'rdhead' }, h('p', { class: 'eyebrow', text: 'Round ' + k }), T && h('h3', { text: T.name }), T && T.blurb && h('p', { class: 'note', text: T.blurb })),
+      ...rows.map(({ p, rd }, i) => {
+        const good = rd.a.filter(x => x[1] >= 0).sort((a, b) => b[1] - a[1]);
+        const sk = rd.a.filter(x => x[1] === -2).length, out = rd.a.filter(x => x[1] === -1).length, w = rd.w || [];
+        return h('div', { class: 'rdrow' + (p.id === S.me.id ? ' me' : '') },
+          h('div', { class: 'rdwho' }, h('span', { class: 'dot', style: 'background:' + colorOf(p.id) }), h('strong', { text: nameOf(p) }), won && i === 0 ? h('i', { class: 'crown', text: '♛ round' }) : null, h('span', { class: 'rdpts', text: rd.pts + ' pts' })),
+          h('ul', { class: 'chips' }, ...good.map(([n, t, s]) => { const c = chip(n, t, '+' + TIERS[t].pts + (s != null ? ' · ' + secs(s) : '')); if (multi && said[k + '|' + n] === 1) { c.classList.add('solo'); c.title = 'nobody else said it'; } return c; }),
+            !rd.a.length ? h('li', { class: 'rdmiss', text: 'no answers' }) : null),
+          (sk || out || w.length) ? h('div', { class: 'rdmeta' },
+            sk > 0 ? pill(sk + ' skipped') : null, out > 0 ? pill(out + ' ran out of time') : null,
+            w.length > 0 ? (p.id === S.me.id ? pill(w.length + ' wrong: ' + w.map(x => '“' + x + '”').join(', '), 'wrong') : pill(w.length + ' wrong ' + (w.length === 1 ? 'guess' : 'guesses'), 'wrong')) : null) : null);
+      }),
+      h('div', { class: 'rdfoot' },
+        obs.length ? h('p', null, h('span', { class: 'k', text: obs.length > 1 ? 'Obscuras' : 'Obscura' }), ...obs.map(e => { const who = rows.filter(x => x.rd.a.some(y => y[0] === e.name)).map(x => nameOf(x.p)); return h('span', { class: 'rdob' + (who.length ? ' got' : '') }, tierIcon(4, 16), h('b', { text: e.name }), h('small', { text: who.length ? ' found by ' + who.join(', ') : ' nobody' })); })) : null,
+        multi && crowd && crowd[1] > 1 ? h('p', null, h('span', { class: 'k', text: 'Most said' }), h('span', { text: '“' + crowd[0] + '” · ' + crowd[1] + ' players' })) : null,
+        popular.length ? h('p', null, h('span', { class: 'k', text: 'Easy ones nobody said' }), h('span', { text: popular.map(e => e.name).join(', ') })) : null,
+        T && obs[0] && obs[0].fact ? h('p', { class: 'note', text: obs[0].name + ': ' + obs[0].fact }) : null));
+  };
+  box.replaceChildren(
+    panel('The rundown', null, h('div', { class: 'rdcards' }, ...st.map(card))),
+    panel('Every answer, round by round', null, h('div', { class: 'rundown' }, ...ks.map(round))));
 }
 function refreshFinal() {
   if (S.room.fixed) return;
@@ -1541,6 +1621,7 @@ function refreshFinal() {
       h('span', { class: 'count', text: n + ' answers · reached the ' + zoneOf(depthOf(p)).toLowerCase() }),
       h('span', { class: 'depth', text: ps.length > 1 ? fmt(total(p)) + ' pts' : fmt(depthOf(p)) + ' m' }));
   }));
+  rundown(ps);
   // a podium and a few awards when there was someone to beat
   if (ps.length < 2) { $('podium').replaceChildren(); $('awards').replaceChildren(); return; }
   const place = (p, k) => p && h('div', { class: 'pl p' + (k + 1), style: '--mc:' + MEDAL[k] }, icon('krill', colorOf(p.id), k === 0 ? 56 : 40), h('span', { class: 'who', text: nameOf(p) }), h('span', { class: 'd', text: fmt(total(p)) + ' pts' }), h('div', { class: 'block', text: String(k + 1) }));

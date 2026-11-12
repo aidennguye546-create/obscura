@@ -868,9 +868,9 @@ function startRound(n) {
   if (r.fixed) { const now = Date.now(); return patchRoom({ phase: 'play', round: n, topic: r.fixed[n - 1], startsAt: now + 2600, endsAt: now + 2600 + (r.secs + 14) * 1000 }); }
   let used = r.used || [];
   let pool = TOPIC_IDS.filter(id => !used.includes(id));
-  if (pool.length < 3) { used = []; pool = TOPIC_IDS.slice(); }
+  if (pool.length < 5) { used = []; pool = TOPIC_IDS.slice(); }
   const order = ordered().map(p => p.id), picks = [];
-  for (const id of shuffle(pool)) { if (usable(id)) picks.push(id); if (picks.length === 3) break; }
+  for (const id of shuffle(pool)) { if (usable(id)) picks.push(id); if (picks.length === 5) break; }
   patchRoom({
     phase: 'pick', round: n, options: picks, used,
     picker: order[(n - 1) % order.length] || S.me.id, pickEndsAt: Date.now() + PICK_MS, topic: '',

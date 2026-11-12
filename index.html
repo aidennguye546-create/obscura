@@ -838,6 +838,42 @@ body.low .landed .perch .perched { animation: none; }
 .pick .card strong { font-size: 24px; line-height: 1; }
 .pick .card span { font-size: 14px; }
 @media (max-width: 560px) { .pick .cards { grid-template-columns: 1fr; } .pick .card strong { font-size: 21px; } }
+
+/* ---- themed packs ---- */
+/* Geography: an explorer's atlas. Parchment cards, sea-blue ink, a stamped eyebrow */
+body.th-geo { --cyan: #7fd6e8; --pink: #e8743b; --gold: #f2d59a; --muted: #b9a98a; --edge: #6b5634; --panel: rgba(28, 22, 14, 0.86); }
+body.th-geo .panel { background: rgba(28, 22, 14, 0.86) repeating-linear-gradient(0deg, rgba(232, 214, 170, 0.05) 0 1px, transparent 1px 24px), rgba(28, 22, 14, 0.86) repeating-linear-gradient(90deg, rgba(232, 214, 170, 0.05) 0 1px, transparent 1px 24px); box-shadow: 0 0 0 2px #120d07, 0 0 0 4px #6b5634, 0 0 0 6px #120d07, inset 0 0 40px rgba(232, 200, 140, 0.08); }
+body.th-geo .panel.topic { background: linear-gradient(rgba(242, 225, 186, 0.96), rgba(226, 204, 158, 0.96)); color: #2b1d0e; box-shadow: 0 0 0 2px #2b1d0e, 0 0 0 5px #8a6a3a, 0 0 0 7px #2b1d0e, 0 10px 30px rgba(0, 0, 0, 0.45); position: relative; }
+body.th-geo .panel.topic h2 { color: #2b1d0e; text-shadow: none; }
+body.th-geo .panel.topic .note { color: #6b5634; }
+body.th-geo .panel.topic .eyebrow { color: #a33a12; display: table; width: auto; border: 2px solid #a33a12; padding: 0 8px; transform: rotate(-2deg); letter-spacing: 0.18em; }
+body.th-geo .panel.topic::after { content: "◍ ATLAS"; position: absolute; right: 12px; top: 10px; font-size: 14px; letter-spacing: 0.2em; color: rgba(43, 29, 14, 0.45); }
+body.th-geo .hudbox { background: linear-gradient(rgba(40, 31, 18, 0.94), rgba(28, 22, 14, 0.94)); box-shadow: 0 0 0 2px #120d07, 0 0 0 4px #6b5634, inset 0 2px 0 rgba(242, 225, 186, 0.08); }
+body.th-geo .hudbox b { color: #7fd6e8; text-shadow: 0 0 12px rgba(127, 214, 232, 0.5); }
+body.th-geo .hudbox.right b { color: #f2d59a; text-shadow: 0 0 12px rgba(242, 213, 154, 0.45); }
+body.th-geo #ruler span, body.th-geo .ruler span { color: #e8d6aa; }
+/* Sports: a floodlit stadium. Navy panels, jersey stripes, an LED scoreboard */
+body.th-sports { --cyan: #5ee0ff; --pink: #ff4d4d; --gold: #ffd23f; --muted: #93a4bf; --edge: #2a3f66; --panel: rgba(8, 14, 28, 0.88); }
+body.th-sports .panel { background: rgba(8, 14, 28, 0.88) repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px); box-shadow: 0 0 0 2px #03060d, 0 0 0 4px #2a3f66, inset 0 3px 0 0 #ff4d4d, inset 0 6px 0 0 #ffffff, inset 0 9px 0 0 #4d8dff; }
+body.th-sports .panel.topic { background: linear-gradient(#0e1a33, #0a1226); padding-top: 22px; }
+body.th-sports .panel.topic h2 { color: #ffffff; text-shadow: 0 0 18px rgba(94, 224, 255, 0.35); }
+body.th-sports .panel.topic .eyebrow { color: #ffd23f; letter-spacing: 0.25em; }
+body.th-sports .panel.topic::before { content: "LIVE"; position: absolute; right: 14px; top: 14px; font-size: 14px; letter-spacing: 0.2em; color: #fff; background: #ff4d4d; padding: 0 6px; animation: livepulse 1.4s ease-in-out infinite; }
+body.th-sports .panel.topic { position: relative; }
+@keyframes livepulse { 50% { opacity: 0.55; } }
+body.th-sports .hudbox { background: #05080f; box-shadow: 0 0 0 2px #000, 0 0 0 4px #2a3f66, inset 0 0 0 2px #10182a; }
+body.th-sports .hudbox b { font-size: 34px; color: #ffd23f; text-shadow: 0 0 6px rgba(255, 210, 63, 0.9), 0 0 16px rgba(255, 160, 0, 0.5); letter-spacing: 0.06em; background: repeating-linear-gradient(90deg, transparent 0 2px, rgba(0, 0, 0, 0.35) 2px 3px); -webkit-background-clip: text; }
+body.th-sports .hudbox.right b { color: #ff4d4d; text-shadow: 0 0 6px rgba(255, 77, 77, 0.9), 0 0 16px rgba(255, 40, 40, 0.5); }
+body.th-sports .hudbox span { color: #93a4bf; }
+/* the pack tiles on the home screen wear their theme too */
+.tile.pk-geo { box-shadow: 0 0 0 2px #120d07, 0 0 0 4px #8a6a3a; }
+.tile.pk-geo i { color: #7fd6e8; }
+.tile.pk-sports { box-shadow: 0 0 0 2px #03060d, 0 0 0 4px #2a3f66, inset 0 3px 0 #ff4d4d; }
+.tile.pk-sports i { color: #ffd23f; }
+@media (prefers-reduced-motion: reduce) { body.th-sports .panel.topic::before { animation: none; } }
+.fb .report { margin-top: 6px; font-size: 15px; padding: 2px 10px; letter-spacing: 0.08em; text-transform: none; background: transparent; color: var(--muted); box-shadow: 0 0 0 1px var(--edge); }
+.fb .report:hover:not(:disabled) { color: var(--text); box-shadow: 0 0 0 1px var(--cyan); }
+.fb .report:disabled { color: var(--cyan); box-shadow: none; }
 </style>
 </head>
 <body>
@@ -901,6 +937,7 @@ body.low .landed .perch .perched { animation: none; }
 <script src="bank-add4.js"></script>
 <script src="bank-add5.js"></script>
 <script src="bank-add6.js"></script>
+<script src="bank-add7.js"></script>
 <script src="bank-alias.js"></script>
 <script src="bank-qa.js"></script>
 <script src="bank-obx.js"></script>

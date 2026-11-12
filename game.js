@@ -97,7 +97,7 @@ for (const a of window.BANK_ADD || []) {
 }
 // Each prompt is indexed the first time it is needed, so loading stays quick however big the bank gets.
 function buildTopic(t) {
-  const map = new Map(), words = new Map(), lmap = new Map(), list = [];
+  const map = new Map(), words = new Map(), lmap = new Map(), list = [], bares = [];
   t.t.slice(0, 5).forEach((str, tier) => {
     for (const raw of String(str).split(',')) {
       const forms = raw.split('|').map(x => x.trim()).filter(Boolean);
@@ -111,9 +111,12 @@ function buildTopic(t) {
         const tk = f.split(/[\s\-\/]+/).map(norm).filter(w => w && !FILLER.has(w));
         if (tk.length) e.toks.push(tk);
         for (const w of tk) if (w.length >= 4) { if (!words.has(w)) words.set(w, new Set()); words.get(w).add(e); }
+        const bare = f.replace(/\s*\([^)]*\)\s*$/, '').trim(); if (bare && bare !== f) bares.push([bare, e]);
       }
     }
   });
+  // "Dim (A Bug's Life)": nobody types the bracket, so the plain name works too, unless it already means another answer
+  for (const [bare, e] of bares) { const k = norm(bare); if (k && !map.has(k)) map.set(k, e); if (k && !lmap.has(loose(k))) lmap.set(loose(k), e); }
   // Shape the tiers the way Krillion does: a handful of Krill, a broad Schooler and Rare middle,
   // a long Deep Cut tail, and exactly one Krillion with a fact.
   const fix = (window.TIERFIX || {})[t.id] || (t.k ? { top: list.filter(e => e.tier === 0).map(e => e.name), k: t.k } : {});

@@ -779,6 +779,12 @@ body.low #bloom { display: none; }
 /* skip: a quiet button tucked under Drop */
 .ans .skip { position: absolute; right: max(16px, calc(50% - 330px)); bottom: calc(2px + env(safe-area-inset-bottom, 0px)); margin: 0; font-size: 13px; padding: 3px 10px 2px; opacity: 0.85; }
 .ans:not(.play .ans) .skip { position: static; align-self: center; }
+
+/* answering feel: the chip punches out each time it breaks a line, and the typed answer launches up into it */
+#tierlines .chip2.bump { animation: chipbump 0.32s cubic-bezier(.2, 1.8, .4, 1); }
+#tierlines .chip2.gold.bump { animation: chipbump 0.32s cubic-bezier(.2, 1.8, .4, 1), goldchip 1s cubic-bezier(.65, 0, .35, 1) 0.32s infinite; }
+@keyframes chipbump { 0% { scale: 1; filter: brightness(1); } 30% { scale: 1.22; filter: brightness(1.9); } 100% { scale: 1; filter: brightness(1); } }
+.launch { position: fixed; z-index: 7; pointer-events: none; font-size: 26px; letter-spacing: 0.06em; color: #f0f7e4; text-shadow: 0 0 12px rgba(125, 255, 176, 0.8), 0 2px 0 #050d08; white-space: nowrap; }
 </style>
 </head>
 <body>

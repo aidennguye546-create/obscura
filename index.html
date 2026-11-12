@@ -800,6 +800,37 @@ body.low #bloom { display: none; }
 @keyframes perchhalo { 0%, 100% { transform: scale(0.92); opacity: 0.75; } 50% { transform: scale(1.06); opacity: 1; } }
 @keyframes perchin { 0% { opacity: 0; transform: translateY(70px) scale(0.4) rotate(-20deg); } 60% { opacity: 1; transform: translateY(-14px) scale(1.15) rotate(6deg); } 100% { transform: none; } }
 body.low .landed .perch .perched { animation: none; }
+.rundown .rd { padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.08); }
+.rundown .rd:first-child { border-top: 0; padding-top: 0; }
+.rundown .rd .eyebrow { margin: 0 0 8px; }
+.rdrow { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 6px 0; }
+.rdrow .chips { gap: 5px; }
+.rdrow .chip { font-size: 0.88em; }
+.rdwho { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rdwho strong { font-weight: 400; text-transform: uppercase; letter-spacing: 0.08em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rdrow.me .rdwho strong { color: var(--cyan); }
+.rdpts { margin-left: auto; color: var(--gold); font-size: 0.85em; white-space: nowrap; }
+.rdmiss { list-style: none; opacity: 0.55; font-size: 0.85em; padding: 4px 6px; }
+.rdcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.rdcard { border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px 12px; background: rgba(0,0,0,0.18); }
+.rdcard.me { border-color: rgba(120,230,255,0.35); }
+.rdtiers { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 6px; }
+.rdtier { display: inline-flex; align-items: center; gap: 3px; font-size: 0.9em; }
+.rdtier.none { opacity: 0.3; }
+.rdstats { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 0.85em; }
+.rdstats dt { opacity: 0.6; text-transform: uppercase; letter-spacing: 0.06em; }
+.rdstats dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.rdhead h3 { margin: 2px 0 2px; font-weight: 400; font-size: 1.05em; }
+.rdhead .note { margin: 0 0 6px; }
+.rdmeta { display: flex; flex-wrap: wrap; gap: 6px; }
+.rdpill { font-size: 0.8em; opacity: 0.75; border: 1px dashed rgba(255,255,255,0.22); border-radius: 4px; padding: 2px 7px; }
+.rdpill.wrong { color: #ff9b8a; border-color: rgba(255,120,100,0.35); }
+.rdfoot { margin-top: 8px; padding: 8px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; font-size: 0.88em; }
+.rdfoot p { margin: 3px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rdfoot .k { text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.6; font-size: 0.85em; min-width: 9em; }
+.rdob { display: inline-flex; align-items: center; gap: 4px; opacity: 0.65; }
+.rdob.got { opacity: 1; color: var(--gold); }
+.rdrow .crown { font-style: normal; color: var(--gold); font-size: 0.8em; }
 </style>
 </head>
 <body>
@@ -857,9 +888,11 @@ body.low .landed .perch .perched { animation: none; }
 <script src="bank-t2.js"></script>
 <script src="bank-t3.js"></script>
 <script src="bank-t4.js"></script>
+<script src="bank-new1.js"></script>
 <script src="bank-add2.js"></script>
 <script src="bank-add3.js"></script>
 <script src="bank-add4.js"></script>
+<script src="bank-alias.js"></script>
 <script src="bank-obx.js"></script>
 <script src="bank-cut.js"></script>
 <script src="tiers-base.js"></script>

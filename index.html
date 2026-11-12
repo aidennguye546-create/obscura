@@ -831,6 +831,13 @@ body.low .landed .perch .perched { animation: none; }
 .rdob { display: inline-flex; align-items: center; gap: 4px; opacity: 0.65; }
 .rdob.got { opacity: 1; color: var(--gold); }
 .rdrow .crown { font-style: normal; color: var(--gold); font-size: 0.8em; }
+.enter .card:nth-child(4) { animation-delay: 0.3s; }
+.enter .card:nth-child(5) { animation-delay: 0.4s; }
+.pick .cards { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.pick .card { padding: 12px 14px 10px; gap: 4px; }
+.pick .card strong { font-size: 24px; line-height: 1; }
+.pick .card span { font-size: 14px; }
+@media (max-width: 560px) { .pick .cards { grid-template-columns: 1fr; } .pick .card strong { font-size: 21px; } }
 </style>
 </head>
 <body>

@@ -399,7 +399,7 @@ const Sound = (() => {
     sink(o) { noise({ dur: 0.7, lp: 2600, to: 300, hp: 250, peak: 0.12, send: 0.3 }); tone({ f0: 330, f1: 90, dur: 0.6, peak: 0.08 }); riser(o.dur, o.tier); },
     // each line rings one step higher, a little louder and brighter, swinging left and right
     // breaking a tier line: a short clean blip that climbs with each line, so a run of them reads as a rising beat
-    line(i) { const f = LINE[i] || C.C5; tone({ type: 'triangle', f0: f, f1: f * 2, dur: 0.07, a: 0.002, peak: 0.13 + i * 0.015, lp: 4200 }); bell(f * 2, { peak: 0.045 + i * 0.01, dur: 0.32 + i * 0.05, send: 0.25, pan: i % 2 ? 0.3 : -0.3 }); noise({ dur: 0.03, lp: 7000, hp: 3000, peak: 0.03 + i * 0.008 }); },
+    line() { tone({ type: 'triangle', f0: 840, f1: 1680, dur: 0.07, a: 0.002, peak: 0.13, lp: 2600 }); },
     // the instant of contact, before the reward
     impact(tier) { stopRiser(); noise({ dur: 0.035, lp: 7000, hp: 1500, peak: 0.16 + tier * 0.03 }); tone({ f0: 150 - tier * 14, f1: 44, dur: 0.28 + tier * 0.14, peak: 0.26 + tier * 0.03, lp: 700 }); },
     land(tier) {
@@ -1652,7 +1652,7 @@ addEventListener('online', checkIn);
   const bloomC = $('bloom'), bloomX = bloomC && bloomC.getContext('2d'); let bloomN = 0;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ruler = $('ruler'), over = $('tierlines'), notes = $('notes'), vig = $('vig');
-  const MPS = 230, AP = 3; // metres per screen height, CSS px per art pixel
+  const MPS = 230, AP = innerWidth >= 1700 && innerHeight >= 1000 ? 4 : 3; // metres per screen height, CSS px per art pixel (bigger on big screens)
   const R = Math.random, mod = (a, n) => ((a % n) + n) % n, D = (a, b) => a + R() * (b - a);
   const hsh = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
   const lerp3 = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
@@ -1822,7 +1822,7 @@ addEventListener('online', checkIn);
       const upto = el.value.slice(0, el.selectionStart == null ? el.value.length : el.selectionStart), ls = parseFloat(cs.letterSpacing) || 0;
       const x = rc.left + Math.max(10, Math.min(rc.width - 14, parseFloat(cs.paddingLeft) + 2 + m.measureText(upto).width + ls * upto.length - el.scrollLeft)); fx.bubble(x + D(-3, 3), rc.top + D(4, 12), 1 + 2 * R()); if (R() < 0.3) fx.bubble(x + D(-8, 8), rc.top + D(2, 10), 1 + 1.6 * R()); },
     submit(rc, text) {
-      if (text && !reduce) { const g = h('div', { class: 'launch', 'aria-hidden': 'true', text: text }); g.style.left = Math.round(rc.left + 16) + 'px'; g.style.top = Math.round(rc.top + rc.height / 2 - 14) + 'px'; document.body.append(g);
+      if (false && text && !reduce) { const g = h('div', { class: 'launch', 'aria-hidden': 'true', text: text }); g.style.left = Math.round(rc.left + 16) + 'px'; g.style.top = Math.round(rc.top + rc.height / 2 - 14) + 'px'; document.body.append(g);
         const dx = W / 2 - (rc.left + 16 + g.offsetWidth / 2), dy = (AY - 24) - (rc.top + rc.height / 2 - 14);
         g.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: 'translate(' + dx * 0.6 + 'px,' + dy * 0.6 + 'px) scale(1.12)', opacity: 1, offset: 0.55 }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.7)', opacity: 0 }], { duration: 380, easing: 'cubic-bezier(.3,.0,.6,1)' }).onfinish = () => g.remove(); }
       fx.zap(); snd('submit'); for (let i = 0; i < 12; i++) fx.bubble(rc.left + D(0, rc.width), rc.top + D(0, rc.height), 2 + 3 * R()); fx.burst(W / 2, AY + 60, '#7dffb0', 12, 0.6); },
@@ -2439,14 +2439,12 @@ addEventListener('online', checkIn);
       if (L) {
         ensureOverlay();
         const kids = over.children;
-        if (linesId !== L.id) { linesId = L.id; for (let i = 0; i < 5; i++) kids[i].classList.remove('passed', 'flash'); kids[5].lastChild.textContent = L.label.replace(' ▼', ''); kids[5].style.setProperty('--cc', TIERS[0].color); kids[5].classList.remove('gold', 'bump'); }
+        if (linesId !== L.id) { linesId = L.id; for (let i = 0; i < 5; i++) kids[i].classList.remove('passed', 'flash'); kids[5].lastChild.textContent = L.label.replace(' ▼', ''); kids[5].style.setProperty('--cc', TIERS[L.tier].color); kids[5].classList.remove('bump'); kids[5].classList.toggle('gold', L.tier === 4); }
         for (let i = 0; i < 5; i++) {
           const d = L.base + TIERS[i].pts * M_PER_PT, el = kids[i];
           el.style.transform = 'translateY(' + sn(yOf(d)) + 'px)';
           if (i <= L.tier && cam >= d - 4 && !el.classList.contains('passed')) {
-            el.classList.add('passed', 'flash'); snd('line', i); if (i !== L.tier) fx.burst(W / 2, yOf(d), SPARK[i], 7 + i * 2, 0.5 + i * 0.08);
-            // the chip punches outward and takes on the colour of the line it just broke
-            const c = kids[5]; c.style.setProperty('--cc', TIERS[i].color); c.classList.toggle('gold', i === 4); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
+            el.classList.add('passed', 'flash'); snd('line', i); if (i !== L.tier) fx.burst(W / 2, yOf(d), SPARK[i], 7, 0.5);
           }
         }
         const wx = sinking ? wobble(p, L.tier) : 0;

@@ -398,7 +398,8 @@ const Sound = (() => {
     count(go) { if (go) { bell(C.C6, { peak: 0.14, dur: 0.9 }); tone({ f0: 130, f1: 65, dur: 0.3, peak: 0.16 }); } else tone({ type: 'triangle', f0: 440, dur: 0.12, peak: 0.12, send: 0.3 }); },
     sink(o) { noise({ dur: 0.7, lp: 2600, to: 300, hp: 250, peak: 0.12, send: 0.3 }); tone({ f0: 330, f1: 90, dur: 0.6, peak: 0.08 }); riser(o.dur, o.tier); },
     // each line rings one step higher, a little louder and brighter, swinging left and right
-    line(i) { bell(LINE[i] || C.C5, { peak: 0.1 + i * 0.022, dur: 0.7 + i * 0.12, pan: i % 2 ? 0.4 : -0.4 }); noise({ dur: 0.06, lp: 6000, hp: 3000, peak: 0.03 + i * 0.008 }); },
+    // breaking a tier line: a short clean blip that climbs with each line, so a run of them reads as a rising beat
+    line(i) { const f = LINE[i] || C.C5; tone({ type: 'triangle', f0: f, f1: f * 2, dur: 0.07, a: 0.002, peak: 0.13 + i * 0.015, lp: 4200 }); bell(f * 2, { peak: 0.045 + i * 0.01, dur: 0.32 + i * 0.05, send: 0.25, pan: i % 2 ? 0.3 : -0.3 }); noise({ dur: 0.03, lp: 7000, hp: 3000, peak: 0.03 + i * 0.008 }); },
     // the instant of contact, before the reward
     impact(tier) { stopRiser(); noise({ dur: 0.035, lp: 7000, hp: 1500, peak: 0.16 + tier * 0.03 }); tone({ f0: 150 - tier * 14, f1: 44, dur: 0.28 + tier * 0.14, peak: 0.26 + tier * 0.03, lp: 700 }); },
     land(tier) {
@@ -933,7 +934,7 @@ function lockIn(hit, skipped) {
   saveMe(); saveProg();
   if (hit) {
     const dur = [3.4, 3.0, 3.4, 4.3, 4.6][hit.tier], to = total(S.mine) * M_PER_PT, box = $('answer');
-    if (window.__fx && box) window.__fx.submit(box.getBoundingClientRect());
+    if (window.__fx && box) window.__fx.submit(box.getBoundingClientRect(), hit.name);
     window.__depth = to;
     window.__sink = { to, dur, start: performance.now() };
     window.__lines = { id: Date.now() + Math.random(), base: to - TIERS[hit.tier].pts * M_PER_PT, tier: hit.tier, label: '“' + hit.name + '” ▼' };
@@ -1820,7 +1821,11 @@ addEventListener('online', checkIn);
       m.font = cs.fontSize + ' ' + cs.fontFamily;
       const upto = el.value.slice(0, el.selectionStart == null ? el.value.length : el.selectionStart), ls = parseFloat(cs.letterSpacing) || 0;
       const x = rc.left + Math.max(10, Math.min(rc.width - 14, parseFloat(cs.paddingLeft) + 2 + m.measureText(upto).width + ls * upto.length - el.scrollLeft)); fx.bubble(x + D(-3, 3), rc.top + D(4, 12), 1 + 2 * R()); if (R() < 0.3) fx.bubble(x + D(-8, 8), rc.top + D(2, 10), 1 + 1.6 * R()); },
-    submit(rc) { fx.zap(); snd('submit'); for (let i = 0; i < 12; i++) fx.bubble(rc.left + D(0, rc.width), rc.top + D(0, rc.height), 2 + 3 * R()); fx.burst(W / 2, AY + 60, '#7dffb0', 12, 0.6); },
+    submit(rc, text) {
+      if (text && !reduce) { const g = h('div', { class: 'launch', 'aria-hidden': 'true', text: text }); g.style.left = Math.round(rc.left + 16) + 'px'; g.style.top = Math.round(rc.top + rc.height / 2 - 14) + 'px'; document.body.append(g);
+        const dx = W / 2 - (rc.left + 16 + g.offsetWidth / 2), dy = (AY - 24) - (rc.top + rc.height / 2 - 14);
+        g.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: 'translate(' + dx * 0.6 + 'px,' + dy * 0.6 + 'px) scale(1.12)', opacity: 1, offset: 0.55 }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(0.7)', opacity: 0 }], { duration: 380, easing: 'cubic-bezier(.3,.0,.6,1)' }).onfinish = () => g.remove(); }
+      fx.zap(); snd('submit'); for (let i = 0; i < 12; i++) fx.bubble(rc.left + D(0, rc.width), rc.top + D(0, rc.height), 2 + 3 * R()); fx.burst(W / 2, AY + 60, '#7dffb0', 12, 0.6); },
     reject() { fx.zap(); snd('reject'); fx.bubble(W / 2 + D(-40, 40), H - 120, 1.2 + 1.8 * R(), '150,170,150'); fx.bubble(W / 2 + D(-40, 40), H - 130, 1.2 + 1.8 * R(), '150,170,150'); },
     miss() { fx.shake(); fx.zap(); snd('miss'); fx.flash('rgba(60,80,62,.5)', 1, 200); },
   };
@@ -2434,11 +2439,15 @@ addEventListener('online', checkIn);
       if (L) {
         ensureOverlay();
         const kids = over.children;
-        if (linesId !== L.id) { linesId = L.id; for (let i = 0; i < 5; i++) kids[i].classList.remove('passed', 'flash'); kids[5].lastChild.textContent = L.label.replace(' ▼', ''); kids[5].style.setProperty('--cc', TIERS[L.tier].color); kids[5].classList.toggle('gold', L.tier === 4); }
+        if (linesId !== L.id) { linesId = L.id; for (let i = 0; i < 5; i++) kids[i].classList.remove('passed', 'flash'); kids[5].lastChild.textContent = L.label.replace(' ▼', ''); kids[5].style.setProperty('--cc', TIERS[0].color); kids[5].classList.remove('gold', 'bump'); }
         for (let i = 0; i < 5; i++) {
           const d = L.base + TIERS[i].pts * M_PER_PT, el = kids[i];
           el.style.transform = 'translateY(' + sn(yOf(d)) + 'px)';
-          if (i <= L.tier && cam >= d - 4 && !el.classList.contains('passed')) { el.classList.add('passed', 'flash'); snd('line', i); if (i !== L.tier) fx.burst(W / 2, yOf(d), SPARK[i], 7, 0.5); }
+          if (i <= L.tier && cam >= d - 4 && !el.classList.contains('passed')) {
+            el.classList.add('passed', 'flash'); snd('line', i); if (i !== L.tier) fx.burst(W / 2, yOf(d), SPARK[i], 7 + i * 2, 0.5 + i * 0.08);
+            // the chip punches outward and takes on the colour of the line it just broke
+            const c = kids[5]; c.style.setProperty('--cc', TIERS[i].color); c.classList.toggle('gold', i === 4); c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
+          }
         }
         const wx = sinking ? wobble(p, L.tier) : 0;
         kids[5].style.transform = 'translate3d(calc(-50% + ' + wx.toFixed(1) + 'px), ' + sn(AY - 24) + 'px, 0) rotate(' + (wx * (L.tier === 0 ? 0.55 : L.tier === 4 ? 0.5 : 0.4)).toFixed(2) + 'deg)';

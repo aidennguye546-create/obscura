@@ -202,7 +202,8 @@ for (const dv of DERIVED) {
   Object.defineProperty(TOPICS, dv.id, { enumerable: true, configurable: true, get() { const v = buildDerived(dv); Object.defineProperty(TOPICS, dv.id, { value: v, enumerable: true }); return v; } });
 }
 const usable = id => { try { return TOPICS[id].list.length >= 12; } catch (e) { return false; } };
-const TOPIC_IDS = Object.keys(RAW).filter(id => !HIDDEN.has(id)).concat(DERIVED.filter(dv => dv.from.some(id => RAW[id])).map(dv => dv.id));
+const CUT = new Set(window.CUT || []);
+const TOPIC_IDS = Object.keys(RAW).filter(id => !HIDDEN.has(id)).concat(DERIVED.filter(dv => dv.from.some(id => RAW[id])).map(dv => dv.id)).filter(id => !CUT.has(id));
 // Returns { e, fix } for a match (fix = the player must confirm the corrected spelling),
 // { amb: true } when the text fits several answers and is not specific enough, or null.
 // A correction has to be a slip of the fingers, not a guess: the typed text must point at one answer only.

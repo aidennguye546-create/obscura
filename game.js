@@ -995,7 +995,7 @@ function submit(ev) {
   if (!m || m.amb) wrong();
   if ((!m || m.amb) && SET.clear) input.value = '';
   if (m && m.amb) { restart(form, 'jolt'); restart($('fb'), 'shake'); return say2({ kind: 'miss', text: typed + ' fits more than one answer', sub: 'be more specific' }); }
-  if (!m) { restart(form, 'jolt'); if (window.__fx) window.__fx.reject(); say2({ kind: 'miss', text: typed + ': no trace of that. try again', report: { topic: r.topic, text: text.slice(0, 60) } }); return restart($('fb'), 'shake'); }
+  if (!m) { restart(form, 'jolt'); if (window.__fx) window.__fx.reject(); say2({ kind: 'miss', text: typed + ': no trace of that. try again', report: canReport(r.topic, text) ? { topic: r.topic, text: text.slice(0, 60) } : null }); return restart($('fb'), 'shake'); }
   const hit = m.e;
   if (roundOf(S.mine, r.round).a.some(x => x[0] === hit.name)) { restart(form, 'jolt'); return say2({ kind: 'dup', text: '“' + hit.name + '” is already in your notebook' }); }
   const changed = norm(text) !== norm(hit.name);
@@ -1010,13 +1010,64 @@ function submit(ev) {
   lockIn(hit);
 }
 // A player who knows a rejected answer is right can flag it; flagged answers are reviewed and added to the bank.
+// The bank is already large, so reporting is deliberately strict: no junk, one report per prompt, ten a day,
+// only after a finished game, and nothing is ever added unless several different players agree (see __review).
+const BAD = /\b(fuck\w*|shit\w*|bitch\w*|cunts?|dicks?|cocks?|pussy|penis|vaginas?|porn\w*|sex|sexy|nigg\w*|fags?|faggots?|retards?|whores?|sluts?|rape\w*|nazis?|hitler|kys|cum|boobs?|anal|dildos?|nudes?|weed|cocaine|heroin|meth|vodka|beers?|wines?|drunk|ass|asshole|bastards?|damn|crap)\b/i;
+function reportJunk(text) {
+  const t = String(text || '').trim(), k = norm(t);
+  if (k.length < 3 || t.length > 50) return true;
+  if (BAD.test(t) || BAD.test(k)) return true;
+  if (/(.)\1{3,}/i.test(k)) return true;                               // aaaaa
+  if (/https?:|www\.|\.com\b|@/i.test(t)) return true;                 // links, handles
+  if (/^\d+$/.test(k) && k.length > 4) return true;                    // long numbers
+  if (/(asdf|qwer|zxcv|hjkl|uiop|sdfg|dfgh|fghj|ghjk|xcvb|cvbn|vbnm|qazwsx)/i.test(k)) return true;   // keyboard mash
+  if (/^(lol+|xd+|test|testing|idk|dunno|nothing|anything|something|yes|no|ok|okay|hi|hello|bruh|wtf|lmao)$/i.test(k) || /^((ha){2,}h?|(he){2,}h?|l(ol)+|xd+)$/i.test(k)) return true;
+  const letters = k.replace(/[^a-z]/g, ''); if (letters.length >= 5 && !/[aeiouy]/.test(letters)) return true;   // no vowels at all
+  if (letters.length >= 8 && /[^aeiouy]{7,}/.test(letters)) return true;                                       // consonant mash
+  const words = t.split(/\s+/); if (words.length > 7) return true;
+  return false;
+}
+const reporterId = () => { let v = 2166136261; for (const ch of String(S.me.id || 'anon') + ':obscura') v = Math.imul(v ^ ch.charCodeAt(0), 16777619) >>> 0; return v.toString(36); };
+function canReport(topic, text) {
+  if (Number(ls.get('played') || 0) < 1) return false;
+  if (reportJunk(text)) return false;
+  let mine = []; try { mine = JSON.parse(ls.get('reported') || '[]'); } catch (e) { mine = []; }
+  const day = Date.now() - 864e5;
+  if (mine.filter(x => x.at > day).length >= 10) return false;
+  if (mine.some(x => x.topic === topic && x.at > day)) return false;
+  return true;
+}
 function reportAnswer(rp) {
-  if (rp.sent) return; rp.sent = true; renderFb(); snd('click');
+  if (rp.sent || !canReport(rp.topic, rp.text)) return; rp.sent = true; renderFb(); snd('click');
   let mine = []; try { mine = JSON.parse(ls.get('reported') || '[]'); } catch (e) { mine = []; }
   mine.push({ topic: rp.topic, text: rp.text, at: Date.now() }); ls.set('reported', JSON.stringify(mine.slice(-200)));
-  try { if (S.db) S.db.collection('reports').doc(Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)).set({ topic: rp.topic, text: rp.text, at: Date.now() }).catch(() => {}); } catch (e) { /* reporting is best-effort */ }
+  try { if (S.db) S.db.collection('reports').doc(Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)).set({ topic: rp.topic, text: rp.text, at: Date.now(), who: reporterId() }).catch(() => {}); } catch (e) { /* reporting is best-effort */ }
   const inp = $('answer'); if (inp) inp.focus();
 }
+// Reviewing reports (run by hand on an export): everything junk, inappropriate or already accepted goes,
+// heavy reporters are ignored, duplicates merge, and only answers that several different players flagged survive.
+// The survivors are a shortlist for a person to judge; nothing here adds anything to the bank.
+window.__review = (reports, opts) => {
+  const o = Object.assign({ minPlayers: 3, maxPerPlayer: 30 }, opts || {});
+  const drop = { junk: 0, unknownPrompt: 0, alreadyCounts: 0, heavyReporter: 0, tooFewPlayers: 0 };
+  const per = {}; for (const r of reports) if (r && r.who) per[r.who] = (per[r.who] || 0) + 1;
+  const groups = new Map();
+  for (const r of reports) {
+    if (!r || typeof r.text !== 'string' || typeof r.topic !== 'string') { drop.junk++; continue; }
+    if (reportJunk(r.text)) { drop.junk++; continue; }
+    if (!r.who || per[r.who] > o.maxPerPlayer) { drop.heavyReporter++; continue; }
+    let T; try { T = TOPICS[r.topic]; } catch (e) { T = null; }
+    if (!T) { drop.unknownPrompt++; continue; }
+    const m = match(r.topic, r.text); if (m && !m.amb) { drop.alreadyCounts++; continue; }
+    const key = r.topic + '|' + loose(norm(r.text));
+    const gp = groups.get(key) || { topic: r.topic, prompt: T.name, texts: {}, who: new Set() };
+    gp.texts[r.text.trim()] = (gp.texts[r.text.trim()] || 0) + 1; gp.who.add(r.who); groups.set(key, gp);
+  }
+  const keep = [];
+  for (const gp of groups.values()) { if (gp.who.size < o.minPlayers) { drop.tooFewPlayers += gp.who.size; continue; } keep.push({ topic: gp.topic, prompt: gp.prompt, answer: Object.entries(gp.texts).sort((a, b) => b[1] - a[1])[0][0], spellings: Object.keys(gp.texts), players: gp.who.size }); }
+  keep.sort((a, b) => b.players - a.players);
+  return { total: reports.length, dropped: drop, shortlist: keep };
+};
 function renderFb() {
   const fb = $('fb'); if (!fb) return;
   const rp = S.fb && S.fb.report;

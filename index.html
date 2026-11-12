@@ -342,7 +342,9 @@ body.sinking .play #fb, body.sinking .play .main > .panel { opacity: 0; transiti
 /* in a dive the header shrinks to a corner button and the gauges sit wide, like instruments */
 .play .bar { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); z-index: 3; }
 .play .bar .brand, .play .bar .code { display: none; }
-.play .hud { max-width: 980px; width: 100%; margin: 0 auto; padding-left: 78px; }
+.play .hud { max-width: 980px; width: 100%; margin: 0 auto; padding-inline: 0; }
+/* only where the corner buttons would touch the depth box does the bar step in, equally on both sides so it stays centred */
+@media (min-width: 641px) and (max-width: 960px) { .play .hud { padding-inline: 78px; } }
 .play .hudbox { min-width: 120px; padding: 8px 16px 6px; clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px); }
 .play .hudbox b { font-size: 34px; }
 .play .topic h2 { font-size: clamp(34px, 7vw, 56px); line-height: 1; }
@@ -352,7 +354,7 @@ body.sinking .play #fb, body.sinking .play .main > .panel { opacity: 0; transiti
 .card { transition: transform 0.15s cubic-bezier(.34, 1.56, .64, 1), box-shadow 0.2s; }
 .card:hover:not(:disabled) { transform: translateY(-4px); }
 button { transition: transform 0.15s cubic-bezier(.34, 1.56, .64, 1), box-shadow 0.2s cubic-bezier(.22, 1, .36, 1), filter 0.1s; }
-@media (max-width: 640px) { .play .hud { padding-left: 64px; } .play .hudbox { min-width: 84px; padding: 6px 10px 4px; } .play .hudbox b { font-size: 26px; } }
+@media (max-width: 640px) { .play .hud { padding-inline: 64px; } .play .hudbox { min-width: 84px; padding: 6px 10px 4px; } .play .hudbox b { font-size: 26px; } }
 #notes span.major { color: #7dffb0; }
 #ruler span { color: rgba(214, 232, 204, 0.85); }
 #notes span { color: rgba(214, 232, 204, 0.85); }
@@ -609,7 +611,7 @@ button.go.big { font-size: 28px; padding: 22px 20px 18px; letter-spacing: 0.2em;
   .home { padding-top: 26px; }
   button.go.big { font-size: 21px; letter-spacing: 0.1em; padding: 18px 10px 15px; white-space: nowrap; }
   .dailies button { font-size: 16px; letter-spacing: 0.06em; }
-  .play .hud { padding-left: 0; margin-top: 42px; }
+  .play .hud { padding-inline: 0; margin-top: 42px; }
   body.trek #mute { top: max(10px, env(safe-area-inset-top, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); left: auto; bottom: auto; }
 }
 /* the dark closes in, as in Krillion: the edges tighten while you fall, and the whole scene dims behind the result */
@@ -846,8 +848,8 @@ body.th-geo .panel { background: rgba(28, 22, 14, 0.86) repeating-linear-gradien
 body.th-geo .panel.topic { background: linear-gradient(rgba(242, 225, 186, 0.96), rgba(226, 204, 158, 0.96)); color: #2b1d0e; box-shadow: 0 0 0 2px #2b1d0e, 0 0 0 5px #8a6a3a, 0 0 0 7px #2b1d0e, 0 10px 30px rgba(0, 0, 0, 0.45); position: relative; }
 body.th-geo .panel.topic h2 { color: #2b1d0e; text-shadow: none; }
 body.th-geo .panel.topic .note { color: #6b5634; }
-body.th-geo .panel.topic .eyebrow { color: #a33a12; display: table; width: auto; border: 2px solid #a33a12; padding: 0 8px; transform: rotate(-2deg); letter-spacing: 0.18em; }
-body.th-geo .panel.topic::after { content: "◍ ATLAS"; position: absolute; right: 12px; top: 10px; font-size: 14px; letter-spacing: 0.2em; color: rgba(43, 29, 14, 0.45); }
+body.th-geo .panel.topic .eyebrow { color: #a33a12; text-shadow: none; display: inline-block; width: fit-content; max-width: max-content; align-self: flex-start; justify-self: start; margin-right: auto; border: 2px solid #a33a12; padding: 0 8px; transform: rotate(-2deg); letter-spacing: 0.18em; }
+body.th-geo .panel.topic::after { content: "◍ ATLAS"; position: absolute; right: 14px; bottom: 10px; font-size: 14px; letter-spacing: 0.2em; color: rgba(43, 29, 14, 0.45); }
 body.th-geo .hudbox { background: linear-gradient(rgba(40, 31, 18, 0.94), rgba(28, 22, 14, 0.94)); box-shadow: 0 0 0 2px #120d07, 0 0 0 4px #6b5634, inset 0 2px 0 rgba(242, 225, 186, 0.08); }
 body.th-geo .hudbox b { color: #7fd6e8; text-shadow: 0 0 12px rgba(127, 214, 232, 0.5); }
 body.th-geo .hudbox.right b { color: #f2d59a; text-shadow: 0 0 12px rgba(242, 213, 154, 0.45); }

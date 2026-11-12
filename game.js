@@ -1412,7 +1412,10 @@ function renderDive() {
     const hit = d.hit, last = r.fixed ? r.round >= r.rounds : d.i >= K, btn = h('button', { class: 'go', type: 'button', onclick: advance, text: last ? '▲ Climb out ▲' : '▼ Descend ▼' });
     if (hit) {
       const T = TIERS[hit.tier];
-      kids = [h('div', { class: 'landed t-' + T.key }, tierIcon(hit.tier, 72, 'bigicon'),
+      // an Obscura: your companion leaves the forest and perches on the card, gold, with a soft halo behind it
+      const pal = window.__pal || { art: 'krill', color: '#ff7a45' };
+      window.__perched = hit.tier === 4;
+      kids = [h('div', { class: 'landed t-' + T.key }, hit.tier === 4 ? h('div', { class: 'perch' }, icon(pal.art, '#ffc23a', 84, 'bigicon perched')) : tierIcon(hit.tier, 72, 'bigicon'),
         h('h2', { class: 'tname', 'aria-label': hit.tier === 4 ? 'Pure Obscura' : T.name, style: '--n:' + (hit.tier === 4 ? 12 : T.name.length) }, [...(hit.tier === 4 ? 'Pure Obscura' : T.name)].map((ch, i) => h('span', { 'aria-hidden': 'true', style: 'animation-delay:' + ((hit.tier === 4 && !SET.low ? 3.05 : 0.28) + i * 0.055).toFixed(3) + 's', text: ch === ' ' ? '\u00a0' : ch }))),
         h('p', { class: 'tans', text: '“' + hit.name + '”' }),
         h('p', { class: 'tpts' }, h('b', { class: 'ptsup', 'data-pts': String(T.pts), text: '+0 PTS' }), ' · drop ' + fmt(T.pts * M_PER_PT) + 'm'),
@@ -2406,9 +2409,11 @@ addEventListener('online', checkIn);
     if (frog.moodT > 0) frog.moodT -= dt; else frog.mood = null;
     const sad = frog.mood === 'sad', loop = frog.mood === 'loop' ? 1 - Math.max(0, frog.moodT) / 1.25 : 0;
     const bob = (sad ? Math.sin(2.2 * time) * 3 + 8 : Math.sin(1.7 * time) * 6) - Math.sin(frog.hop * Math.PI) * 46 - Math.sin(loop * Math.PI) * 40;
+    if (window.__perched && document.querySelector('.landed .perch')) { /* the companion is up on the result card */ } else {
     if (gold) halo(frog.x, frog.y + bob, 46, '#ffd166', 0.5 + 0.2 * Math.sin(time * 2.4));
     spr(pal.art, gold ? '#ffc23a' : pal.color, frog.x, frog.y + bob, 48, false, frog.rot + (sad ? 0.5 : 0) + Math.sin(1.1 * time) * 0.07 + frog.hop * frog.hop * 6.283 - loop * 6.283);
     if (gold && !reduce && time - (frog.gs || 0) > 0.55) { frog.gs = time; fx.burst(frog.x + D(-10, 10), frog.y + bob + D(-6, 10), R() < 0.5 ? '#ffd166' : '#ffe9a8', 1, 0.15); }
+    }
     if (!reduce && time - frog.emit > 2.2 + R()) { frog.emit = time; fx.bubble(frog.x + 20, frog.y + bob - 8, 1.5 + 2 * R()); }
     // depth ruler, notes, vignette
     const trek = bc.contains('trek');

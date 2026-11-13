@@ -131,8 +131,27 @@ function buildTopic(t) {
   return { id: t.id, name: t.name, blurb: t.blurb, map, words, lmap, list, star };
 }
 const RAW = {}, TOPICS = {};
-for (const t of window.BANK) if (t && t.id && Array.isArray(t.t) && t.t.some(x => x && String(x).trim()) && !RAW[t.id]) RAW[t.id] = t;
-for (const id in RAW) Object.defineProperty(TOPICS, id, { enumerable: true, configurable: true, get() { const v = buildTopic(RAW[id]); Object.defineProperty(TOPICS, id, { value: v, enumerable: true }); return v; } });
+// On the live site the answers are split into shards and fetched per prompt (see tools/shard.js): the page
+// only carries a catalog of names. In the local editor every bank is loaded up front and this does nothing.
+const CAT = window.CATALOG || {};
+for (const id in CAT) { const c = CAT[id]; RAW[id] = { id, name: c[0], blurb: c[1], pack: c[2] || undefined, n: c[3], s: c[4], t: null }; }
+for (const t of window.BANK || []) if (t && t.id && Array.isArray(t.t) && t.t.some(x => x && String(x).trim()) && (!RAW[t.id] || !RAW[t.id].t)) RAW[t.id] = t;
+const shardWant = new Map(); let shardTick = null;
+const stubTopic = (id, name, blurb) => ({ id, name: name || '…', blurb: blurb || '', map: new Map(), words: new Map(), lmap: new Map(), list: [], star: { name: '', tier: 4, toks: [], fact: '' }, stub: true });
+function needIds(ids) {
+  const out = [];
+  for (const id of ids) { if (!id) continue; const dv = DERIVED_BY && DERIVED_BY[id]; const src = dv ? dv.from : [id];
+    for (const s of src) { const R = RAW[s]; if (!R || R.t || R.s == null) continue; let p = shardWant.get(R.s);
+      if (!p) { p = new Promise(res => { const el = document.createElement('script'); el.src = 'shards/s' + String(R.s).padStart(2, '0') + '.js'; el.async = true; el.onload = res; el.onerror = () => { shardWant.delete(R.s); res(); }; document.head.append(el); }); shardWant.set(R.s, p); }
+      out.push(p); } }
+  return Promise.all(out);
+}
+window.__shard = data => {
+  for (const id in data) { const R = RAW[id]; if (!R || R.t) continue; const d = data[id]; if (Array.isArray(d)) R.t = d; else { R.t = d.t; if (d.k) R.k = d.k; if (d.ob) R.ob = d.ob; } }
+  // re-draw anything that was showing a placeholder (never mid-answer, so typing is not disturbed)
+  clearTimeout(shardTick); shardTick = setTimeout(() => { try { if (S.room && !(S.room.phase === 'play' && diveState().stage === 'ask')) render(); } catch (e) { /* not ready yet */ } }, 60);
+};
+for (const id in RAW) Object.defineProperty(TOPICS, id, { enumerable: true, configurable: true, get() { if (!RAW[id].t) { needIds([id]); return stubTopic(id, RAW[id].name, RAW[id].blurb); } const v = buildTopic(RAW[id]); Object.defineProperty(TOPICS, id, { value: v, enumerable: true }); return v; } });
 // Broad school-quiz categories make dull prompts. They stay in the bank as raw material
 // for the oddly specific prompts below, but are never offered on their own.
 const HIDDEN = new Set(['composers', 'philosophers', 'emperors', 'painters', 'authors', 'novels', 'battles', 'empires', 'monarchs', 'explorers', 'scientists', 'presidents', 'bible', 'phobias', 'greekmyth', 'constellations', 'bones', 'gems', 'grapes', 'dances', 'musicals', 'shakespeare', 'money', 'trees', 'languages', 'code', 'capitals', 'elements', 'tube', 'ukplaces', 'nationalparks', 'deserts', 'waters', 'mountains', 'rivers', 'islands', 'eurocities', 'asiacities', 'africacities', 'uscities', 'spaceobjects', 'illnesses', 'catbreeds', 'flowers', 'fish', 'reptiles', 'bestpicture', 'breads', 'beers', 'spices', 'instruments', 'cheese', 'genres', 'rockbands', 'popstars', 'rappers', 'birds', 'mammals', 'sea', 'insects', 'countries', 'states', 'cars', 'sports', 'dogs', 'vegetables', 'fruits', 'tools', 'clothing', 'desserts', 'dishes', 'cocktails', 'pasta', 'candy', 'gods', 'dinosaurs', 'bodyparts', 'sitcoms', 'cartoons', 'videogames']);
@@ -200,11 +219,12 @@ function buildDerived(dv) {
   for (const id of dv.from) { const st = RAW[id] && TOPICS[id].star; if (st && st.fact && out.map.has(norm(st.name))) { out.star.tier = 3; out.star = out.map.get(norm(st.name)); out.star.tier = 4; out.star.fact = st.fact; break; } }
   return out;
 }
+var DERIVED_BY = {}; for (const dv of DERIVED) DERIVED_BY[dv.id] = dv;
 for (const dv of DERIVED) {
   if (!dv.from.some(id => RAW[id])) continue;
-  Object.defineProperty(TOPICS, dv.id, { enumerable: true, configurable: true, get() { const v = buildDerived(dv); Object.defineProperty(TOPICS, dv.id, { value: v, enumerable: true }); return v; } });
+  Object.defineProperty(TOPICS, dv.id, { enumerable: true, configurable: true, get() { if (dv.from.some(id => RAW[id] && !RAW[id].t)) { needIds([dv.id]); return stubTopic(dv.id, dv.name, dv.blurb); } const v = buildDerived(dv); Object.defineProperty(TOPICS, dv.id, { value: v, enumerable: true }); return v; } });
 }
-const usable = id => { try { return TOPICS[id].list.length >= 12; } catch (e) { return false; } };
+const usable = id => { const R = RAW[id]; if (R && !R.t) return (R.n || 0) >= 12; if (!R && DERIVED_BY[id] && DERIVED_BY[id].from.some(s => RAW[s] && !RAW[s].t)) return true; try { return TOPICS[id].list.length >= 12; } catch (e) { return false; } };
 const CUT = new Set(window.CUT || []);
 const TOPIC_IDS = Object.keys(RAW).filter(id => !HIDDEN.has(id)).concat(DERIVED.filter(dv => dv.from.some(id => RAW[id])).map(dv => dv.id)).filter(id => !CUT.has(id));
 // Returns { e, fix } for a match (fix = the player must confirm the corrected spelling),
@@ -988,6 +1008,7 @@ function submit(ev) {
   if (!input || r.phase !== 'play' || d.stage !== 'ask') return;
   const text = input.value.trim();
   if (!text) return;
+  if (TOPICS[r.topic] && TOPICS[r.topic].stub) { S.fb = { kind: 'fix', text: 'loading answers…', sub: 'one moment, then press enter again' }; renderFb(); needIds([r.topic]); return; }
   const m = match(r.topic, text), form = input.closest('form'), typed = '“' + text.slice(0, 30) + '”';
   const say2 = (fb) => { S.fb = fb; renderFb(); };
   // wrong guesses are kept for the rundown at the end
@@ -1742,6 +1763,7 @@ function refresh() {
   tick();
 }
 function render() {
+  if (S.room) needIds([S.room.topic].concat(S.room.options || [], S.room.fixed || [], (S.room.used || []).slice(-8)));
   const r = S.room;
   const key = !S.mode ? 'home' : [r.phase, r.g, r.round, S.code, isHost(), r.picker].join(':');
   if (key !== S.screen) {

@@ -144,6 +144,24 @@ function buildTopic(t) {
   });
   // "Dim (A Bug's Life)": nobody types the bracket, so the plain name works too, unless it already means another answer
   for (const [bare, e] of bares) { const k = norm(bare); if (k && !map.has(k)) map.set(k, e); if (k && !lmap.has(loose(k))) lmap.set(loose(k), e); }
+  // An answer that repeats the prompt's own words ("Deep-fried Oreos" for a deep-fried food, "Banana bread" for a
+  // bread) also works without them: "Oreo", "banana". Only when that leftover points at one answer alone.
+  const PW_SKIP = new Set(['name', 'that', 'this', 'with', 'from', 'have', 'has', 'the', 'and', 'for', 'who', 'was', 'are', 'you', 'your', 'its', 'not', 'can', 'one', 'some', 'something', 'thing', 'things', 'famous', 'type', 'kind', 'word', 'words', 'often', 'usually', 'might', 'would', 'could', 'been', 'their', 'than', 'into', 'out', 'any', 'all', 'more', 'less']);
+  const pw = new Set(String(t.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(w => w.length > 2 && !PW_SKIP.has(w)));
+  if (pw.size) {
+    const isPw = w => { w = w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ''); return !!w && (pw.has(w) || pw.has(w.replace(/s$/, '')) || pw.has(w + 's')); };
+    const cand = new Map();
+    for (const e of list) for (const f of e.forms) {
+      const toks = f.split(/[\s\-]+/).filter(Boolean); let a = 0, b = toks.length;
+      while (a < b && isPw(toks[a])) a++;
+      while (b > a && isPw(toks[b - 1])) b--;
+      if (a >= b || (a === 0 && b === toks.length)) continue;
+      const k = norm(toks.slice(a, b).join(' '));
+      if (k.length < 3 || map.has(k)) continue;
+      if (!cand.has(k)) cand.set(k, new Set()); cand.get(k).add(e);
+    }
+    for (const [k, s] of cand) if (s.size === 1) { const e = [...s][0]; map.set(k, e); if (!lmap.has(loose(k))) lmap.set(loose(k), e); }
+  }
   // Shape the tiers the way Krillion does: a handful of Krill, a broad Schooler and Rare middle,
   // a long Deep Cut tail, and exactly one Krillion with a fact.
   const fix = (window.TIERFIX || {})[t.id] || (t.k ? { top: list.filter(e => e.tier === 0).map(e => e.name), k: t.k } : {});
@@ -337,7 +355,11 @@ function matchCore(topicId, input) {
   const lk = loose(k);
   if (T.lmap.has(lk)) return { e: T.lmap.get(lk), fix: true };
   // typos: same first letter, a small number of slips, and one clear closest answer
-  const max = typoBudget(k.length);
+  // the slip allowance is judged on the part that isn't the prompt's own words, so "deep fried lobster"
+  // is not a near-miss of "Deep-fried butter" just because the long shared start makes them look alike
+  if (!T._pw) T._pw = new Set(String(T.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(w => w.length > 2 && !['name', 'that', 'with', 'from', 'have', 'something', 'thing', 'famous', 'type', 'kind'].includes(w)));
+  const own = String(input).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(w => w && !T._pw.has(w) && !T._pw.has(w.replace(/s$/, ''))).join('');
+  const max = own && own.length < k.length ? Math.min(typoBudget(k.length), Math.max(1, typoBudget(own.length))) : typoBudget(k.length);
   let best = max + 1, hits = new Set(), longer = new Set();
   for (const [key, e] of T.map) {
     if (key.length < 4 || (key[0] !== k[0] && loose(key)[0] !== lk[0])) continue;
@@ -351,7 +373,7 @@ function matchCore(topicId, input) {
   if (hits.size > 1 && longer.size === 1) return { e: [...longer][0], fix: true };
   // a distinctive word of the answer ("vader"): fine if only one answer has it
   // it has to be the word the answer is known by: its last word, not its first
-  const byWord = T.words.get(k);
+  const byWord = T.words.get(k) || T.words.get(k + 's') || T.words.get(k + 'es') || (k.length > 4 ? T.words.get(k.replace(/s$/, '')) : null);
   if (byWord && crowd(byWord)) return { amb: true };
   if (byWord) { const last = new Set([...byWord].filter(e => e.toks.some(tk => tk[tk.length - 1] === k))); return last.size === 1 ? one(last) : dip(byWord); }
   // a clear start of the answer ("achilles" for Achilles tendon)

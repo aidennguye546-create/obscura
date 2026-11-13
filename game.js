@@ -423,6 +423,19 @@ function h(tag, props, ...kids) {
 }
 const withTimeout = (p, ms = 10000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// Every prompt this device has been shown, oldest first, so free play, packs and room options deal ones you
+// haven't seen before anything comes round again, and then the longest-ago first.
+const SEEN_MAX = 4000;
+function seenList() { try { const v = JSON.parse(ls.get('seen') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function markSeen(ids) {
+  ids = (ids || []).filter(Boolean); if (!ids.length) return;
+  const drop = new Set(ids), list = seenList().filter(id => !drop.has(id)).concat(ids);
+  ls.set('seen', JSON.stringify(list.slice(-SEEN_MAX)));
+}
+function freshFirst(pool) {
+  const rank = new Map(seenList().map((id, i) => [id, i]));
+  return shuffle(pool.slice()).sort((a, b) => (rank.has(a) ? rank.get(a) : -1) - (rank.has(b) ? rank.get(b) : -1));
+}
 
 /* ---------- sound: synthesized in the browser, no audio files ---------- */
 // Everything pitched is in C major pentatonic so cues never clash, and the reward grows with the tier:
@@ -869,13 +882,14 @@ function dayKey() { const d = new Date(); return d.getFullYear() + '-' + String(
 const dayNo = () => { const d = new Date(); return Math.max(1, Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
 function seeded(seed) { let v = 2166136261; for (const ch of seed) v = Math.imul(v ^ ch.charCodeAt(0), 16777619) >>> 0; return () => { v ^= v << 13; v >>>= 0; v ^= v >>> 17; v ^= v << 5; v >>>= 0; return v / 4294967296; }; }
 function pickSeven(pool, rnd) {
-  const ids = pool.slice().sort(); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  let ids = pool.slice().sort(); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  if (rnd === Math.random) ids = freshFirst(ids); // play-as-often packs: unseen prompts first
   const out = []; for (const id of ids) { if (usable(id)) out.push(id); if (out.length === 7) break; } return out;
 }
 const dayNoOf = key => { const p = key.split('-').map(Number); return Math.max(1, Math.floor((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
 // No repeats: the pool is shuffled once per cycle and dealt out seven a day until it runs out, then reshuffled.
 function dealSeven(pool, tag, n) { const ids = pool.filter(usable).sort(), per = Math.floor(ids.length / 7); if (!per) return []; const cyc = Math.floor((n - 1) / per), rnd = seeded('obscura:' + tag + ':' + cyc); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; } const k = ((n - 1) % per) * 7; return ids.slice(k, k + 7); }
-window.__dbg = { sprite, S: () => S, render: () => render(), run: k => startRun(k), topic: id => TOPICS[id], champ: name => moment(Math.round(innerHeight * 0.3), 'CHAMPION', name + ' · 1,240 pts', icon('krill', '#ffc23a', 128), 'champ'), lead: (name, kind) => leadSlam({ id: 'x', name }, kind), emote: e => showEmote(S.me.id, e), count: t => { const m = S.mode; S.mode = 'online'; bigCount(t); S.mode = m; }, rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
+window.__dbg = { seen: () => seenList(), sprite, S: () => S, render: () => render(), run: k => startRun(k), topic: id => TOPICS[id], champ: name => moment(Math.round(innerHeight * 0.3), 'CHAMPION', name + ' · 1,240 pts', icon('krill', '#ffc23a', 128), 'champ'), lead: (name, kind) => leadSlam({ id: 'x', name }, kind), emote: e => showEmote(S.me.id, e), count: t => { const m = S.mode; S.mode = 'online'; bigCount(t); S.mode = m; }, rivalNews: name => { rivalToast([icon('moth', '#ffe08a', 28), h('span', { text: name + ' found an Obscura' }), h('b', { text: '+100' })], '#ffe08a', true); rivalGold(); } };
 window.__deal = (tag, n) => dealSeven(tag === 'daily' ? TOPIC_IDS : packPool(tag), tag, n);
 const dailySaved = () => { try { return JSON.parse(ls.get('daily_' + dayKey()) || 'null'); } catch (e) { return null; } };
 const dailyKey = kind => 'daily_' + kind + '_' + dayKey();
@@ -888,6 +902,7 @@ function startRun(kind, day, daily) {
   const ids = saved ? saved.ids : kind === 'daily' ? dealSeven(TOPIC_IDS, 'daily', dayNoOf(day || dayKey())) : (daily ? dealSeven(packPool(kind), kind, dayNo()) : pickSeven(packPool(kind), Math.random));
   if (ids.length < 7) return say('That pack is still being stocked. Try the daily descent or geography for now.');
   say('');
+  markSeen(ids);
   S.mode = 'solo'; S.code = kind === 'daily' ? 'DAILY' : kind.toUpperCase();
   S.room = { host: S.me.id, phase: saved ? 'final' : 'lobby', g: 1, round: saved ? 7 : 0, rounds: 7, dives: 1, secs: 25, used: [], fixed: ids, kind, day: day || null, daily: !!daily && kind !== 'daily' };
   S.mine = freshMine(1); if (saved) S.mine.rounds = saved.rounds;
@@ -1001,7 +1016,8 @@ function startRound(n) {
   let pool = TOPIC_IDS.filter(id => !used.includes(id));
   if (pool.length < 5) { used = []; pool = TOPIC_IDS.slice(); }
   const order = ordered().map(p => p.id), picks = [];
-  for (const id of shuffle(pool)) { if (usable(id)) picks.push(id); if (picks.length === 5) break; }
+  for (const id of freshFirst(pool)) { if (usable(id)) picks.push(id); if (picks.length === 5) break; }
+  markSeen(picks);
   patchRoom({
     phase: 'pick', round: n, options: picks, used,
     picker: order[(n - 1) % order.length] || S.me.id, pickEndsAt: Date.now() + PICK_MS, topic: '',
@@ -1845,6 +1861,8 @@ function refresh() {
   tick();
 }
 function render() {
+  if (S.room && S.room.topic && S._seenTopic !== S.room.topic) { S._seenTopic = S.room.topic; markSeen([S.room.topic]); }
+  if (S.room && S.room.phase === 'pick' && S.room.options && S._seenOpts !== S.room.options.join()) { S._seenOpts = S.room.options.join(); markSeen(S.room.options); }
   if (S.room) needIds([S.room.topic].concat(S.room.options || [], S.room.fixed || [], (S.room.used || []).slice(-8)));
   const r = S.room;
   const key = !S.mode ? 'home' : [r.phase, r.g, r.round, S.code, isHost(), r.picker].join(':');

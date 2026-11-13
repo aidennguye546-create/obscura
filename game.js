@@ -2108,7 +2108,7 @@ addEventListener('online', checkIn);
   function trunks(z, n, w0, w1, k, dark) {
     for (let i = 0; i < n; i++) {
       const x = sn((i + 0.15 + hsh(i, k) * 0.7) / n * W), w = Math.round((w0 + hsh(i, k + 3) * w1) / AP) * AP;
-      const top = Math.max(0, AY + (0 - camS * z) / mpp - 30 - hsh(i, k + 5) * 60), bot = Math.min(H, AY + (FLOOR - camS) * z / mpp + 40); // far trunks end where the forest does
+      const top = Math.max(0, yOf(0) + 10, AY + (0 - camS * z) / mpp - 30 - hsh(i, k + 5) * 60), bot = Math.min(H, AY + (FLOOR - camS) * z / mpp + 40); // far trunks end where the forest does
       if (bot < 0 || top > H) continue;
       const g = ctx.createLinearGradient(0, 0, 0, H);
       g.addColorStop(0, css(lerp3(air(camS - H * mpp * 0.3), [2, 8, 5], dark))); g.addColorStop(1, css(lerp3(air(camS + H * mpp * 0.7), [2, 8, 5], dark)));
@@ -2140,13 +2140,17 @@ addEventListener('online', checkIn);
         // leaves along it
         const sway = Math.sin(time * 0.6 + i) * 3;
         for (let q = 0; q < 5; q++) { const lx = left ? len * (0.18 + q * 0.2) : W - len * (0.18 + q * 0.2); drawClump((i * 3 + q) % 6, real, dark, lx + sway * (0.6 + q * 0.15), y + (q % 2) * 6 - 2, big < 0.7 ? 1.5 : big < 1 ? 2 : AP); }
+        // blossoms on the limb while there is light to see them by
+        if (light > 0.15) for (let f = 0; f < 3; f++) { if (hsh(i * 3 + f, k + 31) < 0.4) continue; const fx0 = sn((left ? len * (0.22 + f * 0.26) : W - len * (0.22 + f * 0.26)) + sway), by = y - AP * 2 - (f % 2) * AP * 3; ctx.fillStyle = css(lerp3(base, FO_FLOWER[(i + f) & 3], 0.3 + 0.6 * light)); ctx.fillRect(fx0 - AP, by, AP * 3, AP); ctx.fillRect(fx0, by - AP, AP, AP * 3); ctx.fillStyle = css(lerp3(base, [255, 240, 150], 0.3 + 0.6 * light)); ctx.fillRect(fx0, by, AP, AP); }
       }
       // vines (or roots) hanging from it
-      ctx.fillStyle = css(lerp3(base, under ? [40, 30, 22] : [12, 46, 24], 0.5));
+      const vineC = css(lerp3(base, under ? [40, 30, 22] : [12, 46, 24], 0.5)); ctx.fillStyle = vineC;
       for (let v = 0; v < 2; v++) {
         if (hsh(i * 2 + v, k + 12) < 0.35) continue;
         const vx0 = left ? len * (0.3 + v * 0.45) : W - len * (0.3 + v * 0.45), n = Math.round((30 + hsh(i * 2 + v, k + 14) * 150) * big / (AP * 2));
         for (let q = 0; q < n; q++) { const vx = sn(vx0 + Math.sin(time * 0.8 + i + v + q * 0.22) * q * 0.4); ctx.fillRect(vx, y + th + q * AP * 2, AP, AP * 2 + 1); if (!under && q % 4 === 2) ctx.fillRect(vx + (q % 8 === 2 ? -AP * 2 : AP), y + th + q * AP * 2, AP * 2, AP); }
+        // in the shade the vine ends in a glowing bud
+        if (!under && real > 650) { const gp = foCl((real - 650) / 400) * (0.5 + 0.5 * Math.sin(time * 1.7 + i + v * 2)), tx = sn(vx0 + Math.sin(time * 0.8 + i + v + n * 0.22) * n * 0.4), ty = y + th + n * AP * 2; ctx.fillStyle = 'rgba(170,255,200,' + (0.9 * gp).toFixed(3) + ')'; ctx.fillRect(tx - AP * 0.5, ty, AP * 2, AP * 2); halo(tx + AP * 0.5, ty + AP, 12, 'rgb(140,255,190)', 0.5 * gp); ctx.fillStyle = vineC; }
       }
     }
   }
@@ -2217,19 +2221,8 @@ addEventListener('online', checkIn);
   // a thin waterfall dropping through the far trees, with spray where it lands
   function waterfall() {
     if (camS > FLOOR + 100) return;
-    const z = 0.3, x = sn(W * 0.63), w = AP * 6, yTop = AY + (130 - camS * z) / mpp, yBot = AY + (960 - camS * z) / mpp;
-    if (yBot < -40 || yTop > H + 40) return;
-    const lit = Math.max(0, 1 - camS / 1500), a = lerp3(air(camS), [222, 246, 240], 0.2 + 0.5 * lit), b = lerp3(air(camS), [150, 214, 214], 0.14 + 0.42 * lit), d = lerp3(air(camS), [2, 8, 5], 0.55), S2 = AP * 2;
-    ctx.fillStyle = css(d); ctx.fillRect(x - AP * 14, sn(yTop) - AP * 3, AP * 34, AP * 4); ctx.fillRect(x - AP * 8, sn(yTop) + AP, AP * 22, AP * 2);
-    const from = Math.max(yTop, -S2), to = Math.min(yBot, H + S2), scroll = time * 150;
-    for (let y = from; y < to; y += S2) {
-      const row = Math.floor((y - yTop - scroll) / S2), spread = Math.min(AP * 3, (y - yTop) / 60);
-      for (let cI = 0; cI < 3; cI++) { const r = hsh(row, 60 + cI); ctx.fillStyle = css(r > 0.55 ? a : b, r > 0.2 ? 0.85 : 0.45); ctx.fillRect(sn(x + cI * AP * 2 + (cI - 1) * spread), sn(y), AP * 2, S2); }
-    }
-    if (yBot > -40 && yBot < H + 40) {
-      ctx.fillStyle = css(d); ctx.fillRect(x - AP * 20, sn(yBot), AP * 46, AP * 3);
-      for (let q = 0; q < 9; q++) { const u = mod(time * 0.9 + q / 9, 1), ang = -Math.PI * (0.15 + 0.7 * hsh(q, 71)), rr = 8 + u * 34; halo(x + w / 2 + Math.cos(ang) * rr, yBot + Math.sin(ang) * rr * 0.7, 5 + u * 5, 'rgb(220,246,240)', (0.15 + 0.4 * lit) * (1 - u)); }
-    }
+    foFall(W * 0.86, 0.3, 130, 960, 7, 1);
+    foFall(W * 0.13, 0.42, 70, 540, 4, 2);
   }
   // glowing fungi on the far trunks, once it is dark enough for them to show
   function glowers(z, SP, k) {
@@ -2450,6 +2443,828 @@ addEventListener('online', checkIn);
       ctx.fillStyle = 'rgba(255,248,220,' + (0.6 + beat * 0.4).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(cx, y - R0 * 0.5); ctx.lineTo(cx + R0 * 0.3, y); ctx.lineTo(cx, y + R0 * 0.5); ctx.lineTo(cx - R0 * 0.3, y); ctx.closePath(); ctx.fill();
       ctx.fillStyle = 'rgb(46,32,12)'; for (let q = 0; q < 10; q++) { const a = (q / 10) * Math.PI * 2 + 0.3, len = R0 * (2 + hsh(q, 601) * 2.5); for (let t = R0 * 0.9; t < len; t += AP * 2) ctx.fillRect(sn(cx + Math.cos(a + Math.sin(t * 0.01 + q) * 0.25) * t), sn(y + Math.sin(a + Math.sin(t * 0.01 + q) * 0.25) * t * 0.8), AP * 2 + (len - t) / len * AP * 3, AP * 2); }
     }
+  }
+
+  // ==== the forest journey, dressed band by band (everything new here is named fo… / FO_…) ====
+  const foCl = v => v < 0 ? 0 : v > 1 ? 1 : v;
+  // 0..1 as the camera moves into [a0..a1] and back out over [b0..b1]
+  const foOn = (a0, a1, b0, b1) => foCl((camS - a0) / (a1 - a0)) * foCl((b1 - camS) / (b1 - b0));
+  const foY = (m, z) => AY + (m - camS) * z / mpp;
+  // which repeats (spacing SP metres, parallax z) can be on screen
+  const foI0 = (z, SP, pad) => Math.max(0, Math.floor((camS + (-pad - AY) * mpp / z) / SP));
+  const foI1 = (z, SP, pad) => Math.ceil((camS + (H + pad - AY) * mpp / z) / SP);
+  const foDi = (x, y) => BAYER[(x & 3) + ((y & 3) << 2)];
+  const foPk = (r, g, b, a) => (((a == null ? 255 : a) << 24) | ((b < 0 ? 0 : b > 255 ? 255 : b) << 16) | ((g < 0 ? 0 : g > 255 ? 255 : g) << 8) | (r < 0 ? 0 : r > 255 ? 255 : r)) >>> 0;
+  const foGrad = (S, f) => { if (f <= S[0][0]) return S[0][1]; for (let i = 1; i < S.length; i++) if (f <= S[i][0]) return lerp3(S[i - 1][1], S[i][1], (f - S[i - 1][0]) / (S[i][0] - S[i - 1][0])); return S[S.length - 1][1]; };
+  // offscreen art, painted once per screen size
+  const FO_C = {}; let foCK = '';
+  function foCache(name, w, h, paint) {
+    const k = W + 'x' + H; if (k !== foCK) { foCK = k; for (const n in FO_C) delete FO_C[n]; }
+    let c = FO_C[name]; if (!c) { c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); const g = c.getContext('2d'); g.imageSmoothingEnabled = false; paint(g, c.width, c.height); FO_C[name] = c; }
+    return c;
+  }
+  function foPix(g, w, h, fn) { const id = g.createImageData(w, h), b = new Uint32Array(id.data.buffer); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const v = fn(x, y); if (v) b[y * w + x] = v; } g.putImageData(id, 0, 0); }
+  const FO_FLOWER = [[255, 70, 110], [255, 150, 40], [255, 90, 210], [255, 230, 80]];
+  const FO_LAVA = ['#5a0e04', '#c22a0a', '#ff5a1a', '#ff9a2a', '#ffd34d', '#fff3b0'];
+  const FO_SPORE = ['255,140,220', '200,150,255', '120,240,255', '255,200,240'], FO_SPORE_H = FO_SPORE.map(c => 'rgb(' + c + ')');
+  const FO_RB = ['255,70,70', '255,160,50', '255,240,90', '90,255,120', '80,170,255', '170,100,255'];
+
+  // ---- dawn over the canopy: a dithered sunrise sky, the sun and its rays, birds, and three ranges of treetops in the haze ----
+  const FO_SKY = [[0, [30, 36, 92]], [0.26, [66, 82, 160]], [0.5, [158, 118, 176]], [0.7, [240, 150, 140]], [0.87, [255, 196, 140]], [1, [255, 232, 180]]];
+  const foSkyArt = () => foCache('sky', W / AP, H * 0.4 / AP, (g, w, h) => foPix(g, w, h, (x, y) => {
+    const N = 16, v = y / (h - 1) * N + foDi(x, y) - 0.5, c = foGrad(FO_SKY, Math.max(0, Math.min(N, Math.round(v))) / N);
+    const st = y < h * 0.45 && hsh(x * 977 + y, 951) > 0.993 ? (1 - y / (h * 0.45)) * 0.85 : 0; // the last stars, fading
+    return foPk(c[0] + (255 - c[0]) * st, c[1] + (255 - c[1]) * st, c[2] + (255 - c[2]) * st);
+  }));
+  const foSunArt = () => foCache('sun', 25, 25, (g, w, h) => foPix(g, w, h, (x, y) => { const d = Math.hypot(x - 12, y - 12) + (foDi(x, y) - 0.5) * 0.9; return d < 6 ? foPk(255, 253, 236) : d < 9 ? foPk(255, 238, 176) : d < 11 ? foPk(255, 208, 124) : d < 12.3 ? foPk(255, 168, 104, 170) : 0; }));
+  const FO_HILL = [[[198, 158, 190], [255, 222, 204], 30, 5], [[126, 150, 158], [255, 210, 168], 22, 6], [[74, 140, 100], [222, 238, 160], 13, 8]]; // colour, sunlit rim, height and crown size in art pixels
+  function foHillArt(i) {
+    const L = FO_HILL[i];
+    return foCache('hill' + i, W / AP, 40, (g, w, h) => {
+      const cr = [];
+      for (let x = -12, k = 0; x < w + 12; k++) { const r = L[3] * (0.6 + 0.8 * hsh(k, 960 + i)); cr.push([x, h - L[2] + r * 0.6 + hsh(k, 963 + i) * L[3] * 0.8, r, 0]); x += r * (0.8 + 0.6 * hsh(k, 966 + i)); }
+      if (i === 1) for (let k = 0; k < 3; k++) cr.push([w * (0.12 + 0.3 * k + 0.12 * hsh(k, 970)), h - L[2] - 8 - hsh(k, 971) * 5, 8 + hsh(k, 972) * 3, 1]); // emergent giants with flat crowns
+      const mist = [255, 214, 200];
+      foPix(g, w, h, (x, y) => {
+        let top = 1e9, dx0 = 0, emer = false;
+        for (const q of cr) {
+          const dx = x - q[0];
+          if (q[3]) { // an emergent giant: a slim trunk under a flat, closed crown
+            if (Math.abs(dx) < 1.2 && y > q[1]) { emer = true; if (top > q[1]) { top = q[1]; dx0 = -1; } continue; }
+            if (dx * dx < q[2] * q[2]) { const hh = Math.sqrt(q[2] * q[2] - dx * dx), t = q[1] - hh * 0.4; if (y >= t && y <= q[1] + hh * 0.18) { emer = true; if (t < top) { top = t; dx0 = dx; } } }
+            continue;
+          }
+          if (dx * dx >= q[2] * q[2]) continue; const t = q[1] - Math.sqrt(q[2] * q[2] - dx * dx) * 0.85; if (t < top) { top = t; dx0 = dx; }
+        }
+        if (!emer && y < top) return 0;
+        const d = y - top; let c = d < 1 && dx0 > 0 ? L[1] : d < 2.2 && dx0 > 0 && foDi(x, y) < 0.5 ? lerp3(L[0], L[1], 0.5) : L[0];
+        if (d > 2 && foDi(x, y) < 0.1 * (i + 1)) c = lerp3(c, [0, 0, 0], 0.14);
+        c = lerp3(c, mist, Math.pow(y / h, 2) * 0.45);
+        return foPk(c[0], c[1], c[2]);
+      });
+    });
+  }
+  function foSky(sy) {
+    const sk = foSkyArt(), sh = sk.height * AP, top = sy + 4 - sh;
+    if (top > 0) { ctx.fillStyle = css(FO_SKY[0][1]); ctx.fillRect(0, 0, W, top + 1); }
+    ctx.drawImage(sk, 0, sn(top), sk.width * AP, sh);
+    const sx = W * 0.78, syn = sy - Math.max(64, sy * 0.5);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, sy + 4); ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+    const gl = ctx.createRadialGradient(sx, syn, 0, sx, syn, Math.max(W, H) * 0.6);
+    gl.addColorStop(0, 'rgba(255,224,170,0.55)'); gl.addColorStop(0.12, 'rgba(255,180,120,0.22)'); gl.addColorStop(0.45, 'rgba(255,140,110,0.06)'); gl.addColorStop(1, 'rgba(255,140,110,0)');
+    ctx.fillStyle = gl; ctx.fillRect(0, 0, W, sy + 4);
+    // rays fanning out from the sun, turning slowly
+    const RR = Math.max(W, H), rg = ctx.createRadialGradient(sx, syn, 16, sx, syn, RR); rg.addColorStop(0, 'rgba(255,238,196,0.2)'); rg.addColorStop(1, 'rgba(255,238,196,0)'); ctx.fillStyle = rg;
+    for (let k = 0; k < 12; k++) { const a0 = k / 12 * 6.283 + time * 0.012 + hsh(k, 981) * 0.2, wd = 0.035 + 0.05 * hsh(k, 982); ctx.globalAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time * 0.35 + k * 2.3)); ctx.beginPath(); ctx.moveTo(sx, syn); ctx.lineTo(sx + Math.cos(a0 - wd) * RR, syn + Math.sin(a0 - wd) * RR); ctx.lineTo(sx + Math.cos(a0 + wd) * RR, syn + Math.sin(a0 + wd) * RR); ctx.closePath(); ctx.fill(); }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    const sun = foSunArt(); ctx.drawImage(sun, sn(sx - 12.5 * AP), sn(syn - 12.5 * AP), 25 * AP, 25 * AP);
+    // clouds lit pink on top and gold underneath
+    for (const c of clouds) {
+      const x = sn(mod(c.x + time * c.v, W + 200) - 100), y = sn(sy * c.f * 0.85);
+      ctx.fillStyle = 'rgba(255,232,226,0.88)'; ctx.fillRect(x + AP * 2, y - AP * 2, Math.max(0, c.w - 5) * AP, AP * 2); ctx.fillRect(x + AP * 4, y - AP * 3, Math.max(0, c.w - 10) * AP, AP);
+      ctx.fillStyle = 'rgba(226,150,168,0.88)'; ctx.fillRect(x, y, c.w * AP, AP * 2);
+      ctx.fillStyle = 'rgba(255,204,132,0.95)'; ctx.fillRect(x + AP, y + AP * 2 - 1, (c.w - 2) * AP, AP);
+    }
+    // two skeins of birds crossing the dawn
+    ctx.fillStyle = '#3a2840';
+    for (let g = 0; g < 2; g++) {
+      const dir = g ? -1 : 1, gx = mod(hsh(g, 990) * W + dir * time * (15 + g * 6), W + 300) - 150, gy = sy * (0.2 + 0.18 * g) + Math.sin(time * 0.5 + g) * 6;
+      for (let k = 0; k < 7; k++) { const o = Math.abs(k - 3), x = sn(gx - dir * o * 12), y = sn(gy + (k < 3 ? o : -o) * 5), up = ((time * 5 + k * 0.7) | 0) & 1; ctx.fillRect(x - 1, y, 3, 2); if (up) { ctx.fillRect(x - 4, y - 2, 3, 2); ctx.fillRect(x + 2, y - 2, 3, 2); } else { ctx.fillRect(x - 4, y + 1, 3, 2); ctx.fillRect(x + 2, y + 1, 3, 2); } }
+    }
+    // ranges of treetops fading into the morning haze
+    for (let i = 0; i < 3; i++) {
+      const im = foHillArt(i); ctx.drawImage(im, 0, sn(sy + 4 - im.height * AP), im.width * AP, im.height * AP);
+      const t0 = sy - 34 + i * 10, mg = ctx.createLinearGradient(0, t0, 0, sy + 4); mg.addColorStop(0, 'rgba(255,214,200,0)'); mg.addColorStop(1, 'rgba(255,214,200,' + (0.45 - i * 0.13).toFixed(2) + ')'); ctx.fillStyle = mg; ctx.fillRect(0, t0, W, sy + 4 - t0);
+      if (i < 2) { ctx.fillStyle = 'rgba(255,232,224,0.32)'; for (let q = 0; q < 4; q++) { const L = 60 + hsh(q + i * 4, 995) * 120, x = mod(hsh(q + i * 4, 996) * W + time * (3 + i * 2), W + L) - L; ctx.fillRect(sn(x), sn(sy - 18 - i * 14 - hsh(q, 997) * 14), L, AP * 2); } }
+    }
+    ctx.restore();
+  }
+  // blossoms dotted over the top of the canopy
+  function foCanopyBloom(sy) {
+    for (let q = 0; q < W / 24; q++) {
+      if (hsh(q, 991) < 0.5) continue;
+      const x = sn(q * 24 + hsh(q, 992) * 18), y = sn(sy + 6 + hsh(q, 993) * 46 + Math.sin(time * 0.7 + q) * 1.5), fc = FO_FLOWER[q & 3];
+      ctx.fillStyle = css(fc); ctx.fillRect(x - AP, y, AP * 3, AP); ctx.fillRect(x, y - AP, AP, AP * 3); ctx.fillStyle = '#fff3a0'; ctx.fillRect(x, y, AP, AP);
+    }
+  }
+
+  // ---- the green layers: waterfalls, rope bridges, monkeys, morphos, fireflies, and flowers on the great trunks ----
+  // a waterfall pouring through the far trees, broken by a ledge halfway down, with a rainbow in the spray while the sun reaches it
+  function foFall(xc, z, mTop, mBot, cols, seed) {
+    const S2 = AP * 2, w = cols * S2, x = sn(xc - w / 2), yTop = AY + (mTop - camS * z) / mpp, yBot = AY + (mBot - camS * z) / mpp;
+    if (yBot < -60 || yTop > H + 60) return;
+    const lit = Math.max(0, 1 - camS / 1500), A = air(camS), ca = css(lerp3(A, [238, 252, 248], 0.25 + 0.55 * lit)), cb = css(lerp3(A, [150, 214, 222], 0.18 + 0.45 * lit)), cc = css(lerp3(A, [64, 130, 140], 0.2 + 0.3 * lit)), dk = css(lerp3(A, [2, 8, 5], 0.55));
+    const yMid = yTop + (yBot - yTop) * 0.42;
+    // the cliff lip it pours from, mossy on top
+    ctx.fillStyle = dk; ctx.fillRect(x - AP * 14, sn(yTop) - AP * 4, w + AP * 28, AP * 5); ctx.fillRect(x - AP * 8, sn(yTop) + AP, w + AP * 16, AP * 2);
+    ctx.fillStyle = css(lerp3(A, [70, 150, 70], 0.3 + 0.35 * lit)); ctx.fillRect(x - AP * 14, sn(yTop) - AP * 4, w + AP * 28, AP);
+    const from = Math.max(yTop, -S2), to = Math.min(yBot, H + S2), sc = time * 170;
+    if (to > from) { ctx.fillStyle = css(lerp3(A, [238, 252, 248], 0.4), (0.05 + 0.08 * lit).toFixed(3)); ctx.fillRect(x - S2 * 2, from, w + S2 * 4, to - from); }
+    for (let y = yTop + Math.max(0, Math.floor((from - yTop) / S2)) * S2; y < to; y += S2) {
+      const below = y > yMid, spread = below ? Math.min(AP * 4, (y - yMid) / 30) : Math.min(AP * 2, (y - yTop) / 60);
+      for (let ci = 0; ci < cols; ci++) {
+        const row = Math.floor((y - yTop - sc * (0.85 + 0.3 * hsh(ci, 77 + seed))) / S2), r = hsh(row * 13 + ci, 60 + seed), edge = ci === 0 || ci === cols - 1;
+        ctx.fillStyle = r > 0.78 ? ca : r > 0.33 ? cb : cc; ctx.globalAlpha = edge ? 0.6 : 0.92;
+        ctx.fillRect(sn(x + ci * S2 + (ci - (cols - 1) / 2) * spread * (below ? 1 : 0.5)), sn(y), S2, S2);
+      }
+    }
+    ctx.globalAlpha = 1;
+    if (yMid > -60 && yMid < H + 60) {
+      ctx.fillStyle = dk; ctx.fillRect(x - AP * 10, sn(yMid) - AP, w + AP * 20, AP * 3);
+      ctx.fillStyle = ca; for (let q = 0; q < 8; q++) { const u = mod(time * 1.3 + q / 8, 1); ctx.globalAlpha = 0.8 * (1 - u); ctx.fillRect(sn(x + w / 2 + (hsh(q, 72 + seed) - 0.5) * w * 2.4 * u), sn(yMid - u * 22 * (0.5 + hsh(q, 73 + seed))), AP, AP); }
+      ctx.globalAlpha = 1;
+      for (let q = 0; q < 6; q++) { const u = mod(time * 0.8 + q / 6, 1), ang = -Math.PI * (0.12 + 0.76 * hsh(q, 71 + seed)), rr = 10 + u * 40; halo(x + w / 2 + Math.cos(ang) * rr, yMid + Math.sin(ang) * rr * 0.6, 6 + u * 6, 'rgb(220,246,240)', (0.15 + 0.4 * lit) * (1 - u)); }
+      if (lit > 0.3 && !window.__low) { // a rainbow standing in the spray
+        const rx = x + w / 2, R0 = 46 + w;
+        for (let c = 0; c < 6; c++) { ctx.fillStyle = 'rgba(' + FO_RB[c] + ',' + (0.4 * (lit - 0.3)).toFixed(3) + ')'; for (let ang = 3.4; ang < 6.0; ang += 0.05) ctx.fillRect(sn(rx + Math.cos(ang) * (R0 - c * AP)), sn(yMid + 10 + Math.sin(ang) * (R0 - c * AP) * 0.8), AP, AP); }
+      }
+    }
+  }
+  const FO_BRIDGE = [215, 400, 610, 850, 1120];
+  function foBridges() {
+    const z = 0.66, S = AP * 3;
+    for (let b = 0; b < FO_BRIDGE.length; b++) {
+      const m = FO_BRIDGE[b], y0 = foY(m, z); if (y0 < -120 || y0 > H + 80) continue;
+      const A = air(camS + (y0 - AY) * mpp), rope = css(lerp3(A, [40, 26, 14], 0.7)), pl = css(lerp3(A, [116, 80, 44], 0.55)), pl2 = css(lerp3(A, [72, 50, 26], 0.6)), xa = W * 0.02, xb = W * 0.98, sag = 40 + 30 * hsh(b, 1901), n = Math.ceil((xb - xa) / S), dk = foCl((m - 250) / 600), sw0 = Math.sin(time * 0.8 + b * 2) * 4;
+      for (let k = 0; k <= n; k++) {
+        const u = k / n, x = sn(xa + (xb - xa) * u), s4 = 4 * u * (1 - u), yd = y0 + sag * s4 + sw0 * s4, yr = yd - 22 + 2 * s4;
+        ctx.fillStyle = k & 1 ? pl : pl2; ctx.fillRect(x, sn(yd), S - 1, AP + 1);
+        ctx.fillStyle = rope; ctx.fillRect(x, sn(yr), S, 2); ctx.fillRect(x, sn(yd + AP + 1), S, 1.5); if (k % 3 === 0) ctx.fillRect(x, sn(yr), 1.5, yd - yr);
+      }
+      // lanterns hung on the rail, brighter as the forest darkens
+      for (let l = 0; l < 3; l++) {
+        const u = 0.22 + l * 0.28, x = xa + (xb - xa) * u, s4 = 4 * u * (1 - u), yy = y0 + sag * s4 + sw0 * s4 - 20 + 2 * s4, fl = 0.75 + 0.25 * Math.sin(time * 7 + l * 3 + b);
+        ctx.fillStyle = rope; ctx.fillRect(sn(x), sn(yy), 1.5, AP * 3);
+        ctx.fillStyle = 'rgba(255,204,112,' + (0.55 + 0.45 * dk * fl).toFixed(3) + ')'; ctx.fillRect(sn(x - AP), sn(yy + AP * 3), AP * 3, AP * 3);
+        ctx.fillStyle = rope; ctx.fillRect(sn(x - AP), sn(yy + AP * 3), AP * 3, 1.5);
+        halo(x + AP * 0.5, yy + AP * 4.5, 14 + 12 * dk, 'rgb(255,190,100)', (0.2 + 0.6 * dk) * fl);
+      }
+    }
+  }
+  // spider monkeys hanging by their tails from the limbs, swinging
+  function foMonkeys() {
+    const z = 0.85, SP = 46, tw = Math.max(26, Math.min(70, W * 0.06));
+    for (let i = foI0(z, SP, 140); i <= foI1(z, SP, 60); i++) {
+      if (hsh(i, 921) < 0.25) continue;
+      const m = i * SP + hsh(i, 922) * 20; if (m < 190 || m > 660) continue;
+      const left = hsh(i, 923) < 0.5, ax = left ? tw + 16 + hsh(i, 924) * W * 0.1 : W - tw - 16 - hsh(i, 924) * W * 0.1, ay = foY(m, z) - 50;
+      if (ay < -130 || ay > H + 40) continue;
+      const A = air(m), dk = css(lerp3(A, [24, 15, 10], 0.84)), fur = css(lerp3(A, [74, 46, 28], 0.72)), face = css(lerp3(A, [200, 156, 116], 0.62)), s = AP * 0.95;
+      ctx.fillStyle = css(lerp3(A, [2, 8, 5], 0.6)); const bx0 = left ? 0 : ax - 34, bx1 = left ? ax + 34 : W; ctx.fillRect(bx0, sn(ay - AP * 2), bx1 - bx0, AP * 3);
+      drawClump(i % 6, m, 0.35, ax + (left ? 30 : -30), ay - AP * 3, AP * 0.8);
+      const th = 0.5 * Math.sin(time * 1.25 + i * 2.3), arm = Math.sin(time * 2.5 + i) * 0.5;
+      ctx.save(); ctx.translate(ax, ay); ctx.rotate(th);
+      ctx.fillStyle = dk; ctx.fillRect(-s, -s * 2, s * 4, s); ctx.fillRect(-s, -s, s, s * 2); ctx.fillRect(-s * 0.5, 0, s, s * 14);
+      ctx.fillStyle = fur; ctx.fillRect(-s * 3, s * 13, s * 6, s * 9);
+      ctx.fillStyle = dk; ctx.fillRect(-s * 3, s * 11, s * 2, s * 4); ctx.fillRect(s, s * 11, s * 2, s * 4);
+      ctx.fillStyle = fur; ctx.fillRect(-s * 3, s * 22, s * 6, s * 5);
+      ctx.fillStyle = face; ctx.fillRect(-s * 2, s * 23, s * 4, s * 3);
+      ctx.fillStyle = '#120a06'; ctx.fillRect(-s * 1.5, s * 24, s, s); ctx.fillRect(s * 0.5, s * 24, s, s);
+      ctx.fillStyle = dk;
+      ctx.save(); ctx.translate(-s * 3, s * 16); ctx.rotate(0.4 + arm); ctx.fillRect(-s, 0, s, s * 12); ctx.restore();
+      ctx.save(); ctx.translate(s * 3, s * 16); ctx.rotate(-0.4 + arm * 0.7); ctx.fillRect(0, 0, s, s * 12); ctx.restore();
+      ctx.restore();
+    }
+  }
+  // blue morpho butterflies, flashing as their wings turn to the light
+  function foMorphos(a, low) {
+    ctx.globalAlpha = a;
+    for (let q = 0; q < (low ? 3 : 6); q++) {
+      const s = AP * 0.8 * (0.8 + hsh(q, 913) * 0.6), x = W * (0.5 + 0.48 * Math.sin(time * 0.11 * (1 + hsh(q, 911)) + q * 2.1)), y = H * (0.5 + 0.42 * Math.sin(time * 0.08 * (1 + hsh(q, 912)) + q * 1.3)) + 8 * Math.sin(time * 3 + q);
+      const fl = Math.abs(Math.sin(time * (8 + q) + q)), ww = Math.max(1, Math.round(fl * 5)) * s, bright = fl > 0.55;
+      ctx.fillStyle = '#081430'; ctx.fillRect(sn(x - ww - s), sn(y - 4 * s), ww + s, 4 * s); ctx.fillRect(sn(x + s), sn(y - 4 * s), ww + s, 4 * s);
+      ctx.fillStyle = bright ? '#8ef0ff' : '#3a9cff'; ctx.fillRect(sn(x - ww), sn(y - 3 * s), ww, 3 * s); ctx.fillRect(sn(x + s), sn(y - 3 * s), ww, 3 * s);
+      ctx.fillStyle = bright ? '#3a9cff' : '#1f5fd0'; ctx.fillRect(sn(x - ww * 0.7), sn(y), ww * 0.7, 3 * s); ctx.fillRect(sn(x + s), sn(y), ww * 0.7, 3 * s);
+      ctx.fillStyle = '#0a0a14'; ctx.fillRect(sn(x - s * 0.5), sn(y - 4 * s), s * 1.5, 7 * s);
+      if (bright) halo(x, y, 12, 'rgb(120,210,255)', 0.35 * a);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // golden pollen drifting in the canopy light
+  function foPollen(a, low) {
+    const n = low ? 14 : 34, drift = camS / mpp;
+    for (let q = 0; q < n; q++) {
+      const x = mod(hsh(q, 901) * W + time * (5 + hsh(q, 902) * 9) + 16 * Math.sin(time * 0.6 + q), W + 20) - 10, y = mod(hsh(q, 903) * (H + 40) - drift * (0.5 + hsh(q, 904) * 0.5) + time * (3 + hsh(q, 905) * 5), H + 40) - 20, tw = 0.5 + 0.5 * Math.sin(time * 2.2 + q * 1.7), big = (q & 3) === 0;
+      ctx.fillStyle = big ? 'rgba(255,255,236,' + (a * (0.5 + 0.5 * tw)).toFixed(3) + ')' : 'rgba(255,238,160,' + (a * (0.35 + 0.55 * tw)).toFixed(3) + ')';
+      ctx.fillRect(sn(x), sn(y), big ? 3 : 2, big ? 3 : 2);
+      if (big && tw > 0.5) halo(x + 1, y + 1, 9, 'rgb(255,232,150)', a * 0.55 * tw);
+    }
+  }
+  // fireflies: they blink, slowly, everywhere the light has gone
+  function foFireflies(a, low, warm) {
+    const n = low ? 14 : 36, drift = camS / mpp;
+    for (let q = 0; q < n; q++) {
+      const par = 0.4 + hsh(q, 931) * 0.7, x = mod(hsh(q, 932) * W + 30 * Math.sin(time * (0.3 + hsh(q, 933) * 0.4) + q), W), y = mod(hsh(q, 934) * (H + 60) - drift * par + 20 * Math.sin(time * (0.25 + hsh(q, 935) * 0.3) + q * 2), H + 60) - 30;
+      const bl = Math.pow(Math.max(0, Math.sin(time * (0.8 + hsh(q, 936) * 0.9) + q * 2.7)), 3) * a; if (bl < 0.04) continue;
+      const green = q % 5 !== 0;
+      halo(x, y, 8 + par * 8, warm ? (green ? 'rgb(255,190,110)' : 'rgb(255,230,150)') : green ? 'rgb(226,255,120)' : 'rgb(140,255,200)', bl * 0.85);
+      ctx.fillStyle = (warm ? 'rgba(255,236,190,' : green ? 'rgba(244,255,180,' : 'rgba(196,255,228,') + bl.toFixed(3) + ')'; ctx.fillRect(sn(x), sn(y), 2, 2);
+    }
+  }
+  // eyes in the deep shade, watching, blinking
+  function foEyes(a) {
+    const z = 0.55, SP = 40;
+    for (let i = foI0(z, SP, 20); i <= foI1(z, SP, 20); i++) {
+      const m = i * SP; if (m < 650 || m > 1520 || hsh(i, 941) < 0.5) continue;
+      if (mod(time * (0.2 + hsh(i, 942) * 0.15) + hsh(i, 943), 1) < 0.04) continue;
+      const x = W * (0.05 + hsh(i, 944) * 0.9), y = foY(m + hsh(i, 945) * SP, z), gap = 6 + hsh(i, 946) * 6, c = hsh(i, 947) < 0.6 ? '228,255,106' : '255,190,90';
+      ctx.fillStyle = 'rgba(' + c + ',' + (0.85 * a).toFixed(3) + ')'; ctx.fillRect(sn(x), sn(y), 3, 2); ctx.fillRect(sn(x + gap), sn(y), 3, 2);
+      halo(x + gap / 2, y, 10, 'rgb(' + c + ')', 0.22 * a);
+    }
+  }
+  // what grows on the two great trunks: bromeliads, orchids, and (in the shade) glowing bracket fungi
+  function foTrunkFlora(side, w) {
+    const SP = 22, dir = side ? -1 : 1, ex = side ? W - w : w, o = side ? AP : 0;
+    for (let i = foI0(1, SP, 60); i <= foI1(1, SP, 60); i++) {
+      const m = i * SP + hsh(i, 1941 + side) * SP * 0.6; if (m < 15 || m > FLOOR - 10 || hsh(i, 1943 + side) < 0.3) continue;
+      const y = sn(yOf(m)), k = hsh(i, 1945 + side), lit = foCl(1 - m / 1200), A = air(m);
+      if (m > 650 && k < 0.5) {
+        const teal = k < 0.25, on = foCl((m - 650) / 300), pul = 0.6 + 0.4 * Math.sin(time * 1.3 + i), gc = teal ? '120,255,210' : '190,255,120';
+        for (let s = 0; s < 3; s++) { const ww = (5 - s) * AP * 2, yy = y + s * AP * 4; ctx.fillStyle = css(lerp3(A, [200, 190, 160], 0.35)); ctx.fillRect(side ? ex - ww : ex, yy, ww, AP * 2); ctx.fillStyle = 'rgba(' + gc + ',' + (0.75 * on * pul).toFixed(3) + ')'; ctx.fillRect(side ? ex - ww : ex, yy + AP * 2, ww, AP); }
+        halo(ex + dir * AP * 5, y + AP * 6, 20, 'rgb(' + gc + ')', 0.45 * on * pul);
+      } else if (k < 0.7) {
+        const leaf = css(lerp3(A, [70, 160, 70], 0.3 + 0.35 * lit)), dark = css(lerp3(A, [10, 40, 20], 0.6));
+        for (let f = 0; f < 5; f++) { const L = 4 + f, ang = 0.25 + f * 0.27; for (let t = 1; t <= L; t++) { ctx.fillStyle = t === L || !(f & 1) ? leaf : dark; ctx.fillRect(sn(ex + dir * Math.cos(ang) * t * AP * 1.2) - o, sn(y - Math.sin(ang) * t * AP * 1.2), AP, AP); } }
+        const fc = FO_FLOWER[i % 3]; ctx.fillStyle = css(lerp3(A, fc, 0.4 + 0.55 * lit));
+        ctx.fillRect(sn(ex + dir * AP * 3) - o, y - AP * 10, AP, AP * 6); ctx.fillRect(sn(ex + dir * AP * 2) - o, y - AP * 9, AP * 3, AP); ctx.fillRect(sn(ex + dir * AP * 2) - o, y - AP * 7, AP * 3, AP);
+        if (lit > 0.3) { ctx.fillStyle = 'rgba(255,250,220,' + (0.6 * lit).toFixed(2) + ')'; ctx.fillRect(sn(ex + dir * AP * 3) - o, y - AP * 11, AP, AP); }
+      } else {
+        const st = css(lerp3(A, [30, 80, 40], 0.5)), pc = css(lerp3(A, i & 1 ? [255, 240, 250] : [255, 150, 214], 0.45 + 0.5 * lit)), cc = css(lerp3(A, [255, 210, 60], 0.45 + 0.5 * lit)), sw = Math.sin(time * 0.9 + i) * AP;
+        ctx.fillStyle = st; for (let t = 0; t < 7; t++) ctx.fillRect(sn(ex + dir * t * AP * 1.5 + sw * t / 7) - o, sn(y + t * t * AP * 0.25), AP, AP);
+        for (let b = 0; b < 3; b++) { const bx = sn(ex + dir * (3 + b * 3) * AP + sw * (0.4 + b * 0.3)) - o, by = sn(y + (2 + b * 2.4) * AP * 1.2); ctx.fillStyle = pc; ctx.fillRect(bx - AP, by, AP * 3, AP); ctx.fillRect(bx, by - AP, AP, AP * 3); ctx.fillStyle = cc; ctx.fillRect(bx, by, AP, AP); }
+      }
+    }
+  }
+  // the forest floor: buttress roots, a fallen log, red-capped and glowing mushrooms
+  function foFloor() {
+    if (!near(FLOOR, 280)) return;
+    const y = yOf(FLOOR), tw = Math.max(26, Math.min(70, W * 0.06)), A = air(FLOOR), bark = css(lerp3(A, [2, 7, 4], 0.86)), bark2 = css(lerp3(A, [10, 16, 8], 0.8)), moss = css(lerp3(A, [80, 160, 60], 0.45));
+    for (let side = 0; side < 2; side++) {
+      const dir = side ? -1 : 1, o = side ? AP * 2 : 0;
+      for (let f = 0; f < 2; f++) {
+        const x0 = (side ? W - tw : tw) + dir * f * W * 0.035, reach = W * (0.13 - f * 0.04), hgt = 170 - f * 70;
+        for (let t = 0; t < reach; t += AP * 2) { const u = t / reach, top = y - hgt * Math.pow(1 - u, 2.4) - 3; ctx.fillStyle = f ? bark2 : bark; ctx.fillRect(sn(x0 + dir * t) - o, sn(top), AP * 2, y - top + 8); ctx.fillStyle = moss; if (hsh(t + f * 7, 1951 + side) < 0.6) ctx.fillRect(sn(x0 + dir * t) - o, sn(top), AP * 2, AP); }
+      }
+    }
+    // a fallen log, furred with moss, with a few glowing caps on it
+    const lx0 = W * 0.1, lx1 = W * 0.32, ly = y - AP * 9;
+    ctx.fillStyle = css(lerp3(A, [40, 26, 14], 0.75)); ctx.fillRect(sn(lx0), sn(ly), lx1 - lx0, AP * 8);
+    ctx.fillStyle = css(lerp3(A, [10, 6, 4], 0.7)); ctx.fillRect(sn(lx0), sn(ly + AP * 6), lx1 - lx0, AP * 2);
+    ctx.fillStyle = moss; for (let x = lx0; x < lx1; x += AP) if (hsh(x | 0, 1953) < 0.7) ctx.fillRect(sn(x), sn(ly - (hsh(x | 0, 1954) < 0.3 ? AP : 0)), AP, AP * 2);
+    ctx.fillStyle = css(lerp3(A, [150, 110, 70], 0.5)); ctx.fillRect(sn(lx1), sn(ly), AP * 2, AP * 8); ctx.fillStyle = css(lerp3(A, [70, 46, 26], 0.6)); ctx.fillRect(sn(lx1), sn(ly + AP * 3), AP * 2, AP * 2);
+    const pul = 0.6 + 0.4 * Math.sin(time * 1.4);
+    for (let q = 0; q < 4; q++) { const mx = sn(lx0 + (lx1 - lx0) * (0.15 + q * 0.22)), my = sn(ly - AP * 2); ctx.fillStyle = 'rgba(140,255,220,' + (0.6 + 0.35 * pul).toFixed(3) + ')'; ctx.fillRect(mx - AP, my - AP, AP * 3, AP); ctx.fillRect(mx, my, AP, AP); halo(mx + AP / 2, my, 12, 'rgb(120,255,210)', 0.5 * pul); }
+    // pools of the last daylight on the ground
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let q = 0; q < 3; q++) { const px = W * (0.18 + q * 0.32), pr = 70 + q * 20, pg = ctx.createRadialGradient(px, y, 0, px, y, pr); pg.addColorStop(0, 'rgba(220,255,160,' + (0.16 + 0.04 * Math.sin(time * 0.6 + q)).toFixed(3) + ')'); pg.addColorStop(1, 'rgba(220,255,160,0)'); ctx.fillStyle = pg; ctx.setTransform(DPR, 0, 0, DPR * 0.35, 0, y * DPR * 0.65); ctx.fillRect(px - pr, y - pr, pr * 2, pr * 2); }
+    ctx.restore();
+    // glowing caps scattered over the ground
+    for (let q = 0; q < 14; q++) { const gx = W * (0.04 + 0.92 * hsh(q, 1957)), gy = y - AP - hsh(q, 1958) * AP * 3, pp = 0.55 + 0.45 * Math.sin(time * 1.2 + q * 2), blue = q % 3 === 0; ctx.fillStyle = blue ? 'rgba(140,200,255,' + (0.6 + 0.4 * pp).toFixed(3) + ')' : 'rgba(150,255,210,' + (0.6 + 0.4 * pp).toFixed(3) + ')'; ctx.fillRect(sn(gx) - AP, sn(gy) - AP, AP * 3, AP); ctx.fillRect(sn(gx), sn(gy), AP, AP * 2); halo(gx, gy, 12, blue ? 'rgb(120,190,255)' : 'rgb(120,255,210)', 0.5 * pp); }
+    // red toadstools by the right-hand roots
+    for (let q = 0; q < 5; q++) {
+      const mx = sn(W * (0.7 + q * 0.035) + hsh(q, 1955) * 10), sz = (q & 1 ? 3 : 4) * AP, my = sn(y - sz * 1.6);
+      ctx.fillStyle = css(lerp3(A, [236, 226, 200], 0.6)); ctx.fillRect(mx - AP / 2, my, AP, sz * 1.6);
+      ctx.fillStyle = css(lerp3(A, [220, 40, 34], 0.6)); ctx.fillRect(mx - sz, my - AP, sz * 2 + AP, AP * 2); ctx.fillRect(mx - sz + AP, my - AP * 2, sz * 2 - AP, AP);
+      ctx.fillStyle = css(lerp3(A, [255, 250, 230], 0.55)); ctx.fillRect(mx - sz + AP, my - AP, AP, AP); ctx.fillRect(mx + AP, my - AP * 2, AP, AP); ctx.fillRect(mx + sz - AP, my, AP, AP);
+    }
+  }
+  function foFrondArt(v, b) {
+    return foCache('fr' + v + '_' + b, 52, 34, (g, w, h) => {
+      const A = air([60, 500, 1100][b]), base = lerp3(A, [2, 8, 5], 0.4 + b * 0.12), lt = [0.6, 0.32, 0.18][b];
+      const c0 = css(lerp3(base, [8, 40, 20], 0.55)), c1 = css(lerp3(base, [46, 132, 58], 0.3 + lt * 0.5)), c2 = css(lerp3(base, [160, 226, 116], lt * 0.75));
+      const rib = x => 7 + Math.pow(x / w, 1.6) * (13 + v * 4);
+      for (let x = 0; x < w - 2; x += 2) {
+        const L = Math.round(9 * Math.sin(Math.PI * Math.min(1, (x + 5) / w)) * (0.85 + 0.3 * hsh(x, 1961 + v))), y0 = rib(x);
+        for (let t = 1; t <= L; t++) { g.fillStyle = t >= L - 1 ? c2 : c1; g.fillRect((x + t * 0.6) | 0, (y0 - t) | 0, 1, 1); g.fillStyle = t === L ? c1 : c0; g.fillRect((x + t * 0.7) | 0, (y0 + t * 0.8) | 0, 1, 1); }
+      }
+      g.fillStyle = c0; for (let x = 0; x < w; x++) g.fillRect(x, rib(x) | 0, 1, 1);
+    });
+  }
+  function foFronds() {
+    const z = 1.15, SP = 15, tw = Math.max(26, Math.min(70, W * 0.06));
+    for (let i = foI0(z, SP, 120); i <= foI1(z, SP, 60); i++) {
+      const m = i * SP + hsh(i, 1971) * 8; if (m < 30 || m > FLOOR - 40 || hsh(i, 1972) < 0.2) continue;
+      const side = (i + (hsh(i, 1973) < 0.3 ? 1 : 0)) & 1, y = foY(m, z), im = foFrondArt(i % 3, m < 260 ? 0 : m < 800 ? 1 : 2), sc = AP * (0.9 + hsh(i, 1974) * 0.5) * Math.min(1, 0.45 + W / 1400), ww = im.width * sc, hh = im.height * sc;
+      if (y < -hh || y > H + hh) continue;
+      ctx.save(); ctx.translate(side ? W - tw + AP : tw - AP, sn(y)); if (side) ctx.scale(-1, 1); ctx.rotate(-0.25 + hsh(i, 1975) * 0.5 + Math.sin(time * 0.8 + i) * 0.04);
+      ctx.drawImage(im, 0, -hh * 0.25, ww, hh); ctx.restore();
+    }
+  }
+  // giant roots reaching across the shaft under the forest, beaded with glowing sap in the root caves
+  function foRootArches() {
+    const z = 0.9, SP = 40, S = AP * 2;
+    for (let i = foI0(z, SP, 120); i <= foI1(z, SP, 80); i++) {
+      const m = i * SP + hsh(i, 1521) * 16; if (m < FLOOR + 40 || m > 2900 || hsh(i, 1522) < 0.3) continue;
+      const left = hsh(i, 1523) < 0.5, dir = left ? 1 : -1, x0 = left ? 0 : W, y = foY(m, z), reach = W * (0.16 + 0.2 * hsh(i, 1524)), sap = m > 1950, A = air(m);
+      if (y < -90 || y > H + 150) continue;
+      const dk = css(lerp3(A, [24, 15, 9], 0.85)), md = css(lerp3(A, [62, 42, 24], 0.7)), lt = css(lerp3(A, sap ? [220, 150, 80] : [150, 120, 70], 0.5));
+      for (let t = 0, j = 0; t <= reach; t += S, j++) {
+        const u = t / reach, th = Math.max(AP, Math.round((1 - u * 0.75) * 8) * AP), yy = sn(y - Math.sin(u * Math.PI) * 14 + u * u * 50 + Math.sin(u * 7 + i) * 4), xx = sn(x0 + dir * t - (left ? 0 : S)), hj = hsh(i * 50 + j, 1525);
+        ctx.fillStyle = dk; ctx.fillRect(xx, yy, S + 1, th); ctx.fillStyle = md; ctx.fillRect(xx, yy + AP, S + 1, Math.max(0, th * 0.4 - AP)); ctx.fillStyle = lt; ctx.fillRect(xx, yy, S + 1, AP);
+        if (hj < 0.18) { ctx.fillStyle = dk; const hl = 3 + hsh(i * 50 + j, 1526) * 8; for (let k = 0; k < hl; k++) ctx.fillRect(sn(xx + AP + Math.sin(k * 0.9 + time * 0.8 + i) * 2), yy + th + k * AP, 1.5, AP); }
+        else if (hj > (sap ? 0.86 : 0.92)) {
+          const pul = 0.6 + 0.4 * Math.sin(time * 1.7 + j + i), gc = sap ? '255,190,110' : '140,255,210', bx = xx + AP * 0.5, by = yy + th;
+          ctx.fillStyle = 'rgba(' + gc + ',' + (0.9 * pul).toFixed(3) + ')'; ctx.fillRect(bx - AP * 0.5, by, AP * 2, AP * 2); ctx.fillStyle = 'rgba(255,255,230,' + (0.8 * pul).toFixed(3) + ')'; ctx.fillRect(bx, by, AP, AP);
+          halo(bx + AP / 2, by + AP, sap ? 18 : 12, 'rgb(' + gc + ')', 0.55 * pul);
+          if (sap) { const uu = mod(time * 0.5 + hj * 9, 1); ctx.fillStyle = 'rgba(255,200,120,' + (0.9 * (1 - uu)).toFixed(3) + ')'; ctx.fillRect(bx, sn(by + AP * 2 + uu * uu * 110), AP, AP * 2); }
+        }
+      }
+    }
+  }
+
+  // great drops of amber sap hanging on root threads, lit from inside
+  const FO_DROP = [1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 4, 3];
+  function foSapDrops(a) {
+    const z = 0.8, SP = 30;
+    for (let i = foI0(z, SP, 360); i <= foI1(z, SP, 60); i++) {
+      const m = i * SP + hsh(i, 1981) * 12; if (m < 1950 || m > 2850 || hsh(i, 1982) < 0.3) continue;
+      const x = W * (hsh(i, 1983) < 0.5 ? 0.05 + hsh(i, 1984) * 0.24 : 0.71 + hsh(i, 1984) * 0.24), len = 70 + hsh(i, 1986) * 140, yTop = foY(m, z) - len, sw = Math.sin(time * 0.7 + i) * 5, yb = yTop + len, s = AP * (0.7 + hsh(i, 1987) * 0.5), pul = 0.65 + 0.35 * Math.sin(time * 1.3 + i * 2), dx = sn(x + sw);
+      if (yb + 14 * s < -20 || yTop > H + 20) continue;
+      ctx.fillStyle = 'rgb(30,19,10)'; for (let t = 0; t < len; t += AP * 2) ctx.fillRect(sn(x + sw * t / len + Math.sin(t * 0.05 + i) * 2), sn(yTop + t), AP, AP * 2 + 1);
+      ctx.globalCompositeOperation = 'lighter'; const R = 34 * s / AP, lg = ctx.createRadialGradient(dx, yb + 8 * s, 0, dx, yb + 8 * s, R); lg.addColorStop(0, 'rgba(255,170,70,' + (0.3 * pul * a).toFixed(3) + ')'); lg.addColorStop(1, 'rgba(255,140,50,0)'); ctx.fillStyle = lg; ctx.fillRect(dx - R, yb + 8 * s - R, R * 2, R * 2); ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = a;
+      for (let r = 0; r < FO_DROP.length; r++) { const hw = FO_DROP[r] * s, yy = sn(yb + r * s); ctx.fillStyle = '#b4520c'; ctx.fillRect(dx - hw, yy, hw * 2, s); if (FO_DROP[r] > 1) { ctx.fillStyle = r > 6 ? '#ffcf6a' : '#ff9a2a'; ctx.fillRect(dx - hw + s, yy, hw * 2 - 2 * s, s); } }
+      ctx.fillStyle = 'rgba(255,248,214,' + (0.7 + 0.3 * pul).toFixed(3) + ')'; ctx.fillRect(dx - 2 * s, sn(yb + 6 * s), s, 2 * s); ctx.fillRect(dx, sn(yb + 8 * s), 2 * s, 2 * s);
+      ctx.globalAlpha = 1;
+      halo(dx, yb + 8 * s, 18, 'rgb(255,180,90)', 0.65 * pul * a);
+      const u = mod(time * 0.4 + hsh(i, 1988), 1); if (u < 0.8) { ctx.fillStyle = 'rgba(255,200,110,' + (a * (1 - u)).toFixed(3) + ')'; ctx.fillRect(dx - s * 0.5, sn(yb + 12 * s + u * u * 160), s, s * 2); }
+    }
+  }
+  // ---- the underground river: caustic light, luminous fish, bubbles, and the great eel ----
+  const foCausArt = () => foCache('caus', 96, 96, (g, w, h) => foPix(g, w, h, (x, y) => { const T = 6.2832 / 96, v = Math.sin(2 * T * x + 1.6 * Math.sin(T * y + 0.5)) + Math.sin(3 * T * y + 1.4 * Math.sin(2 * T * x)), e = Math.abs(v); return e < 0.22 ? foPk(150, 230, 255, e < 0.1 ? 255 : 140) : 0; }));
+  function foCaustics(a) {
+    const c = foCausArt(), s = AP * 2.4, T = 96 * s;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let p = 0; p < 2; p++) {
+      const ox = mod(time * (p ? -7 : 9), T), oy = mod(-camS / mpp * (p ? 0.35 : 0.5) + time * (p ? 3 : 5), T);
+      ctx.globalAlpha = a * (p ? 0.04 : 0.065);
+      for (let y = oy - T; y < H; y += T) for (let x = -ox - (p ? T * 0.5 : 0); x < W; x += T) ctx.drawImage(c, sn(x), sn(y), T, T);
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
+  function foFish(low) {
+    const z = 1, SP = 40;
+    for (let i = foI0(z, SP, 60); i <= foI1(z, SP, 60); i++) {
+      const m = i * SP + hsh(i, 1501) * 20; if (m < 2790 || m > 3760 || hsh(i, 1502) < 0.2) continue;
+      const dir = hsh(i, 1503) < 0.5 ? 1 : -1, sp = 26 + hsh(i, 1504) * 30, cx = mod(hsh(i, 1505) * W + dir * time * sp, W + 260) - 130, cy = foY(m, z), n = low ? 4 : 7 + (hsh(i, 1506) * 5 | 0), pink = hsh(i, 1507) < 0.3;
+      if (cy < -60 || cy > H + 60) continue;
+      const stripe = pink ? 'rgba(255,156,224,0.95)' : 'rgba(156,244,255,0.95)', body = pink ? '#3a1840' : '#0e2c40', gc = pink ? 'rgb(255,130,210)' : 'rgb(110,214,255)', s = AP * 0.95;
+      for (let k = 0; k < n; k++) {
+        const fx0 = cx - dir * (k & 3) * 22 - dir * (k >> 2) * 11 + Math.sin(time * 1.7 + k * 1.3 + i) * 5, fy = cy + ((k * 37) % 7 - 3) * 9 + Math.sin(time * 2.1 + k) * 3, tl = ((time * 8 + k) | 0) & 1;
+        ctx.fillStyle = body; ctx.fillRect(sn(fx0 - 4 * s), sn(fy - s), 8 * s, 3 * s); ctx.fillRect(sn(fx0 - 3 * s), sn(fy - 2 * s), 5 * s, s);
+        ctx.fillRect(sn(dir > 0 ? fx0 - 5 * s : fx0 + 4 * s), sn(fy - 2 * s + tl * s), s, 3 * s);
+        ctx.fillStyle = stripe; ctx.fillRect(sn(fx0 - 3 * s), sn(fy), 6 * s, s);
+        ctx.fillStyle = '#eaffff'; ctx.fillRect(sn(dir > 0 ? fx0 + 2 * s : fx0 - 3 * s), sn(fy - s), s, s);
+        if (k % 2 === 0) halo(fx0, fy, 14, gc, 0.5);
+      }
+    }
+  }
+  function foBubbles(a) {
+    ctx.fillStyle = 'rgba(190,240,255,' + (0.55 * a).toFixed(3) + ')';
+    for (let q = 0; q < 18; q++) {
+      const x = sn(mod(hsh(q, 1531) * W + Math.sin(time * 1.3 + q) * 6, W)), y = sn(mod(hsh(q, 1532) * (H + 40) - time * (30 + hsh(q, 1533) * 40) - camS / mpp * 0.8, H + 40) - 20), s = q % 3 ? 2 : AP;
+      if (q % 3) ctx.fillRect(x, y, 2, 2); else { ctx.fillRect(x - s, y, s, s); ctx.fillRect(x + s, y, s, s); ctx.fillRect(x, y - s, s, s); ctx.fillRect(x, y + s, s, s); }
+    }
+  }
+  function foEel() {
+    const cy = yOf(3250), hx = mod(time * 46, W + 700) - 350, n = 34;
+    for (let k = n - 1; k >= 0; k--) {
+      const x = hx - k * AP * 2.2, y = cy + Math.sin(time * 2.6 - k * 0.32) * 16 * Math.min(1, k / 6 + 0.3), th = AP * (k < 3 ? 3 + k * 0.5 : 4.5 * (1 - k / n) + 1.2);
+      ctx.fillStyle = '#071820'; ctx.fillRect(sn(x), sn(y - th / 2), AP * 2.4, th);
+      if (k % 4 === 2) { ctx.fillStyle = 'rgba(140,250,255,0.9)'; ctx.fillRect(sn(x), sn(y - AP / 2), AP, AP); if (k % 8 === 2) halo(x, y, 12, 'rgb(110,214,255)', 0.5); }
+    }
+    ctx.fillStyle = '#aef8ff'; ctx.fillRect(sn(hx + AP * 1.2), sn(cy + Math.sin(time * 2.6) * 4.8 - AP), AP, AP);
+  }
+
+  // ---- the glowworm grotto: a roof of living stars ----
+  function foStarArt(k) {
+    return foCache('st' + k, W, 512, (g, w, h) => {
+      if (!k) for (let q = 0; q < 5; q++) { const r = 60 + hsh(q, 1123) * 80, x = hsh(q, 1121) * w, y = r + hsh(q, 1122) * (h - r * 2), gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, q & 1 ? 'rgba(60,140,210,0.12)' : 'rgba(60,210,190,0.1)'); gr.addColorStop(1, 'rgba(60,160,200,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+      const n = Math.round(w * h / (k ? 3600 : 300));
+      for (let q = 0; q < n; q++) {
+        let x = hsh(q, 1101 + k * 7) * w, y = hsh(q, 1102 + k * 7) * h;
+        if (!k && q % 3 === 0) { const u = hsh(q, 1103); x = u * w; y = mod(h * (0.15 + 0.7 * u) + (hsh(q, 1104) - 0.5) * 70 * (1.2 + Math.sin(u * 11)), h); } // a river of light across the roof
+        const b = hsh(q, 1105 + k), c = b > 0.88 ? '235,255,255' : b > 0.45 ? '125,240,255' : '70,190,205';
+        x |= 0; y |= 0;
+        if (k) { g.fillStyle = 'rgba(' + c + ',0.95)'; g.fillRect(x, y, 2, 2); g.fillStyle = 'rgba(' + c + ',0.4)'; g.fillRect(x - 2, y, 2, 2); g.fillRect(x + 2, y, 2, 2); g.fillRect(x, y - 2, 2, 2); g.fillRect(x, y + 2, 2, 2); }
+        else { g.fillStyle = 'rgba(' + c + ',' + (0.4 + 0.6 * hsh(q, 1106)).toFixed(2) + ')'; const s = b > 0.7 ? 2 : 1; g.fillRect(x, y, s, s); if (b > 0.96) { g.fillStyle = 'rgba(' + c + ',0.35)'; g.fillRect(x - 1, y, 4, 2); g.fillRect(x, y - 1, 2, 4); } }
+      }
+    });
+  }
+  function foStars(a, low) {
+    const T = 512, o0 = mod(camS / mpp * 0.1, T), base = foStarArt(0);
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a; for (let y = -o0; y < H; y += T) ctx.drawImage(base, 0, sn(y));
+    if (!low) { const o1 = mod(camS / mpp * 0.14, T); for (let k = 1; k <= 2; k++) { const im = foStarArt(k); ctx.globalAlpha = a * (0.5 + 0.5 * Math.sin(time * 1.3 + k * 3.1)); for (let y = -o1; y < H; y += T) ctx.drawImage(im, 0, sn(y)); } }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
+  // the brightest of them flare into little crosses
+  function foGlints(a, col, n, seed, par) {
+    const rp = rampOf(col);
+    for (let q = 0; q < n; q++) {
+      const x = F(hsh(q, seed) * W), y = F(mod(hsh(q, seed + 1) * (H + 80) - camS / mpp * par * (0.6 + hsh(q, seed + 3) * 0.6), H + 80) - 40), tw = Math.pow(Math.max(0, Math.sin(time * (0.7 + hsh(q, seed + 2)) + q * 2)), 4) * a;
+      if (tw < 0.12) continue;
+      pglow(x, y, 5, tw * 0.8, rp, 4); const L = (1 + tw * 5) | 0;
+      for (let k = 1; k <= L; k++) { const c = rp[k < 2 ? 4 : 3]; pset(x + k, y, c, 5); pset(x - k, y, c, 5); pset(x, y + k, c, 5); pset(x, y - k, c, 5); }
+      pset(x, y, rp[4], 6);
+    }
+  }
+
+  // ---- the crystal caverns: clusters of faceted crystal, and light split into colours ----
+  function foXtalArt(v) {
+    return foCache('xt' + v, 40, 56, (g, w, h) => {
+      const P = [], n = 3 + (v % 3);
+      for (let k = 0; k < n; k++) { const ang = -Math.PI / 2 + (k - (n - 1) / 2) * 0.32 + (hsh(k, 1201 + v) - 0.5) * 0.25, L = h * (0.45 + 0.5 * hsh(k, 1202 + v)) * (k === (n >> 1) ? 1.1 : 0.85); P.push([w / 2 + (k - (n - 1) / 2) * 4, h - 1, Math.cos(ang), Math.sin(ang), Math.min(L, h - 2), 5 + hsh(k, 1203 + v) * 5]); }
+      const pal = [[[110, 56, 196], [186, 130, 255], [242, 224, 255]], [[56, 116, 206], [120, 200, 255], [226, 250, 255]], [[186, 56, 166], [255, 130, 220], [255, 226, 250]]][v % 3];
+      foPix(g, w, h, (x, y) => {
+        let col = 0;
+        for (const p of P) {
+          const dx = x - p[0], dy = y - p[1], u = dx * p[2] + dy * p[3], s = -dx * p[3] + dy * p[2]; if (u < 0 || u > p[4]) continue;
+          const half = p[5] / 2 * Math.min(1, (p[4] - u) / (p[5] * 0.9)); if (Math.abs(s) > half) continue;
+          const f = s / Math.max(0.5, half), edge = Math.abs(s) > half - 1;
+          let c = f < -0.33 ? pal[0] : f < 0.33 ? pal[1] : pal[2]; c = lerp3(c, [255, 255, 255], (u / p[4]) * 0.25 + (edge ? 0.35 : 0));
+          if (!edge && foDi(x, y) < 0.07) c = lerp3(c, pal[2], 0.6);
+          col = foPk(c[0], c[1], c[2]);
+        }
+        return col;
+      });
+    });
+  }
+  function foXtalFar(a) {
+    const z = 0.32, SP = 30;
+    for (let i = foI0(z, SP, 220); i <= foI1(z, SP, 40); i++) {
+      const m = i * SP; if (m < 4650 || m > 5900 || hsh(i, 1210) < 0.3) continue;
+      const im = foXtalArt(i % 6), sc = AP * (0.6 + hsh(i, 1213) * 0.6), x = hsh(i, 1212) * W, y = foY(m + hsh(i, 1211) * SP, z), up = hsh(i, 1214) < 0.6, ww = im.width * sc, hh = im.height * sc;
+      if (y < -hh - 20 || y > H + hh + 20) continue;
+      ctx.globalAlpha = a * 0.5;
+      if (up) ctx.drawImage(im, sn(x - ww / 2), sn(y - hh), ww, hh); else { ctx.save(); ctx.translate(sn(x), sn(y)); ctx.scale(1, -1); ctx.drawImage(im, -ww / 2, -hh, ww, hh); ctx.restore(); }
+      halo(x, up ? y - hh * 0.6 : y + hh * 0.6, 14 + hh * 0.3, 'rgb(200,140,255)', 0.2 * a * (0.6 + 0.4 * Math.sin(time + i)));
+    }
+    ctx.globalAlpha = 1;
+  }
+  // beams of white light fall in, strike a floating crystal and fan out as a spectrum
+  function foPrism(a) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 3; k++) {
+      const px = W * (0.16 + 0.34 * k) + Math.sin(time * 0.13 + k * 2) * W * 0.05, py = H * (0.22 + 0.2 * ((k * 2) % 3)) + Math.sin(time * 0.1 + k) * 30, ang = 0.95 + 0.3 * Math.sin(time * 0.08 + k * 1.7), pul = a * (0.6 + 0.4 * Math.sin(time * 0.5 + k * 2.1));
+      ctx.strokeStyle = 'rgba(255,250,255,' + (0.12 * pul).toFixed(3) + ')'; ctx.lineWidth = AP * 2; ctx.beginPath(); ctx.moveTo(px - Math.cos(ang) * H, py - Math.sin(ang) * H); ctx.lineTo(px, py); ctx.stroke();
+      ctx.lineWidth = AP;
+      for (let c = 0; c < 6; c++) { const an = ang + 0.12 + (c - 2.5) * 0.05; ctx.strokeStyle = 'rgba(' + FO_RB[c] + ',' + (0.18 * pul).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(an) * W * 1.3, py + Math.sin(an) * W * 1.3); ctx.stroke(); }
+      ctx.globalCompositeOperation = 'source-over';
+      const im = foXtalArt(k + 3), sc = AP * 0.45; ctx.globalAlpha = a; ctx.save(); ctx.translate(sn(px), sn(py)); ctx.rotate(Math.sin(time * 0.4 + k) * 0.3); ctx.drawImage(im, -im.width * sc / 2, -im.height * sc * 0.6, im.width * sc, im.height * sc); ctx.restore(); ctx.globalAlpha = 1;
+      halo(px, py, 18, 'rgb(240,220,255)', 0.7 * pul);
+      ctx.globalCompositeOperation = 'lighter';
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---- the sunken temple: carved walls, braziers, and guardians that still keep watch ----
+  const FO_KEY = ['#######.', '#.....#.', '#.###.#.', '#.#.#.#.', '#.#...#.', '#.#####.', '#.......', '########'];
+  const FO_GLYPH = [['..###..', '.#...#.', '#..#..#', '#.###.#', '#..#..#', '.#...#.', '..###..'], ['#..#..#', '.#.#.#.', '..###..', '###.###', '..###..', '.#.#.#.', '#..#..#'], ['......#', '.....##', '....#.#', '...#..#', '..#...#', '.#....#', '#######'], ['.#####.', '#.....#', '#.#.#.#', '#.....#', '#.###.#', '#.....#', '.#####.']];
+  function foTempleArt(glow) {
+    return foCache('tw' + glow, W / AP, 160, (g, w, h) => {
+      const st = [];
+      for (let r = 0; r < 20; r++) { const a = []; let x = -((hsh(r, 1311) * 12) | 0); while (x < w) { a.push(x); x += 10 + ((hsh(r * 131 + a.length, 1312) * 12) | 0); } a.push(x); st.push(a); }
+      foPix(g, w, h, (x, y) => {
+        const r = y >> 3, ly = y & 7, A = st[r]; let bi = 0; while (A[bi + 1] <= x) bi++;
+        const x0 = A[bi], x1 = A[bi + 1], id = r * 131 + bi, frieze = r === 4 || r === 5;
+        let mark = 0;
+        if (frieze) { if (y > 33 && y < 46 && hsh(x >> 4, 1330) > 0.22 && FO_KEY[((y - 34) >> 1) & 7][(x >> 1) & 7] === '#') mark = hsh(x >> 4, 1331) < 0.2 ? 2 : 1; }
+        else if (ly < 7 && x1 - x0 >= 10 && hsh(id, 1313) < 0.09) { const gx = x - x0 - (((x1 - x0) - 7) >> 1); if (gx >= 0 && gx < 7 && FO_GLYPH[(hsh(id, 1314) * 4) | 0][ly][gx] === '#') mark = hsh(id, 1315) < 0.45 ? 2 : 1; }
+        if (glow) return mark === 2 ? foPk(255, 209, 102) : 0;
+        if (frieze ? (y === 32 || y === 47) : (ly === 7 || x === x0)) return foPk(16, 13, 8);
+        let c = frieze ? [84, 72, 46] : lerp3([62, 54, 34], [94, 82, 56], hsh(id, 1316));
+        if (!frieze && (ly === 0 || x === x0 + 1)) c = lerp3(c, [150, 132, 92], 0.35);
+        if (!frieze && (ly === 6 || x === x1 - 1)) c = lerp3(c, [0, 0, 0], 0.3);
+        if (mark) c = mark === 2 ? [200, 160, 70] : lerp3(c, [0, 0, 0], 0.5);
+        if (foDi(x, y) < 0.1 && hsh(x * 7 + y * 3, 1317) < 0.5) c = lerp3(c, [0, 0, 0], 0.18);
+        if (hsh(x, 1318) < 0.025 && y < 10 + hsh(x, 1319) * 60 && foDi(x, y) < 0.75) c = lerp3([40, 90, 40], [70, 130, 50], hsh(y, x));
+        else if (!frieze && ly === 0 && hsh(x * 13 + r, 1320) < 0.25) c = [64, 104, 44];
+        return foPk(c[0], c[1], c[2]);
+      });
+    });
+  }
+  function foTempleWall(a, low) {
+    const z = 0.3, base = foTempleArt(0), th = base.height * AP, off = mod((camS - 5800) / mpp * z, th);
+    ctx.globalAlpha = a * 0.26; for (let y = -off; y < H; y += th) ctx.drawImage(base, 0, sn(y), base.width * AP, th);
+    if (!low) { const gl = foTempleArt(1); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * (0.16 + 0.14 * Math.sin(time * 1.1)); for (let y = -off; y < H; y += th) ctx.drawImage(gl, 0, sn(y), gl.width * AP, th); ctx.globalCompositeOperation = 'source-over'; }
+    ctx.globalAlpha = 1;
+  }
+  // a stone brazier and its fire: rows of flame that flicker, embers rising, warm light thrown on the stone
+  function foBrazier(x, y, s) {
+    ctx.fillStyle = 'rgb(54,46,30)'; ctx.fillRect(sn(x - 3 * s), y, 6 * s, 16 * s); ctx.fillRect(sn(x - 5 * s), y + 14 * s, 10 * s, 3 * s); ctx.fillRect(sn(x - 7 * s), y - 3 * s, 14 * s, 4 * s);
+    ctx.fillStyle = 'rgb(118,96,58)'; ctx.fillRect(sn(x - 7 * s), y - 3 * s, 14 * s, s); ctx.fillRect(sn(x - 3 * s), y, s, 16 * s);
+    ctx.globalCompositeOperation = 'lighter'; const lg = ctx.createRadialGradient(x, y - 8 * s, 0, x, y - 8 * s, 34 * s); lg.addColorStop(0, 'rgba(255,170,80,' + (0.22 + 0.04 * Math.sin(time * 13 + x)).toFixed(3) + ')'); lg.addColorStop(1, 'rgba(255,140,60,0)'); ctx.fillStyle = lg; ctx.fillRect(x - 34 * s, y - 42 * s, 68 * s, 68 * s); ctx.globalCompositeOperation = 'source-over';
+    const tk = (time * 11) | 0;
+    for (let r = 0; r < 9; r++) {
+      const wv = Math.round((9 - r) * 0.7 * (0.7 + 0.6 * hsh(tk * 13 + r + (x | 0), 1021))), off = Math.round((hsh(tk * 7 + r + (x | 0), 1022) - 0.5) * r * 0.35); if (wv <= 0) continue;
+      const yy = y - 3 * s - (r + 1) * s;
+      ctx.fillStyle = '#ff5a1a'; ctx.fillRect(sn(x + (off - wv) * s), yy, wv * 2 * s, s);
+      if (wv > 2) { ctx.fillStyle = '#ffb12a'; ctx.fillRect(sn(x + (off - wv + 1.5) * s), yy, (wv * 2 - 3) * s, s); }
+      if (wv > 4) { ctx.fillStyle = '#fff2b0'; ctx.fillRect(sn(x + (off - wv + 3) * s), yy, (wv * 2 - 6) * s, s); }
+    }
+    halo(x, y - 8 * s, 22 + 3 * Math.sin(time * 9 + x), 'rgb(255,170,70)', 0.6);
+    for (let e = 0; e < 3; e++) { const u = mod(time * 0.7 + e / 3 + x * 0.013, 1); ctx.fillStyle = 'rgba(255,200,90,' + (1 - u).toFixed(2) + ')'; ctx.fillRect(sn(x + Math.sin(u * 8 + e) * 6 * s), sn(y - 12 * s - u * 40 * s), Math.max(1, s * 0.7), Math.max(1, s * 0.7)); }
+  }
+  function foGuardian(x, y, s, i) {
+    const A = air(camS), st = css(lerp3(A, [44, 37, 24], 0.72)), hi = css(lerp3(A, [118, 102, 66], 0.5)), dk = css(lerp3(A, [8, 6, 3], 0.7)), pul = 0.55 + 0.45 * Math.sin(time * 1.2 + i);
+    const R = (a, b, c, d, col) => { ctx.fillStyle = col; ctx.fillRect(sn(x + a * s), sn(y + b * s), c * s, d * s); };
+    R(-3, -12, 6, 3, st); R(-7, -9, 14, 3, st); R(-9, -6, 18, 4, st); R(-9, -6, 18, 1, hi);
+    R(-7, -2, 14, 14, st); R(-7, -2, 1, 14, hi); R(-5, 2, 3, 2, dk); R(2, 2, 3, 2, dk); R(-1, 4, 2, 4, hi); R(-3, 9, 6, 1, dk);
+    R(-10, 12, 20, 4, st); R(-13, 16, 26, 22, st); R(-13, 16, 1, 22, hi); R(-6, 20, 12, 2, dk); R(-4, 24, 8, 8, dk); R(-3, 25, 6, 6, st);
+    R(-17, 18, 5, 20, st); R(12, 18, 5, 20, st); R(-17, 18, 1, 20, hi);
+    R(-18, 38, 36, 10, st); R(-18, 38, 36, 1, hi); R(-20, 48, 40, 6, hi); R(-20, 54, 40, 12, st);
+    for (let q = 0; q < 5; q++) R(-16 + q * 7, 57, 4, 2, dk);
+    const gold = 'rgba(255,209,102,' + (0.5 + 0.5 * pul).toFixed(3) + ')';
+    R(-5, 2, 3, 2, gold); R(2, 2, 3, 2, gold); R(-3, 25, 6, 1, gold);
+    halo(x - 3.5 * s, y + 3 * s, 12, 'rgb(255,209,102)', 0.6 * pul); halo(x + 3.5 * s, y + 3 * s, 12, 'rgb(255,209,102)', 0.6 * pul);
+    foBrazier(x - 15 * s, y + 46 * s, s * 0.5); foBrazier(x + 15 * s, y + 46 * s, s * 0.5);
+  }
+  function foGuardians() {
+    const z = 0.8, SP = 230;
+    for (let i = foI0(z, SP, 500); i <= foI1(z, SP, 120); i++) {
+      const m = i * SP + 60; if (m < 5950 || m > 6950) continue;
+      const left = i % 2 === 0, s = AP * Math.max(0.8, Math.min(1.6, W / 760)), x = left ? W * 0.05 + 16 * s : W * 0.95 - 16 * s, y = foY(m, z);
+      if (y < -70 * s || y > H + 20 * s) continue;
+      foGuardian(x, y, s, i);
+    }
+  }
+
+  // ---- the fungal deep: a forest of giant glowing mushrooms, drifting spores and floating spore-pods ----
+  function foMushArt(v) {
+    return foCache('mu' + v, 64, 72, (g, w, h) => {
+      const cw = 15 + v * 3 + hsh(v, 1401) * 5, ch = cw * (0.42 + 0.12 * hsh(v, 1402)), cy = 22, sx = w / 2 + (hsh(v, 1403) - 0.5) * 8, sp = [[255, 150, 220], [180, 140, 255], [120, 230, 255], [255, 170, 140]][v % 4], spot = lerp3(sp, [255, 255, 255], 0.5);
+      foPix(g, w, h, (x, y) => {
+        if (y <= cy) {
+          const dx = (x - sx) / cw, dy = (cy - y) / ch, rr = dx * dx + dy * dy; if (rr >= 1) return 0;
+          if (rr > 0.86) return foPk(sp[0], sp[1], sp[2]);
+          if (rr < 0.75 && hsh(((x / 3) | 0) * 31 + ((y / 3) | 0), 1404 + v) < 0.1) return foPk(spot[0], spot[1], spot[2]);
+          const c = lerp3([40, 16, 52], [120, 58, 144], foCl(dy * 1.1 - dx * 0.3 + (foDi(x, y) - 0.5) * 0.25)); return foPk(c[0], c[1], c[2]);
+        }
+        if (y <= cy + 2 && Math.abs(x - sx) < cw * (0.95 - (y - cy) * 0.08)) return x & 1 ? foPk(sp[0] * 0.8, sp[1] * 0.8, sp[2] * 0.8) : foPk(30, 10, 40);
+        const t = (y - cy) / (h - cy), scx = sx + (w / 2 - sx) * t + Math.sin(t * 3 + v) * 2, sw = 2 + t * 2 + v * 0.3;
+        if (Math.abs(x - scx) < sw) { const c = lerp3([70, 50, 84], [150, 120, 160], x < scx ? 0.6 : 0.1); return foPk(c[0], c[1], c[2]); }
+        return 0;
+      });
+    });
+  }
+  function foMushFar(a) {
+    const z = 0.34, SP = 24;
+    for (let i = foI0(z, SP, 280); i <= foI1(z, SP, 20); i++) {
+      const m = i * SP + hsh(i, 1441) * 12; if (m < 6950 || m > 8500 || hsh(i, 1442) < 0.35) continue;
+      const im = foMushArt(i & 3), sc = AP * (0.7 + hsh(i, 1443) * 0.8), x = hsh(i, 1444) * W, y = foY(m, z), hh = im.height * sc, pul = 0.6 + 0.4 * Math.sin(time * 1.1 + i);
+      if (y < -20 || y - hh > H + 20) continue;
+      ctx.globalAlpha = a * 0.62; ctx.drawImage(im, sn(x - im.width * sc / 2), sn(y - hh), im.width * sc, hh);
+      halo(x, y - hh * 0.68, 12 + sc * 7, FO_SPORE_H[i & 3], 0.22 * a * pul);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function foSpores(a, low) {
+    const n = low ? 16 : 44;
+    for (let q = 0; q < n; q++) {
+      const par = 0.3 + hsh(q, 1431) * 0.9, x = mod(hsh(q, 1432) * W + Math.sin(time * 0.5 + q * 1.3) * 26, W), y = mod(hsh(q, 1433) * (H + 40) - camS / mpp * par - time * (4 + 6 * hsh(q, 1434)), H + 40) - 20, tw = 0.5 + 0.5 * Math.sin(time * 1.8 + q * 2.1), c = q & 3, s = par > 0.9 ? 3 : 2;
+      ctx.fillStyle = 'rgba(' + FO_SPORE[c] + ',' + (a * (0.35 + 0.6 * tw)).toFixed(3) + ')'; ctx.fillRect(sn(x), sn(y), s, s);
+      if (q % 3 === 0) halo(x + 1, y + 1, 6 + par * 6, FO_SPORE_H[c], a * 0.55 * tw);
+    }
+  }
+  function foPods(a, low) {
+    const s = AP;
+    for (let q = 0; q < (low ? 2 : 5); q++) {
+      const x = W * (0.07 + 0.215 * q) + Math.sin(time * 0.3 + q * 2) * 24, y = mod(hsh(q, 1451) * (H + 240) - camS / mpp * 0.75 - time * 7, H + 240) - 120, pul = 0.6 + 0.4 * Math.sin(time * 1.4 + q * 2), c = FO_SPORE[q & 3];
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgba(' + c + ',0.45)'; ctx.fillRect(sn(x - 3 * s), sn(y - 2 * s), 6 * s, 4 * s); ctx.fillRect(sn(x - 2 * s), sn(y - 3 * s), 4 * s, 6 * s);
+      ctx.fillStyle = 'rgba(' + c + ',0.9)'; ctx.fillRect(sn(x - s), sn(y - s), 2 * s, 2 * s); ctx.fillStyle = 'rgba(255,255,255,' + (0.8 * pul).toFixed(3) + ')'; ctx.fillRect(sn(x - s), sn(y - s), s, s);
+      ctx.fillStyle = 'rgba(' + c + ',0.5)'; for (let t = 0; t < 3; t++) for (let k = 1; k < 7; k++) ctx.fillRect(sn(x + (t - 1) * 2 * s + Math.sin(time * 2 + k * 0.6 + t + q) * k * 0.6), sn(y + 2 * s + k * s * 1.4), Math.max(1, s * 0.67), s);
+      halo(x, y, 24, FO_SPORE_H[q & 3], 0.5 * a * pul);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- the magma veins: a wall of glowing cracks, falls of lava, embers and heat ----
+  function foCrackArt() {
+    return foCache('crk', W, 512, (g, w, h) => {
+      const walk = (x, y, ang, n, wd, seed) => {
+        for (let s = 0; s < n && y < h + 10; s++) {
+          ang += (hsh(s * 7 + seed, 1603) - 0.5) * 0.7; ang = Math.max(0.4, Math.min(Math.PI - 0.4, ang)); x += Math.cos(ang) * 4; y += Math.sin(ang) * 4;
+          g.fillStyle = 'rgba(255,80,20,0.3)'; g.fillRect((x - wd - 2) | 0, (y - 1) | 0, wd * 2 + 4, 6);
+          g.fillStyle = wd > 1 ? '#ffb12a' : '#ff6a1a'; g.fillRect((x - wd / 2) | 0, y | 0, Math.max(1, wd), 4);
+          if (wd > 1 && hsh(s, seed + 1604) < 0.05) walk(x, y, ang + (hsh(s, seed + 1605) < 0.5 ? -0.9 : 0.9), 26, 1, seed + s * 3 + 1);
+        }
+      };
+      for (let k = 0; k < Math.max(6, w / 130); k++) walk(hsh(k, 1601) * w, -10, Math.PI / 2 + (hsh(k, 1602) - 0.5) * 0.8, 140, 2, k * 100);
+    });
+  }
+  function foMagmaFar(a) {
+    const T = 512, im = foCrackArt(), off = mod(camS / mpp * 0.22, T);
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * (0.32 + 0.16 * Math.sin(time * 1.3));
+    for (let y = -off; y < H; y += T) ctx.drawImage(im, 0, sn(y));
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  }
+  function foLavaFall(x, y0, len, cols, a, seed) {
+    const S2 = AP * 2, w = cols * S2, xl = x - w / 2, t0 = Math.max(y0, -S2), t1 = Math.min(y0 + len, H + S2), sc = time * 110;
+    if (t1 > t0) { ctx.globalCompositeOperation = 'lighter'; const gw = w * 3, gg = ctx.createLinearGradient(x - gw, 0, x + gw, 0); gg.addColorStop(0, 'rgba(255,80,20,0)'); gg.addColorStop(0.5, 'rgba(255,110,40,' + (0.2 * a).toFixed(3) + ')'); gg.addColorStop(1, 'rgba(255,80,20,0)'); ctx.fillStyle = gg; ctx.fillRect(x - gw, t0, gw * 2, t1 - t0); ctx.globalCompositeOperation = 'source-over'; }
+    ctx.globalAlpha = a;
+    if (y0 > -20 && y0 < H + 20) { ctx.fillStyle = '#1a0806'; ctx.fillRect(sn(xl - AP * 8), sn(y0 - AP * 4), w + AP * 16, AP * 5); ctx.fillStyle = '#ff8a2a'; ctx.fillRect(sn(xl - AP * 4), sn(y0), w + AP * 8, AP); }
+    for (let y = y0 + Math.max(0, Math.floor((t0 - y0) / S2)) * S2; y < t1; y += S2) {
+      const u = (y - y0) / len, row = Math.floor((y - y0 - sc) / S2);
+      for (let c = 0; c < cols; c++) { const hot = 1 - Math.abs(c - (cols - 1) / 2) / (cols / 2), v = 1.4 + hot * 3 + (hsh(row * 11 + c, 1620 + seed) - 0.5) * 2.6 - u * 1.2; ctx.fillStyle = FO_LAVA[Math.max(0, Math.min(5, Math.round(v)))]; ctx.fillRect(sn(xl + c * S2), sn(y), S2, S2); }
+    }
+    const yb = y0 + len;
+    if (yb > -30 && yb < H + 60) {
+      ctx.fillStyle = '#ff5a1a'; ctx.fillRect(sn(x - w * 1.6), sn(yb), w * 3.2, AP * 2); ctx.fillStyle = '#ffd34d'; ctx.fillRect(sn(x - w * 0.8), sn(yb), w * 1.6, AP);
+      for (let q = 0; q < 6; q++) { const uu = mod(time * 1.6 + q / 6, 1); ctx.globalAlpha = a * (1 - uu); ctx.fillRect(sn(x + (hsh(q, 1630 + seed) - 0.5) * 60 * uu), sn(yb - Math.sin(uu * Math.PI) * 26 * (0.6 + hsh(q, 1631))), AP, AP); }
+      halo(x, yb, 34, 'rgb(255,140,50)', 0.75 * a);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function foLavaFalls(a) {
+    const z = 0.62, SP = 110;
+    for (let i = foI0(z, SP, 560); i <= foI1(z, SP, 60); i++) {
+      const m = i * SP + hsh(i, 1611) * 40; if (m < 8450 || m > 10100) continue;
+      const left = (i & 1) === 0, x = left ? W * (0.09 + hsh(i, 1612) * 0.08) : W * (0.83 + hsh(i, 1612) * 0.08), y0 = foY(m, z), len = 300 + hsh(i, 1613) * 260;
+      if (y0 > H + 20 || y0 + len < -40) continue;
+      foLavaFall(x, y0, len, 3 + (hsh(i, 1614) * 3 | 0), a, i);
+    }
+  }
+  function foEmbers(a, low) {
+    ctx.globalCompositeOperation = 'lighter'; const hg = ctx.createLinearGradient(0, H, 0, H * 0.45); hg.addColorStop(0, 'rgba(255,90,30,' + (0.2 * a).toFixed(3) + ')'); hg.addColorStop(1, 'rgba(255,90,30,0)'); ctx.fillStyle = hg; ctx.fillRect(0, H * 0.45, W, H * 0.55); ctx.globalCompositeOperation = 'source-over';
+    for (let q = 0; q < (low ? 14 : 40); q++) {
+      const x = mod(hsh(q, 1642) * W + Math.sin(time * 1.1 + q) * 14, W), y = mod(hsh(q, 1643) * (H + 40) - time * (30 + hsh(q, 1641) * 60) - camS / mpp * 0.4, H + 40) - 20, fl = 0.5 + 0.5 * Math.sin(time * 9 + q * 3);
+      ctx.fillStyle = FO_LAVA[3 + (fl * 2.9 | 0)]; ctx.globalAlpha = a * (0.5 + 0.5 * fl); ctx.fillRect(sn(x), sn(y), 2, q % 3 ? 2 : 4);
+      if (q % 5 === 0) halo(x, y, 8, 'rgb(255,150,60)', 0.5 * a * fl);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- the Obscura: veils of gold, floating rune-stones, the heart's pull, and the floor of the world ----
+  const foRibArt = () => foCache('rib', 1, 96, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,214,120,0)'); gr.addColorStop(0.6, 'rgba(255,214,120,0.35)'); gr.addColorStop(0.92, 'rgba(255,244,200,0.9)'); gr.addColorStop(1, 'rgba(255,214,120,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+  function foMonolith(x, y, wd, ht, i, dim) {
+    const A = air(camS), st = css(lerp3([34, 26, 10], A, dim)), ed = css(lerp3([126, 96, 42], A, dim)), pul = 0.5 + 0.5 * Math.sin(time * 1.2 + i * 1.9);
+    ctx.fillStyle = st; ctx.fillRect(sn(x - wd / 2), sn(y), wd, ht); ctx.fillRect(sn(x - wd / 2 + AP), sn(y - AP * 2), wd - AP * 2, AP * 2); ctx.fillRect(sn(x - wd / 2 + AP * 2), sn(y + ht), wd - AP * 4, AP * 2);
+    ctx.fillStyle = ed; ctx.fillRect(sn(x - wd / 2), sn(y), AP, ht);
+    ctx.fillStyle = 'rgba(255,214,120,' + ((0.35 + 0.6 * pul) * (1 - dim)).toFixed(3) + ')';
+    for (let r = 0; r < ht / (AP * 5) - 1; r++) { const b = (hsh(i * 17 + r, 1801) * 512) | 0, gx = x - AP * 1.5, gy = y + AP * 3 + r * AP * 5; for (let p = 0; p < 9; p++) if ((b >> p) & 1) ctx.fillRect(sn(gx + (p % 3) * AP), sn(gy + ((p / 3) | 0) * AP), AP, AP); }
+    if (dim < 0.5) halo(x, y + ht / 2, wd * 1.3, 'rgb(255,214,120)', 0.3 * pul);
+  }
+  function foMonoliths(a, z, SP, far) {
+    for (let i = foI0(z, SP, 300); i <= foI1(z, SP, 60); i++) {
+      const m = i * SP + hsh(i, 1811 + far) * SP * 0.5; if (m < 9950 || hsh(i, 1812 + far) < 0.35) continue;
+      const left = hsh(i, 1813 + far) < 0.5, x = far ? hsh(i, 1814) * W : left ? W * (0.08 + hsh(i, 1814) * 0.1) : W * (0.82 + hsh(i, 1814) * 0.1), sc = far ? 0.55 : 1, wd = Math.round((6 + hsh(i, 1815) * 4) * sc) * AP, ht = Math.round((20 + hsh(i, 1816) * 20) * sc) * AP, y = foY(m, z) + Math.sin(time * 0.6 + i) * 6;
+      if (y > H + 20 || y + ht < -20) continue;
+      ctx.globalAlpha = a; foMonolith(x, y, wd, ht, i, far ? 0.55 : 0);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function foObscFar(a, low) {
+    const rib = foRibArt(), S = AP * 2;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < (low ? 1 : 2); k++) {
+      const by = mod(H * (0.35 + 0.4 * k) - camS / mpp * 0.12, H + 300) - 100;
+      for (let x = 0; x < W; x += S) { const y = by + 40 * Math.sin(x * 0.005 + time * 0.22 + k * 2) + 16 * Math.sin(x * 0.019 - time * 0.5 + k), hh = 70 + 40 * Math.sin(x * 0.011 + time * 0.3 + k * 4); ctx.globalAlpha = a * (0.2 + 0.13 * Math.sin(x * 0.03 - time * 1.2 + k)); ctx.drawImage(rib, x, sn(y - hh), S, hh); }
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    foMonoliths(a, 0.35, 40, 1);
+  }
+  function foGold(a, low) {
+    const drift = camS / mpp;
+    for (let q = 0; q < (low ? 14 : 36); q++) {
+      const x = mod(hsh(q, 1701) * W + Math.sin(time * 0.4 + q) * 20, W), y = mod(hsh(q, 1702) * (H + 40) - drift * (0.4 + hsh(q, 1703) * 0.6) - time * (6 + hsh(q, 1704) * 8), H + 40) - 20, tw = 0.5 + 0.5 * Math.sin(time * 2 + q * 1.3);
+      ctx.fillStyle = 'rgba(255,226,140,' + (a * (0.3 + 0.6 * tw)).toFixed(3) + ')'; ctx.fillRect(sn(x), sn(y), 2, 2);
+      if ((q & 3) === 0) halo(x + 1, y + 1, 8, 'rgb(255,214,120)', 0.45 * a * tw);
+    }
+    // near the heart: slow rays, orbiting shards, light spiralling in, rings breaking outward
+    if (near(11400, 700)) {
+      const cy = yOf(11400), cx = W / 2, k0 = foCl(1 - Math.abs(camS - 11400) / 900), RR = Math.max(W, H);
+      if (!low) { ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const rg = ctx.createRadialGradient(cx, cy, 30, cx, cy, RR); rg.addColorStop(0, 'rgba(255,220,140,' + (0.11 * k0).toFixed(3) + ')'); rg.addColorStop(1, 'rgba(255,220,140,0)'); ctx.fillStyle = rg;
+      for (let k = 0; k < 14; k++) { const a0 = k / 14 * 6.283 - time * 0.03, wd = 0.03 + 0.03 * hsh(k, 1721); ctx.globalAlpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(time * 0.6 + k * 1.9)); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a0 - wd) * RR, cy + Math.sin(a0 - wd) * RR); ctx.lineTo(cx + Math.cos(a0 + wd) * RR, cy + Math.sin(a0 + wd) * RR); ctx.closePath(); ctx.fill(); }
+      ctx.restore(); }
+      const R0 = Math.min(W, 700) * 0.16;
+      for (let k = 0; k < 10; k++) {
+        const an = time * (0.25 + 0.04 * k) + k * 0.628, r = R0 * (2 + 0.6 * Math.sin(time * 0.5 + k)), x = cx + Math.cos(an) * r * 1.4, y = cy + Math.sin(an) * r * 0.55, s = AP * (k & 1 ? 1 : 1.5);
+        ctx.fillStyle = 'rgb(70,50,16)'; ctx.fillRect(sn(x - s), sn(y - 2 * s), 2 * s, 4 * s); ctx.fillStyle = 'rgba(255,220,130,0.9)'; ctx.fillRect(sn(x - s), sn(y - 2 * s), s, 3 * s); ctx.fillRect(sn(x - 2 * s), sn(y - s * 0.5), 4 * s, s);
+        halo(x, y, 10, 'rgb(255,214,120)', 0.4 * k0);
+      }
+      const rp = rampOf('#ffd166');
+      for (let q = 0; q < (low ? 16 : 44); q++) { const u = mod(time * 0.07 + hsh(q, 1711), 1), r = (1 - u) * Math.min(W, H) * 0.6, an = hsh(q, 1712) * 6.283 + u * 7; pset(F(cx + Math.cos(an) * r * 1.3), F(cy + Math.sin(an) * r * 0.65), rp[u > 0.7 ? 4 : 3], 4); }
+      if (!low) for (let k = 0; k < 3; k++) { const rr = mod(time * 0.22 + k / 3, 1); pring(F(cx), F(cy), F(R0 * 1.4 + rr * Math.min(W, H) * 0.55), 2, (1 - rr) * 0.6 * k0, rp, time + k); }
+    }
+    // the floor of the world, lit from below
+    if (camS > 11000) {
+      const yb = yOf(12000), k2 = foCl((camS - 11000) / 800), yf = Math.min(H, yb);
+      ctx.globalCompositeOperation = 'lighter';
+      const gg = ctx.createLinearGradient(0, yf - H * 0.6, 0, yf); gg.addColorStop(0, 'rgba(255,200,100,0)'); gg.addColorStop(1, 'rgba(255,200,100,' + (0.22 * k2).toFixed(3) + ')'); ctx.fillStyle = gg; ctx.fillRect(0, yf - H * 0.6, W, H * 0.6);
+      for (let q = 0; q < 6; q++) { const px = W * (0.1 + 0.16 * q) + Math.sin(time * 0.2 + q) * 20, pw = 10 + 26 * hsh(q, 1831), al = k2 * (0.07 + 0.05 * Math.sin(time * 0.7 + q * 2)), pg = ctx.createLinearGradient(0, yf, 0, yf - H); pg.addColorStop(0, 'rgba(255,226,150,' + al.toFixed(3) + ')'); pg.addColorStop(1, 'rgba(255,226,150,0)'); ctx.fillStyle = pg; ctx.fillRect(sn(px - pw / 2), yf - H, pw, H); }
+      ctx.globalCompositeOperation = 'source-over';
+      if (yb < H + 10) {
+        ctx.fillStyle = 'rgb(34,24,8)'; ctx.beginPath(); ctx.moveTo(0, H + 10); for (let x = 0; x <= W + 30; x += 30) ctx.lineTo(x, yb + hsh(x, 1841) * 14 - 7); ctx.lineTo(W, H + 10); ctx.closePath(); ctx.fill();
+        const pul = 0.6 + 0.4 * Math.sin(time * 1.5);
+        for (let k = 0; k < 7; k++) { let x = W * (0.08 + k * 0.14), y = yb + 4; ctx.fillStyle = 'rgba(255,214,120,' + (0.55 + 0.4 * pul).toFixed(3) + ')'; for (let t = 0; t < 14 && y < H; t++) { x += (hsh(k * 20 + t, 1842) - 0.5) * AP * 4; y += AP * 2; ctx.fillRect(sn(x), sn(y), AP, AP * 2); } }
+        ctx.fillStyle = 'rgba(255,240,200,' + (0.6 + 0.4 * pul).toFixed(3) + ')'; ctx.fillRect(0, sn(yb - 1), W, AP);
+        // spires of rock standing on the floor, gilded on the side that faces the light
+        for (let k = 0; k < 8; k++) { const left = k < 4, sx = left ? W * (0.03 + k * 0.07) : W * (0.97 - (k - 4) * 0.07), sh = 50 + hsh(k, 1851) * 110, bw = 10 + hsh(k, 1852) * 12; for (let t = 0; t < sh; t += AP * 2) { const ww = Math.max(AP, bw * (1 - t / sh)); ctx.fillStyle = 'rgb(30,21,7)'; ctx.fillRect(sn(sx - ww / 2), sn(yb - t - AP * 2), ww, AP * 2 + 1); ctx.fillStyle = 'rgba(255,214,120,' + (0.35 + 0.3 * pul).toFixed(3) + ')'; ctx.fillRect(sn(left ? sx + ww / 2 - AP : sx - ww / 2), sn(yb - t - AP * 2), AP, AP * 2); } }
+        // a great seal set into the floor of the world, turning slowly
+        const sx0 = W / 2, sy0 = yb + Math.min(90, H * 0.14), R1 = Math.min(W * 0.34, 240), sp = rampOf('#ffd166');
+        for (let ring = 0; ring < 3; ring++) {
+          const rr = R1 * (1 - ring * 0.24), n = Math.max(48, (rr * 0.55) | 0), rot = ring & 1 ? time * 0.05 : -time * 0.04;
+          ctx.fillStyle = 'rgba(255,214,120,' + ((0.35 + 0.45 * pul) * (1 - ring * 0.18)).toFixed(3) + ')';
+          for (let q = 0; q < n; q++) { if (ring === 1 && q % 7 === 0) continue; const an = q / n * 6.283 + rot, px = sx0 + Math.cos(an) * rr, py = sy0 + Math.sin(an) * rr * 0.3; ctx.fillRect(sn(px), sn(py), AP, AP); if (ring === 0 && q % 6 === 0) { const b = (hsh(q, 1853) * 512) | 0; for (let p = 0; p < 9; p++) if ((b >> p) & 1) ctx.fillRect(sn(px + (p % 3 - 1) * AP), sn(py + AP * 2 + ((p / 3) | 0) * AP), AP, AP); } }
+        }
+        ctx.globalCompositeOperation = 'lighter'; const bg2 = ctx.createLinearGradient(0, sy0, 0, sy0 - H); bg2.addColorStop(0, 'rgba(255,226,150,' + (0.16 * pul * k2).toFixed(3) + ')'); bg2.addColorStop(1, 'rgba(255,226,150,0)'); ctx.fillStyle = bg2; ctx.fillRect(sx0 - R1 * 0.3, sy0 - H, R1 * 0.6, H); ctx.globalCompositeOperation = 'source-over';
+        pglow(F(sx0), F(sy0), F(70), 0.7 * pul, sp, 4);
+      }
+    }
+  }
+
+  // ---- what grows on the shaft walls below the forest, one world after another ----
+  function foWall(side, w) {
+    const SP = 26, dir = side ? -1 : 1, ex = side ? W - w * 0.75 : w * 0.75;
+    for (let i = foI0(1, SP, 90); i <= foI1(1, SP, 90); i++) {
+      const m = i * SP + hsh(i, 1001 + side) * SP * 0.5, r = hsh(i, 1003 + side); if (m < FLOOR + 30 || r < 0.2) continue;
+      const kind = biomeOf(m).kind, y = sn(yOf(m)), pul = 0.6 + 0.4 * Math.sin(time * 1.5 + i * 1.7), A = air(m);
+      const P = (dx, dy, ww, hh) => ctx.fillRect(sn(ex + (side ? -dx - ww : dx)), sn(y + dy), ww, hh);
+      if (kind === 'floor' || kind === 'roots') {
+        ctx.fillStyle = css(lerp3(A, [30, 20, 12], 0.8)); let tx = 0, ty = 0;
+        for (let t = 0; t < 12; t++) { tx = t * AP * 1.6; ty = t * t * AP * 0.18 + Math.sin(t * 0.8 + i) * AP; P(tx, ty, AP * 2, Math.max(AP, (4 - t * 0.3) * AP)); }
+        if (kind === 'roots' && r > 0.45) {
+          ctx.fillStyle = 'rgba(255,190,110,' + (0.85 * pul).toFixed(3) + ')'; P(tx, ty + AP * 2, AP * 2, AP * 2); halo(ex + dir * (tx + AP), y + ty + AP * 3, 16, 'rgb(255,190,110)', 0.55 * pul);
+          const u = mod(time * 0.55 + r * 7, 1); ctx.fillStyle = 'rgba(255,200,120,' + (0.9 * (1 - u)).toFixed(3) + ')'; P(tx + AP * 0.5, ty + AP * 4 + u * u * 90, AP, AP * 2);
+        } else if (kind === 'floor' && r > 0.6) { ctx.fillStyle = 'rgba(160,255,200,' + (0.6 * pul).toFixed(3) + ')'; P(tx, ty + AP * 2, AP, AP); halo(ex + dir * tx, y + ty + AP * 2, 10, 'rgb(125,255,176)', 0.35 * pul); }
+      } else if (kind === 'river') {
+        for (let s = 0; s < 3; s++) { ctx.fillStyle = s === 1 ? 'rgba(60,170,150,0.8)' : 'rgba(30,110,100,0.8)'; for (let t = 0; t < 14; t++) P(s * AP * 2 + Math.sin(time * 1.4 + t * 0.45 + i + s) * t * 0.7, t * AP * 2, AP, AP * 2); }
+        if (r > 0.55) { ctx.fillStyle = 'rgba(170,240,255,' + (0.9 * pul).toFixed(3) + ')'; P(AP * 2, -AP * 2, AP * 2, AP); halo(ex + dir * AP * 3, y - AP * 2, 12, 'rgb(110,214,255)', 0.5 * pul); }
+      } else if (kind === 'grotto') {
+        for (let s = 0; s < 4; s++) {
+          const tl = 20 + hsh(i * 4 + s, 1011) * 90, tx = AP * (1 + s * 3), a2 = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(time * 1.6 + s * 2 + i));
+          ctx.fillStyle = 'rgba(125,240,255,' + (0.18 * a2).toFixed(3) + ')'; P(tx, 0, 1, tl);
+          ctx.fillStyle = 'rgba(125,240,255,' + (0.6 * a2).toFixed(3) + ')'; for (let d2 = 10; d2 < tl; d2 += 14) P(tx - 1, d2, 2, 2);
+          ctx.fillStyle = 'rgba(225,255,255,' + a2.toFixed(3) + ')'; P(tx - 1, tl, 3, 3); if (s === 1) halo(ex + dir * tx, y + tl, 10, 'rgb(125,240,255)', 0.5 * a2);
+        }
+      } else if (kind === 'crystal') {
+        const im = foXtalArt((i % 3) + 3), sc = AP * (0.5 + r * 0.4) * Math.min(1, 0.4 + W / 1200);
+        ctx.save(); ctx.translate(sn(ex - dir * AP * 2), y); ctx.rotate(dir * Math.PI / 2); ctx.drawImage(im, -im.width * sc / 2, -im.height * sc, im.width * sc, im.height * sc); ctx.restore();
+        halo(ex + dir * im.height * sc * 0.6, y, 16 + 10 * r, 'rgb(200,140,255)', 0.4 * pul);
+      } else if (kind === 'temple') {
+        if (r > 0.6) { ctx.fillStyle = css(lerp3(A, [70, 60, 40], 0.8)); P(-AP * 2, 15 * AP * 0.7, AP * 14, AP * 3); foBrazier(ex + dir * AP * 6, y, AP * 0.7); }
+        else { ctx.fillStyle = css(lerp3(A, [78, 68, 44], 0.8)); P(-AP * 2, -AP * 6, AP * 11, AP * 11); ctx.fillStyle = css(lerp3(A, [20, 16, 8], 0.7)); const gl = FO_GLYPH[i & 3]; for (let gy = 0; gy < 7; gy++) for (let gx = 0; gx < 7; gx++) if (gl[gy][gx] === '#') P(AP * (gx + 1), AP * (gy - 4), AP, AP); if (r > 0.45) { ctx.fillStyle = 'rgba(255,209,102,' + (0.5 * pul).toFixed(3) + ')'; P(AP * 4, -AP, AP, AP); } }
+      } else if (kind === 'fungal') {
+        for (let s = 0; s < 3; s++) { const ww = (7 - s * 2) * AP, yy = s * AP * 4 - AP * 4; ctx.fillStyle = css(lerp3([90, 34, 90], A, 0.3)); P(0, yy, ww, AP * 2); ctx.fillStyle = 'rgba(255,140,210,' + (0.8 * pul).toFixed(3) + ')'; P(0, yy + AP * 2, ww, AP); }
+        ctx.fillStyle = 'rgba(255,170,230,' + (0.25 * pul).toFixed(3) + ')'; for (let t = 0; t < 10; t++) P(((t * 5) % 3) * AP, -AP * 5 - t * AP * 2, 1.5, AP * 2);
+        halo(ex + dir * AP * 4, y, 22, 'rgb(255,120,200)', 0.45 * pul);
+      } else if (kind === 'magma') {
+        let dx = -AP * 8, dy = 0; ctx.globalAlpha = 0.5 + 0.5 * pul;
+        for (let t = 0; t < 10; t++) { dx += AP * (1 + hsh(i * 10 + t, 1013)); dy += (hsh(i * 10 + t, 1014) - 0.5) * AP * 3; ctx.fillStyle = t < 3 ? '#ffd34d' : t < 7 ? '#ff8a2a' : '#c22a0a'; P(dx, dy, AP * 2, AP); }
+        ctx.globalAlpha = 1; halo(ex, y, 26, 'rgb(255,110,50)', 0.4 * pul);
+      } else {
+        ctx.fillStyle = 'rgba(255,214,120,' + (0.5 + 0.45 * pul).toFixed(3) + ')'; const b = (hsh(i, 1015) * 512) | 0;
+        for (let p = 0; p < 9; p++) if ((b >> p) & 1) P(-AP * 2 + (p % 3) * AP, ((p / 3) | 0) * AP, AP, AP);
+        for (let t = 0; t < 8; t++) P(-AP * 8 + t * AP, Math.sin(t + i) * AP * 2 + AP * 6, AP, AP);
+        halo(ex - dir * AP, y + AP, 14, 'rgb(255,214,120)', 0.45 * pul);
+      }
+    }
+  }
+
+  // ---- the order things are drawn in: far, middle, among the creatures, and in front of the haze ----
+  function foFar(low) {
+    let a;
+    if ((a = foOn(3550, 3800, 4650, 4850)) > 0) foStars(a, low);
+    if ((a = foOn(2700, 2850, 3650, 3850)) > 0 && !low) foCaustics(a);
+    if ((a = foOn(4550, 4750, 5750, 5950)) > 0) foXtalFar(a);
+    if ((a = foOn(5650, 5850, 6950, 7150)) > 0) foTempleWall(a, low);
+    if ((a = foOn(6850, 7050, 8350, 8550)) > 0) foMushFar(a);
+    if ((a = foOn(8250, 8450, 9950, 10150)) > 0 && !low) foMagmaFar(a);
+    if ((a = foOn(9850, 10100, 13000, 13001)) > 0) foObscFar(a, low);
+  }
+  function foMid(low) {
+    let a;
+    if (camS < 1250) foBridges();
+    if (camS > FLOOR - 120 && camS < 3000) foRootArches();
+    if ((a = foOn(1850, 2050, 2750, 2950)) > 0) foSapDrops(a);
+    if (near(3250, 260)) foEel();
+    if ((a = foOn(4600, 4800, 5700, 5900)) > 0) foPrism(a);
+    if (camS > 5800 && camS < 7100) foGuardians();
+    if ((a = foOn(8300, 8500, 10000, 10200)) > 0) foLavaFalls(a);
+    if ((a = foOn(9900, 10150, 13000, 13001)) > 0) foMonoliths(a, 0.75, 60, 0);
+  }
+  function foLife(low) {
+    let a;
+    if ((a = foOn(20, 80, 600, 900)) > 0) foMorphos(a, low);
+    if (camS > 90 && camS < 760) foMonkeys();
+    if ((a = foOn(650, 850, 1450, 1550)) > 0) foEyes(a);
+    if (camS > 2650 && camS < 3900) foFish(low);
+    if ((a = foOn(6900, 7100, 8300, 8500)) > 0) foPods(a, low);
+  }
+  function foFront(low) {
+    let a;
+    if ((a = foOn(-200, -100, 300, 700)) > 0) foPollen(a, low);
+    if ((a = foOn(250, 700, 1600, 1900)) > 0) foFireflies(a, low);
+    if ((a = foOn(1850, 2050, 2700, 2900)) > 0) foFireflies(a * 0.8, low, 1);
+    if ((a = foOn(2750, 2900, 3650, 3850)) > 0) foBubbles(a);
+    if ((a = foOn(3600, 3800, 4650, 4850)) > 0) foGlints(a, '#9ff6ff', low ? 6 : 14, 1111, 0.16);
+    if ((a = foOn(4600, 4800, 5700, 5900)) > 0) foGlints(a, '#ead6ff', low ? 6 : 16, 1251, 0.7);
+    if ((a = foOn(6900, 7100, 8300, 8500)) > 0) foSpores(a, low);
+    if ((a = foOn(8300, 8500, 9950, 10150)) > 0) foEmbers(a, low);
+    if ((a = foOn(9900, 10200, 13000, 13001)) > 0) foGold(a, low);
   }
 
   // ---- themed packs: the Geography pack turns the forest into an explorer's atlas, Sports into a floodlit stadium
@@ -4101,25 +4916,13 @@ addEventListener('online', checkIn);
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
     const TH = window.__theme;
     if (TH === 'geo') earthWorld(dt); else if (TH === 'sports') stadiumWorld(dt, sy); else {
-    // sky above the treetops
-    if (sy > -60) {
-      const g = ctx.createLinearGradient(0, 0, 0, Math.max(1, sy));
-      g.addColorStop(0, '#b6dcf0'); g.addColorStop(1, '#eaf6e2');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, sy + 4);
-      const sun = ctx.createRadialGradient(W * 0.82, sy * 0.3, 0, W * 0.82, sy * 0.3, 130);
-      sun.addColorStop(0, 'rgba(255,240,180,0.9)'); sun.addColorStop(0.35, 'rgba(255,232,150,0.35)'); sun.addColorStop(1, 'rgba(255,232,150,0)');
-      ctx.fillStyle = sun; ctx.fillRect(0, 0, W, sy + 4);
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      for (const c of clouds) { const x = sn(mod(c.x + time * c.v, W + 200) - 100), y = sn(sy * c.f); ctx.fillRect(x, y, c.w * AP, AP * 2); ctx.fillRect(x + AP * 2, y - AP * 2, (c.w - 5) * AP, AP * 2); ctx.fillRect(x + AP * 4, y - AP * 3, (c.w - 10) * AP, AP); }
-      // far hills of treetops
-      ctx.fillStyle = '#6fb88a'; ctx.beginPath(); ctx.moveTo(0, sy + 4);
-      for (let x = 0; x <= W + 40; x += 40) ctx.arc(x, sy - 6 + hsh(x, 2) * 10, 34 + hsh(x, 3) * 18, Math.PI, 0);
-      ctx.lineTo(W, sy + 4); ctx.closePath(); ctx.fill();
-    }
+    // dawn above the treetops
+    if (sy > -60) foSky(sy);
     const low = !!window.__low;
     const fog = camS > FLOOR ? 0.75 : Math.min(1, camS / 220) * Math.max(0.25, 1 - camS / 5200);
     if (!low) trunks(0.2, Math.max(5, Math.round(W / 110)), 8, 10, 31, 0.12);
     if (!low) { farFoliage(0.24, 70, 201, 0.18, AP * 0.67, 0.5); mist(0.27, 62, 211, 0.2 * fog); waterfall(); }
+    foFar(low);
     trunks(0.35, Math.max(4, Math.round(W / 150)), 14, 22, 1, 0.3);
     if (!low) limbs(0.42, 120, 40, 0.3, 0.6);
     if (!low) { caveFar(); deepFeatures(0.4, 80, 301, 0.5); glowers(0.38, 46, 231); mist(0.46, 96, 221, 0.15 * fog); }
@@ -4147,6 +4950,7 @@ addEventListener('online', checkIn);
       }
       ctx.globalCompositeOperation = 'source-over';
     }
+    foMid(low);
     if (!low) lianas(0.5, 210, 51, 0.4);
     limbs(0.6, 150, 20, 0.45, 0.8);
     deepFeatures(0.72, 150, 331, 0.18);
@@ -4171,8 +4975,10 @@ addEventListener('online', checkIn);
       ctx.fillStyle = css(lerp3(air(FLOOR), [34, 110, 52], 0.3));
       for (let i = 0; i < W / 70; i++) { const fx0 = i * 70 + hsh(i, 41) * 40; if (Math.abs(fx0 - W / 2) < W * 0.1) continue; for (let f = -3; f <= 3; f++) for (let q = 1; q < 8; q++) ctx.fillRect(sn(fx0 + f * q * AP * 0.9), y - q * AP * (2.2 - Math.abs(f) * 0.4), AP * 2, AP); }
     }
+    foFloor();
     if (near(1750, 100)) for (let r = 0; r < 8; r++) { ctx.fillStyle = 'rgba(125,255,176,' + (0.2 + 0.25 * Math.sin(4 * time + 3 * r)).toFixed(3) + ')'; ctx.fillRect(sn((0.13 * r + 0.05) * W + 14 * Math.sin(0.8 * time + 2 * r)), sn(yOf(1750) + 18 * Math.sin(1.3 * time + r) + (r % 3) * 10), 3, 3); }
     deepLandmarks();
+    foLife(low);
     // butterflies (moths, deeper) that keep you company
     for (const b of roam) {
       b.x += b.sp * dt; if (b.sp > 0 && b.x > W + 60) { b.x = -60; b.off = D(-200, 200); } if (b.sp < 0 && b.x < -60) { b.x = W + 60; b.off = D(-200, 200); }
@@ -4187,6 +4993,7 @@ addEventListener('online', checkIn);
     if (sy > -80) {
       for (let x = -40, q = 0; x <= W + 90; x += 78, q++) drawClump((q * 5 + 2) % 6, 0, 0.2, x + 39 + Math.sin(time * 0.6 + q) * 2, sy + 44 + (q % 2) * 8, AP);
       for (let x = -40, q = 0; x <= W + 90; x += 78, q++) drawClump(q % 6, 0, 0.2, x + Math.sin(time * 0.7 + q) * 2, sy + 16 + (q % 3) * 6, AP);
+      foCanopyBloom(sy);
       const px = sn(W * 0.3), py = sy - 4 + Math.sin(time * 1.1) * 1.5;
       ctx.fillStyle = '#3b2a1a'; ctx.fillRect(px - 60, py, 120, 5); for (let q = 0; q < 8; q++) ctx.fillRect(px - 58 + q * 15, py + 5, 3, 5);
       ctx.fillRect(px - 58, py - 26, 3, 26); ctx.fillRect(px + 55, py - 26, 3, 26); ctx.fillStyle = 'rgba(59,42,26,0.8)'; ctx.fillRect(px - 58, py - 20, 116, 2);
@@ -4201,14 +5008,17 @@ addEventListener('online', checkIn);
     if (haze > 0.01) { ctx.fillStyle = css(air(camS + H * mpp * 0.1), haze.toFixed(3)); ctx.fillRect(-W, -H, W * 3, H * 3); }
     // spores and dust hanging in the still air: tiny, sparse, drifting up past you as you fall
     if (!low) { const n = Math.round(W * H / 9000), drift = camS / mpp; for (let q = 0; q < n; q++) { const x = mod(hsh(q, 401) * W + Math.sin(time * 0.3 + q) * 6, W), y = mod(hsh(q, 402) * (H + 40) - drift * (0.6 + hsh(q, 403) * 0.5) - time * (3 + hsh(q, 404) * 5), H + 40) - 20, big = hsh(q, 405) > 0.85, warm = hsh(q, 406) > 0.9; ctx.fillStyle = (camS > FLOOR ? 'rgba(' + (warm ? '255,255,255' : biomeOf(camS).mote) + ',' : warm ? 'rgba(232,255,122,' : 'rgba(190,236,210,') + ((big ? 0.5 : 0.28) * (0.6 + 0.4 * Math.sin(time * 1.7 + q))).toFixed(2) + ')'; ctx.fillRect(sn(x), sn(y), big ? 2 : 1, big ? 2 : 1); } }
+    foFront(low);
     // the trunks you are climbing down between
     for (const side of [0, 1]) {
       const w = Math.max(26, Math.min(70, W * 0.06)), x = side ? W - w : 0, top = Math.max(0, sy - 20), bot = Math.min(H, yOf(FLOOR) + 30);
       if (bot > 0 && top < H) {
         fillBark(x, top, w, bot - top, camS / mpp, css(lerp3(air(camS + H * mpp * 0.2), [2, 7, 4], 0.86)), 90 + side);
+        foTrunkFlora(side, w);
       }
-      if (camS > FLOOR - 200) { ctx.fillStyle = css(lerp3(air(camS + H * mpp * 0.3), rockAt(camS + H * mpp * 0.3), 0.85)); const t2 = Math.max(0, yOf(FLOOR) + 20); ctx.beginPath(); ctx.moveTo(side ? W : 0, t2); for (let y = t2; y <= H + 30; y += 30) ctx.lineTo(side ? W - w * (0.7 + hsh((y + camS / mpp) / 30 | 0, 80 + side) * 0.9) : w * (0.7 + hsh((y + camS / mpp) / 30 | 0, 80 + side) * 0.9), y); ctx.lineTo(side ? W : 0, H + 30); ctx.closePath(); ctx.fill(); }
+      if (camS > FLOOR - 200) { ctx.fillStyle = css(lerp3(air(camS + H * mpp * 0.3), rockAt(camS + H * mpp * 0.3), 0.85)); const t2 = Math.max(0, yOf(FLOOR) + 20); ctx.beginPath(); ctx.moveTo(side ? W : 0, t2); for (let y = t2; y <= H + 30; y += 30) ctx.lineTo(side ? W - w * (0.7 + hsh((y + camS / mpp) / 30 | 0, 80 + side) * 0.9) : w * (0.7 + hsh((y + camS / mpp) / 30 | 0, 80 + side) * 0.9), y); ctx.lineTo(side ? W : 0, H + 30); ctx.closePath(); ctx.fill(); foWall(side, w); }
     }
+    if (camS < FLOOR + 200) foFronds();
     leafLayer(leavesB, dt); leafLayer.prev = camS;
     // big leaves right in front of the lens: they whip past as you fall
     if (camS < FLOOR + 100) {

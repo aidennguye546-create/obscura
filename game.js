@@ -83,7 +83,8 @@ function lev(a, b, max) {
   return prev[b.length];
 }
 // A looser spelling key so near-misses still land: ph/f, ck/k, z/s, y/i, doubled letters.
-const loose = k => k.replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/z/g, 's').replace(/y/g, 'i').replace(/(.)\1+/g, '$1').replace(/e$/, '');
+// (runs of i are kept, so Henry VI and Henry VIII stay apart)
+const loose = k => k.replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/z/g, 's').replace(/y/g, 'i').replace(/([^i])\1+/g, '$1').replace(/e$/, '');
 const FILLER = new Set(['the', 'of', 'and', 'a', 'an', 'in', 'de', 'la', 'le', 'st', 'saint', 'mr', 'mrs', 'dr']);
 // Extra answers for existing prompts are merged in before anything is indexed.
 for (const a of window.BANK_ADD || []) {
@@ -95,6 +96,28 @@ for (const a of window.BANK_ADD || []) {
     t.t = t.t.map(str => String(str || '').split(',').map(raw => { const head = raw.split('|')[0].trim(), extra = want[norm(head)]; return extra ? raw.replace(/\s+$/, '') + '|' + extra.join('|') : raw; }).join(','));
   }
 }
+// Near-duplicate prompts are folded into their twin: the answers move over, one tier deeper at the top
+for (const [from, to] of Object.entries(window.FOLD || {})) {
+  const a = window.BANK.find(x => x && x.id === from), b = window.BANK.find(x => x && x.id === to);
+  if (!a || !b || a === b) continue;
+  const add = ['', [a.t[0], a.t[1]].filter(Boolean).join(', '), a.t[2] || '', [a.t[3], a.t[4]].filter(Boolean).join(', '), ''];
+  b.t = b.t.map((s, i) => add[i] ? (s ? s + ', ' : '') + add[i] : s);
+}
+// A few joke answers that would only spoil a round are taken out wherever they appear
+// ("prompt id::Answer" takes it out of just that prompt).
+{
+  const ban = new Set((window.BAN || []).filter(x => !x.includes('::')).map(norm)), banIn = {};
+  for (const x of window.BAN || []) if (x.includes('::')) { const [id, n] = x.split('::'); (banIn[id] = banIn[id] || new Set()).add(norm(n)); }
+  for (const t of window.BANK) {
+    if (!t || !Array.isArray(t.t)) continue;
+    const bad = f => ban.has(norm(f)) || (banIn[t.id] && banIn[t.id].has(norm(f)));
+    t.t = t.t.map(str => String(str || '').split(',').map(raw => {
+      const forms = raw.split('|').map(x => x.trim()).filter(Boolean);
+      if (!forms.length || bad(forms[0])) return '';
+      return forms.filter(f => !bad(f)).join('|');
+    }).filter(Boolean).join(', '));
+  }
+}
 // Each prompt is indexed the first time it is needed, so loading stays quick however big the bank gets.
 function buildTopic(t) {
   const map = new Map(), words = new Map(), lmap = new Map(), list = [], bares = [];
@@ -104,7 +127,9 @@ function buildTopic(t) {
       if (!forms.length) continue;
       // a name that already exists only contributes its extra spellings
       let e = map.get(norm(forms[0]));
-      if (!e) { e = { name: forms[0], tier, toks: [] }; list.push(e); }
+      // shown with a capital ("teacher" → "Teacher"), but brand styles like iPhone or eBay stay as written
+      if (!e) { e = { name: /^[a-z](?![A-Z])/.test(forms[0]) ? forms[0][0].toUpperCase() + forms[0].slice(1) : forms[0], tier, toks: [], forms: [] }; list.push(e); }
+      for (const f of forms) if (!e.forms.includes(f)) e.forms.push(f);
       for (const f of forms) {
         const k = norm(f); if (k && !map.has(k)) map.set(k, e);
         if (k && !lmap.has(loose(k))) lmap.set(loose(k), e);
@@ -140,7 +165,7 @@ const shardWant = new Map(); let shardTick = null;
 const stubTopic = (id, name, blurb) => ({ id, name: name || '…', blurb: blurb || '', map: new Map(), words: new Map(), lmap: new Map(), list: [], star: { name: '', tier: 4, toks: [], fact: '' }, stub: true });
 function needIds(ids) {
   const out = [];
-  for (const id of ids) { if (!id) continue; const dv = DERIVED_BY && DERIVED_BY[id]; const src = dv ? dv.from : [id];
+  for (const id of ids) { if (!id) continue; const dv = !RAW[id] && DERIVED_BY && DERIVED_BY[id]; const src = dv ? dv.from : [id];
     for (const s of src) { const R = RAW[s]; if (!R || R.t || R.s == null) continue; let p = shardWant.get(R.s);
       if (!p) { p = new Promise(res => { const el = document.createElement('script'); el.src = 'shards/s' + String(R.s).padStart(2, '0') + '.js'; el.async = true; el.onload = res; el.onerror = () => { shardWant.delete(R.s); res(); }; document.head.append(el); }); shardWant.set(R.s, p); }
       out.push(p); } }
@@ -154,11 +179,14 @@ window.__shard = data => {
 for (const id in RAW) Object.defineProperty(TOPICS, id, { enumerable: true, configurable: true, get() { if (!RAW[id].t) { needIds([id]); return stubTopic(id, RAW[id].name, RAW[id].blurb); } const v = buildTopic(RAW[id]); Object.defineProperty(TOPICS, id, { value: v, enumerable: true }); return v; } });
 // Broad school-quiz categories make dull prompts. They stay in the bank as raw material
 // for the oddly specific prompts below, but are never offered on their own.
-const HIDDEN = new Set(['composers', 'philosophers', 'emperors', 'painters', 'authors', 'novels', 'battles', 'empires', 'monarchs', 'explorers', 'scientists', 'presidents', 'bible', 'phobias', 'greekmyth', 'constellations', 'bones', 'gems', 'grapes', 'dances', 'musicals', 'shakespeare', 'money', 'trees', 'languages', 'code', 'capitals', 'elements', 'tube', 'ukplaces', 'nationalparks', 'deserts', 'waters', 'mountains', 'rivers', 'islands', 'eurocities', 'asiacities', 'africacities', 'uscities', 'spaceobjects', 'illnesses', 'catbreeds', 'flowers', 'fish', 'reptiles', 'bestpicture', 'breads', 'beers', 'spices', 'instruments', 'cheese', 'genres', 'rockbands', 'popstars', 'rappers', 'birds', 'mammals', 'sea', 'insects', 'countries', 'states', 'cars', 'sports', 'dogs', 'vegetables', 'fruits', 'tools', 'clothing', 'desserts', 'dishes', 'cocktails', 'pasta', 'candy', 'gods', 'dinosaurs', 'bodyparts', 'sitcoms', 'cartoons', 'videogames']);
+const HIDDEN = new Set(['foods', 'v7_animala', 'v7_animalc', 'v7_animalf', 'v7_animals', 'v7_animaljn', 'v7_animaluvy', 'v7_animal3', 'v7_animalz', 'v7_animaldouble', 'v7_animalcolour', 'v7_fooda', 'v7_foodd', 'v7_foodf', 'v7_foodg', 'v7_foodh', 'v7_foodm', 'v7_foodr', 'v7_foodz', 'composers', 'philosophers', 'emperors', 'painters', 'authors', 'novels', 'battles', 'empires', 'monarchs', 'explorers', 'scientists', 'presidents', 'bible', 'phobias', 'greekmyth', 'constellations', 'bones', 'gems', 'grapes', 'dances', 'musicals', 'shakespeare', 'money', 'trees', 'languages', 'code', 'capitals', 'elements', 'tube', 'ukplaces', 'nationalparks', 'deserts', 'waters', 'mountains', 'rivers', 'islands', 'eurocities', 'asiacities', 'africacities', 'uscities', 'spaceobjects', 'illnesses', 'catbreeds', 'flowers', 'fish', 'reptiles', 'bestpicture', 'breads', 'beers', 'spices', 'instruments', 'cheese', 'genres', 'rockbands', 'popstars', 'rappers', 'birds', 'mammals', 'sea', 'insects', 'countries', 'states', 'cars', 'sports', 'dogs', 'vegetables', 'fruits', 'tools', 'clothing', 'desserts', 'dishes', 'cocktails', 'pasta', 'candy', 'gods', 'dinosaurs', 'bodyparts', 'sitcoms', 'cartoons', 'videogames']);
 const COLOURS = /\b(red|blue|green|black|white|gold|golden|silver|grey|gray|yellow|orange|pink|purple|scarlet|crimson|violet|brown|ruby|emerald|amber|blond|blonde|rosy|rose|snowy|snow)\b/i;
 const ANIMALS = ['mammals', 'birds', 'sea', 'reptiles', 'insects', 'fish'];
 const CITIES = ['uscities', 'eurocities', 'asiacities', 'africacities', 'capitals'];
 const one = n => !/[\s\-]/.test(n);
+// Food answers for the letter prompts: every food bank plus the hand-written letter lists
+const FOODS = ['foods', 'fruits', 'vegetables', 'cheese', 'pasta', 'spices', 'sandwiches', 'dumplings', 'cereals', 'candy', 'p1_soup', 'breakfast', 'n3_biscuit', 'p1_indian', 'p1_rice', 'p1_french', 'p1_chinese', 'p1_japanese', 'p1_mexican', 'p1_spanish', 'p1_korean', 'p1_thai', 'p1_greek', 'p1_british', 'p1_cake', 'p1_bread', 'p2_nuts', 'q7_italiannotpasta', 'u2_chocdessert', 'u2_moviesnack'];
+const LETTER = (what, from, letters, extra) => letters.map(L => ({ id: 'x_' + what + L.toLowerCase().replace(/\W/g, ''), name: 'Name ' + (what === 'animal' ? 'an animal' : 'a food') + ' that starts with ' + L.split('').join(' or '), from: from.concat(extra.filter(x => x.endsWith(what + L.toLowerCase())).length ? extra.filter(x => x.endsWith(what + L.toLowerCase())) : []), test: n => L.includes(n.replace(/^(the|a|an)\s+/i, '').normalize('NFD')[0].toUpperCase()), typed: true }));
 // Each takes answers from existing prompts and keeps the ones that pass its test.
 const DERIVED = [
   { id: 'x_and', name: 'Name a country with “an” in its name', from: ['countries'], test: n => /an/i.test(n) },
@@ -167,9 +195,9 @@ const DERIVED = [
   { id: 'x_island', name: 'Name a country that is an island or islands', from: ['countries'], test: n => /^(Japan|Iceland|Ireland|United Kingdom|Cuba|Jamaica|Haiti|Dominican Republic|Bahamas|Barbados|Trinidad and Tobago|Madagascar|Sri Lanka|Singapore|Indonesia|Philippines|New Zealand|Australia|Fiji|Malta|Cyprus|Maldives|Mauritius|Seychelles|Samoa|Tonga|Papua New Guinea|Bahrain|Brunei|East Timor|Vanuatu|Solomon Islands|Grenada|Saint Lucia|Dominica|Antigua and Barbuda|Comoros|Sao Tome and Principe|Cape Verde|Saint Kitts and Nevis|Saint Vincent and the Grenadines|Kiribati|Tuvalu|Nauru|Palau|Marshall Islands|Micronesia)$/.test(n) },
   { id: 'x_newstate', name: 'Name a US state with two words in its name', from: ['states'], test: n => /\s/.test(n) },
   { id: 'x_stateA', name: 'Name a US state that ends in the letter A', from: ['states'], test: n => /a$/i.test(n) },
-  { id: 'x_double', name: 'Name an animal with a double letter in its name', blurb: 'One-word names only, like giraffe', from: ANIMALS, test: n => one(n) && /([a-z])\1/i.test(n) },
-  { id: 'x_three', name: 'Name an animal with a three-letter name', from: ANIMALS, test: n => one(n) && n.length === 3 },
-  { id: 'x_colouranimal', name: 'Name an animal with a colour in its name', blurb: 'Like blue whale', from: ANIMALS, test: n => COLOURS.test(n) },
+  { id: 'x_double', name: 'Name an animal with a double letter in its name', blurb: 'One-word names only, like giraffe', from: ANIMALS.concat(['v7_animaldouble']), test: n => one(n) && /([a-z])\1/i.test(n) },
+  { id: 'x_three', name: 'Name an animal with a three-letter name', from: ANIMALS.concat(['v7_animal3']), test: n => one(n) && n.length === 3 },
+  { id: 'x_colouranimal', name: 'Name an animal with a colour in its name', blurb: 'Like blue whale', from: ANIMALS.concat(['v7_animalcolour']), test: n => COLOURS.test(n) },
   { id: 'x_fishname', name: 'Name a sea creature with “fish” in its name', from: ['sea', 'fish'], test: n => /fish/i.test(n) },
   { id: 'x_birdsea', name: 'Name an animal named after another animal', blurb: 'Like tiger shark or elephant seal', from: ANIMALS, test: n => /\b(tiger|elephant|leopard|zebra|lion|wolf|horse|cat|dog|bear|bull|cow|goat|pig|hog|fox|eagle|hawk|snake|spider|parrot|bat|rat|mouse|rabbit|monkey|frog|butterfly|bird|shark|whale|crocodile|alligator|turkey|chicken|duck|swan|deer|camel|kangaroo|mole|squirrel|buffalo|ox|sheep|ram|hound)\b/i.test(n) && /\s|-/.test(n) || /^(catfish|dogfish|lionfish|parrotfish|wolffish|ratfish|goatfish|hogfish|zebrafish|frogfish|rabbitfish|cowfish|batfish|boarfish|squirrelfish|hawkfish|lizardfish|toadfish|pigfish|horsefish|bullfrog|cowbird|catbird|antlion|bearcat|seahorse|sea lion)$/i.test(n) },
   { id: 'x_san', name: 'Name a city that starts with San, Santa, Saint or São', from: CITIES, test: n => /^(san|santa|santo|saint|st\.?|são|sao)\s/i.test(n) },
@@ -201,6 +229,10 @@ const DERIVED = [
   { id: 'x_bodyshort', name: 'Name a body part with four letters or fewer', from: ['bodyparts', 'bones'], test: n => one(n) && n.length <= 4 },
   { id: 'x_cocktailname', name: 'Name a cocktail with a place or person in its name', blurb: 'Like Moscow Mule or Bloody Mary', from: ['cocktails'], test: n => /\s/.test(n) && /^[A-Z].*\s[A-Z]/.test(n) },
   { id: 'x_spicehot', name: 'Name a herb or spice with a name of five letters or fewer', from: ['spices'], test: n => one(n) && n.length <= 5 },
+  ...LETTER('animal', ANIMALS.concat(['dogs']), ['A', 'B', 'C', 'F', 'G', 'M', 'P', 'S', 'T', 'JN', 'UVY'], ['v7_animala', 'v7_animalc', 'v7_animalf', 'v7_animals', 'v7_animaljn', 'v7_animaluvy']),
+  { id: 'x_animalz', name: 'Name an animal with a Z in its name', from: ANIMALS.concat(['dogs', 'v7_animalz']), test: n => /z/i.test(n), typed: true },
+  ...LETTER('food', FOODS, ['A', 'B', 'C', 'D', 'F', 'G', 'H', 'M', 'P', 'R', 'S', 'T'], ['v7_fooda', 'v7_foodd', 'v7_foodf', 'v7_foodg', 'v7_foodh', 'v7_foodm', 'v7_foodr']),
+  { id: 'x_foodz', name: 'Name a food with a Z in its name', from: FOODS.concat(['v7_foodz']), test: n => /z/i.test(n), typed: true },
 ];
 function buildDerived(dv) {
   const t = ['', '', '', '', ''], seen = new Set();
@@ -221,12 +253,13 @@ function buildDerived(dv) {
 }
 var DERIVED_BY = {}; for (const dv of DERIVED) DERIVED_BY[dv.id] = dv;
 for (const dv of DERIVED) {
-  if (!dv.from.some(id => RAW[id])) continue;
+  // on the live site these come prebuilt in the catalog and shards (tools/shard.js), so they load like any prompt
+  if (RAW[dv.id] || !dv.from.some(id => RAW[id])) continue;
   Object.defineProperty(TOPICS, dv.id, { enumerable: true, configurable: true, get() { if (dv.from.some(id => RAW[id] && !RAW[id].t)) { needIds([dv.id]); return stubTopic(dv.id, dv.name, dv.blurb); } const v = buildDerived(dv); Object.defineProperty(TOPICS, dv.id, { value: v, enumerable: true }); return v; } });
 }
 const usable = id => { const R = RAW[id]; if (R && !R.t) return (R.n || 0) >= 12; if (!R && DERIVED_BY[id] && DERIVED_BY[id].from.some(s => RAW[s] && !RAW[s].t)) return true; try { return TOPICS[id].list.length >= 12; } catch (e) { return false; } };
 const CUT = new Set(window.CUT || []);
-const TOPIC_IDS = Object.keys(RAW).filter(id => !HIDDEN.has(id)).concat(DERIVED.filter(dv => dv.from.some(id => RAW[id])).map(dv => dv.id)).filter(id => !CUT.has(id));
+const TOPIC_IDS = Object.keys(RAW).filter(id => !HIDDEN.has(id)).concat(DERIVED.filter(dv => !RAW[dv.id] && dv.from.some(id => RAW[id])).map(dv => dv.id)).filter(id => !CUT.has(id));
 // Returns { e, fix } for a match (fix = the player must confirm the corrected spelling),
 // { amb: true } when the text fits several answers and is not specific enough, or null.
 // A correction has to be a slip of the fingers, not a guess: the typed text must point at one answer only.
@@ -245,11 +278,24 @@ function sayings(s) {
   for (const b of new Set([t, ord])) { const p = b.replace(TITLE, ''); out.add(b); out.add(p); out.add(p.replace(PLACE, '')); out.add(b.replace(PLACE, '')); }
   out.delete(t); return [...out].filter(x => x && x.length >= 3);
 }
+// The words a saying dropped ("lake", "river", "games"): if the prompt is about that kind of thing the
+// answer is taken as typed, otherwise ("Lake Burton" for an NBA player) it's offered as a correction.
+function droppedFits(T, input, v) {
+  const ctx = (String(T.name) + ' ' + String(T.blurb || '')).toLowerCase();
+  const a = String(input).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean), b = new Set(String(v).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/));
+  for (const w of a) { if (b.has(w) || /^(?:the|st|saint|\d+(?:st|nd|rd|th)?|[ivx]+|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth)$/.test(w)) continue;
+    const stem = w === 'mt' ? 'moun' : w === 'np' ? 'park' : w === 'dr' ? 'doc' : w === 'czar' ? 'tsar' : w.slice(0, 4);
+    if (!ctx.includes(stem) && !(stem === 'king' || stem === 'quee' ? /monarch|royal|ruler|king|queen/.test(ctx) : false)) return false; }
+  return true;
+}
 // Players often pad an answer with words from the prompt ("lori loud" for a Loud House character) or say
 // where it's from ("neo from the matrix"). Only when nothing else matched, try again without that padding;
 // whatever it finds is offered as a correction, so the player still confirms it.
 const PROMPT_SKIP = new Set(['name', 'a', 'an', 'the', 'of', 'or', 'and', 'that', 'is', 'in', 'from', 'with', 'who', 'has', 'have', 'famous', 'something', 'thing', 'you', 'your', 'its', 'it', 'by', 'to', 'for', 'one', 'not', 'usually', 'can']);
 function match(topicId, input) {
+  // letter prompts: what was typed has to fit the rule too, so "tiger" can't become "Siberian tiger"
+  const dv = DERIVED_BY[topicId];
+  if (dv && dv.typed && !dv.test(String(input).trim())) { const m = matchCore(topicId, input); return m && !m.amb && norm(m.e.name) === norm(input) ? m : null; }
   const r = matchCore(topicId, input);
   if (r && !r.amb) return r;
   const T = TOPICS[topicId]; if (!T) return r;
@@ -260,6 +306,9 @@ function match(topicId, input) {
   const cut = raw.match(/^(.+?)\s+(?:from|in|on|off|of the film|of the show)\s+.+$/i); if (cut) tries.push(cut[1]);
   const as = raw.match(/^.+?\s+as\s+(.+)$/i); if (as) tries.push(as[1]);
   const lead = raw.replace(/^(?:a|an|the|my|some|play|playing)\s+/i, ''); if (lead !== raw) tries.push(lead);
+  // a mistyped 'the' ("teh", "thhe", "tha") in front of the answer
+  const tht = raw.replace(/^(?:th|teh|tha|thee|thhe|te|tbe|tse|tho|thu|tte|rhe|yhe|hte|eth)\s+(?=\S{3})/i, ''); if (tht !== raw) tries.push(tht);
+  if (/^the\S{5}/i.test(raw)) tries.push(raw.slice(3));
   const mine = raw.replace(/\b(?:my|your|his|her|their)\b/gi, 'the'); if (mine !== raw) tries.push(mine);
   if (kept.length > 1) { const tidy = kept.filter(w => !/^(?:the|a|an|my)$/i.test(w)); if (tidy.length && tidy.length < kept.length) tries.push(tidy.join(' ')); }
   for (const t of tries) { if (norm(t).length < 3) continue; const r2 = matchCore(topicId, t); if (r2 && !r2.amb) return Object.assign({}, r2, { fix: true }); }
@@ -269,8 +318,11 @@ function matchCore(topicId, input) {
   const T = TOPICS[topicId], k = norm(input);
   if (!T || !k) return null;
   if (T.map.has(k)) return { e: T.map.get(k), fix: false };
-  if (k.length >= 4) for (const x of [k + 's', k + 'es', k.replace(/s$/, ''), k.replace(/es$/, ''), k.replace(/ies$/, 'y')]) if (x && x !== k && T.map.has(x)) return { e: T.map.get(x), fix: false };
-  for (const v of sayings(input)) { const kv = norm(v); if (kv && kv !== k && T.map.has(kv)) return { e: T.map.get(kv), fix: false }; }
+  // "TheGrinch", "Th eBoondocks": a leading 'the' that the spaces didn't separate
+  if (k.length > 5 && k.startsWith('the') && T.map.has(k.slice(3))) return { e: T.map.get(k.slice(3)), fix: false };
+  if (k.length > 4 && k.startsWith('st') && T.map.has('saint' + k.slice(2))) return { e: T.map.get('saint' + k.slice(2)), fix: false };
+  if (k.length >= 4) for (const x of [k + 's', k + 'es', k.replace(/s$/, ''), k.replace(/(s|x|z|ch|sh|o)es$/, '$1'), k.replace(/ies$/, 'y')]) if (x && x !== k && T.map.has(x)) return { e: T.map.get(x), fix: false };
+  for (const v of sayings(input)) { const kv = norm(v); if (kv && kv !== k && T.map.has(kv)) return { e: T.map.get(kv), fix: !droppedFits(T, input, v) }; }
   if (k.length < 4) return null;
   const one = set => set.size === 1 ? { e: [...set][0], fix: true } : set.size ? { amb: true } : null;
   // A bare name or word shared by several answers is a lucky dip: it always resolves to the same
@@ -285,9 +337,10 @@ function matchCore(topicId, input) {
   let best = max + 1, hits = new Set(), longer = new Set();
   for (const [key, e] of T.map) {
     if (key.length < 4 || (key[0] !== k[0] && loose(key)[0] !== lk[0])) continue;
-    const d = Math.min(lev(k, key, max), lev(lk, loose(key), max));
-    if (d < best) { best = d; hits = new Set([e]); longer = new Set(); } else if (d === best && d <= max) hits.add(e);
-    if (d === best && d <= max && key.length > k.length) longer.add(e);
+    // a near miss as typed beats one that only works once the spelling is loosened
+    let d = lev(k, key, max); if (d > max) { const d2 = lev(lk, loose(key), max); if (d2 <= max) d = d2 + 0.5; }
+    if (d < best) { best = d; hits = new Set([e]); longer = new Set(); } else if (d === best && d <= max + 0.5) hits.add(e);
+    if (d === best && d <= max + 0.5 && key.length > k.length) longer.add(e);
   }
   if (hits.size === 1) return { e: [...hits][0], fix: true };
   // on a tie, a dropped letter is the likelier slip than an extra one
@@ -315,7 +368,9 @@ function matchCore(topicId, input) {
   return hits.size > 1 ? { amb: true } : null;
 }
 window.__match = (t, x) => { const m = match(t, x); return !m ? null : m.amb ? 'ambiguous' : m.e.name + (m.dip ? ' (lucky dip)' : m.fix ? ' (confirm)' : ''); };
-if (typeof document === 'undefined') { module.exports = { norm, match, TOPICS }; return; }
+// for tools/shard.js: a derived prompt's answers and fact, so the live site can ship it ready-made
+const derivedData = dv => { const T = TOPICS[dv.id]; if (!T || T.stub) return null; const t = ['', '', '', '', ''], fs = e => (e.forms && e.forms.length ? e.forms : [e.name]).join('|'); for (const e of T.list) { if (e === T.star) continue; const k = Math.min(3, e.tier); t[k] += (t[k] ? ', ' : '') + fs(e); } t[4] = fs(T.star); return { t, k: [T.star.name, T.star.fact || ''], n: T.list.length }; };
+if (typeof document === 'undefined') { module.exports = { norm, match, TOPICS, DERIVED, derivedData }; return; }
 
 /* ---------- small helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -1619,7 +1674,7 @@ function refreshReveal() {
         h('strong', { text: nameOf(p) }), won && h('i', { class: 'crown', text: '♛ round' }),
         h('span', { class: 'depth', text: '+' + fmt(rd.pts * M_PER_PT) + 'm · ' + rd.pts + ' pts' })),
       rd.a.some(x => x[1] >= 0) ? h('ul', { class: 'chips' }, rd.a.filter(x => x[1] >= 0).sort((a, b) => b[1] - a[1]).map(([n, t], i) => { const c = chip(n, t, '+' + TIERS[t].pts, i); if (multi && saidN[n] === 1) { c.classList.add('solo'); c.title = 'nobody else said it'; } return c; }))
-                  : h('p', { class: 'note', text: 'Found nothing.' }));
+                  : h('p', { class: 'note', text: !rd.a.length && gone(p) ? 'Left the room.' : 'Found nothing.' }));
   }));
   if (!T) return;
   const said = new Set(); ps.forEach(p => roundOf(p, r.round).a.forEach(x => said.add(x[0])));
@@ -2665,6 +2720,177 @@ addEventListener('online', checkIn);
         ctx.fillStyle = '#c9a24a'; ctx.fillRect(x - 24, y + 14, 48, 10);
       }
       ctx.globalCompositeOperation = 'lighter'; const deep = Math.min(1, (camS - 6400) / 4000); const cg = ctx.createRadialGradient(W / 2, H * 1.1, 0, W / 2, H * 1.1, H); cg.addColorStop(0, 'rgba(255,210,100,' + (0.5 * deep).toFixed(2) + ')'); cg.addColorStop(1, 'rgba(255,180,60,0)'); ctx.fillStyle = cg; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+  // ---- Geography: a dive through the whole planet, sky to core
+  const GEO_COL = [[-600, [10, 18, 48]], [0, [34, 70, 140]], [450, [110, 168, 226]], [800, [255, 186, 142]], [1150, [196, 160, 196]], [1350, [150, 180, 222]], [1800, [255, 168, 116]], [1990, [255, 140, 96]], [2000, [44, 140, 178]], [2800, [16, 80, 126]], [3900, [6, 30, 66]], [5200, [2, 9, 24]], [6900, [3, 3, 9]], [7000, [52, 32, 20]], [8800, [86, 34, 12]], [10400, [190, 86, 18]], [12000, [255, 196, 90]]];
+  function geoCol(m) {
+    if (m <= GEO_COL[0][0]) return GEO_COL[0][1]; const L = GEO_COL[GEO_COL.length - 1]; if (m >= L[0]) return L[1];
+    for (let i = 0; i < GEO_COL.length - 1; i++) { const a = GEO_COL[i], b = GEO_COL[i + 1]; if (m <= b[0]) { const t = (m - a[0]) / Math.max(1, b[0] - a[0]); return a[1].map((v, k) => Math.round(v + (b[1][k] - v) * t)); } }
+    return L[1];
+  }
+  const rgb = (c, a) => a == null ? 'rgb(' + c.join(',') + ')' : 'rgba(' + c.join(',') + ',' + a.toFixed(3) + ')';
+  const mixc = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const near2 = (a, b, f) => Math.max(0, Math.min(1, (camS - (a - f)) / f, ((b + f) - camS) / f));
+  const fish = []; let fishInit = false;
+  function earthWorld(dt) {
+    const px = camS / mpp, yp = (m, f) => AY + (m / mpp - px) * f, SURF = 2000, ys = yp(SURF, 1);
+    // the air or water, coloured by depth all the way down the screen
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    for (const s of [0, 0.25, 0.5, 0.75, 1]) { let m = camS + (s * H - AY) * mpp; if (ys > 0 && ys < H) { const above = s * H < ys; if (above && m > SURF - 1) m = SURF - 1; if (!above && m < SURF) m = SURF; } bg.addColorStop(s, rgb(geoCol(m))); }
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // stars above the sky
+    const st = Math.max(0, 1 - Math.max(0, camS) / 700);
+    if (st > 0) for (let i = 0; i < 90; i++) { const y = mod(hsh(i, 801) * H * 1.6 - px * 0.08, H * 1.6) - H * 0.3; if (y < 0 || y > H) continue; const tw = 0.5 + 0.5 * Math.sin(time * (1 + hsh(i, 802) * 3) + i); ctx.fillStyle = 'rgba(255,255,255,' + (st * tw * 0.8).toFixed(3) + ')'; ctx.fillRect(sn(hsh(i, 803) * W), sn(y), hsh(i, 804) < 0.15 ? 3 : 2, hsh(i, 804) < 0.15 ? 3 : 2); }
+    // northern lights rippling over the top of the world, a big moon and the odd shooting star
+    const sky = Math.max(0, 1 - Math.max(0, camS) / 900);
+    if (sky > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (let b = 0; b < 3; b++) { const c = ['80,255,170', '90,200,255', '200,120,255'][b], base = H * (0.18 + b * 0.09) - px * 0.15;
+        for (let x = 0; x < W; x += 4) { const y = base + Math.sin(x * 0.006 + time * 0.35 + b * 2) * 40 + Math.sin(x * 0.017 - time * 0.5 + b) * 16, hh = 70 + 50 * Math.sin(x * 0.01 + time * 0.7 + b * 3); const gr = ctx.createLinearGradient(0, y - hh, 0, y); gr.addColorStop(0, 'rgba(' + c + ',0)'); gr.addColorStop(1, 'rgba(' + c + ',' + (0.16 * sky).toFixed(3) + ')'); ctx.fillStyle = gr; ctx.fillRect(x, y - hh, 4, hh); } }
+      const mx = W * 0.2, my = H * 0.2 - px * 0.12; halo(mx, my, 90, '220,230,255', 0.5 * sky); ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(236,240,255,' + sky.toFixed(2) + ')'; ctx.beginPath(); ctx.arc(mx, my, 34, 0, 6.283); ctx.fill(); ctx.fillStyle = 'rgba(190,200,225,' + (0.8 * sky).toFixed(2) + ')'; for (const [cx2, cy2, r2] of [[-10, -8, 7], [9, 6, 5], [-4, 12, 4], [12, -12, 3]]) { ctx.beginPath(); ctx.arc(mx + cx2, my + cy2, r2, 0, 6.283); ctx.fill(); }
+      const ss = mod(time, 7) / 1.1; if (ss < 1) { const sx = W * (0.3 + 0.5 * hsh(Math.floor(time / 7), 805)) + ss * 220, sy2 = H * 0.12 + ss * 90; ctx.fillStyle = 'rgba(255,255,255,' + (sky * (1 - ss)).toFixed(2) + ')'; for (let k = 0; k < 12; k++) ctx.fillRect(sn(sx - k * 9), sn(sy2 - k * 3.7), 3 - k / 6, 2); }
+    }
+    // the sun, low over the sea
+    // the sun, low over the sea
+    const sunY = yp(1880, 0.42) - 40, sunX = W * 0.68;
+    if (camS < 2600 && sunY > -200 && sunY < H + 200) {
+      ctx.globalCompositeOperation = 'lighter';
+      const sg = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, Math.min(W, H) * 0.7); sg.addColorStop(0, 'rgba(255,220,160,0.55)'); sg.addColorStop(0.15, 'rgba(255,180,120,0.25)'); sg.addColorStop(1, 'rgba(255,150,100,0)'); ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#fff1c8'; ctx.beginPath(); ctx.arc(sunX, sunY, 46, 0, 6.283); ctx.fill(); ctx.fillStyle = 'rgba(255,200,120,0.6)'; for (let k = 0; k < 4; k++) ctx.fillRect(sunX - 50, sunY + 10 + k * 9, 100, 2);
+    }
+    // a sea of clouds, bank behind bank, golden on top where the low sun catches them
+    for (const L of [[540, 0.32, 0.5, 0.6], [660, 0.48, 0.62, 0.8], [780, 0.66, 0.75, 1], [900, 0.86, 0.85, 1.25], [1020, 1.1, 0.95, 1.6], [1150, 1.4, 1, 2]]) {
+      const by = yp(L[0], L[1]); if (by < -320 || by > H + 320) continue;
+      const lit = [255, 222, 178], rim = [255, 244, 214], body = mixc(geoCol(L[0]), [236, 200, 210], 0.55), shade = mixc(geoCol(L[0] + 300), [118, 98, 148], 0.6), sc = L[3];
+      ctx.fillStyle = rgb(shade, L[2]); ctx.fillRect(0, by + 14 * sc, W, 120 * sc + 40);
+      for (let i = -2; i < W / (60 * sc) + 3; i++) {
+        const seed = i + L[0] * 7, x = mod(i * 60 * sc + hsh(seed, 806) * 40 * sc + time * 5 * L[1], W + 180 * sc) - 90 * sc, r = (22 + 30 * hsh(seed, 807)) * sc, cy = by - (hsh(seed, 808) * 26 + Math.sin(i * 1.3 + L[0]) * 8) * sc;
+        ctx.fillStyle = rgb(shade, L[2]); ctx.beginPath(); ctx.arc(x, cy + r * 0.45, r * 1.05, 0, 6.283); ctx.fill();
+        ctx.fillStyle = rgb(body, L[2]); ctx.beginPath(); ctx.arc(x, cy + r * 0.1, r * 0.95, 0, 6.283); ctx.fill();
+        ctx.fillStyle = rgb(lit, L[2]); ctx.beginPath(); ctx.arc(x - r * 0.18, cy - r * 0.12, r * 0.7, 0, 6.283); ctx.fill();
+        ctx.fillStyle = rgb(rim, L[2] * 0.9); ctx.beginPath(); ctx.arc(x - r * 0.28, cy - r * 0.32, r * 0.38, 0, 6.283); ctx.fill();
+      }
+    }
+    // god rays breaking through the gaps in the clouds
+    if (camS > 400 && camS < 1500) { const a = Math.min(1, (camS - 400) / 200) * Math.min(1, (1500 - camS) / 300); ctx.globalCompositeOperation = 'lighter'; for (let k = 0; k < 6; k++) { const x0 = W * (0.1 + k * 0.17) + Math.sin(time * 0.2 + k) * 20, gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(255,214,160,' + (0.14 * a).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(255,214,160,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(x0, 0); ctx.lineTo(x0 + 26, 0); ctx.lineTo(x0 + 110, H); ctx.lineTo(x0 + 40, H); ctx.fill(); } ctx.globalCompositeOperation = 'source-over'; }
+    // mountain ranges, five deep, hazier the further away; snow on the peaks, pines on the nearer slopes, mist between
+    const RANGES = [[1260, 0.36, 0.78, 801], [1360, 0.5, 0.62, 811], [1470, 0.66, 0.45, 821], [1590, 0.82, 0.26, 831], [1720, 1, 0.08, 841]];
+    for (let ri = 0; ri < RANGES.length; ri++) {
+      const R0 = RANGES[ri], base = yp(R0[0], R0[1]); if (base < -500 || base > H + 600) continue;
+      const amp = 200 * R0[1] + 50, far = R0[2], top = mixc([58, 70, 110], geoCol(1300), far), bot = mixc([22, 26, 42], geoCol(1500), far * 0.8), snow = mixc([255, 250, 255], geoCol(1300), far * 0.6), step = Math.max(3, AP * 2);
+      const ridge = x => base - amp * (0.5 + 0.32 * Math.sin(x / W * 4.7 + R0[3]) + 0.2 * Math.sin(x / W * 11.3 + R0[3] * 2) + 0.1 * Math.sin(x / W * 27 + R0[3]) + 0.05 * Math.sin(x / W * 61 + R0[3] * 3));
+      const gr = ctx.createLinearGradient(0, base - amp, 0, base + 120); gr.addColorStop(0, rgb(top)); gr.addColorStop(1, rgb(bot)); ctx.fillStyle = gr;
+      for (let x = 0; x < W; x += step) { const y = ridge(x); ctx.fillRect(x, sn(y), step, base + H - y); }
+      ctx.fillStyle = rgb(snow); for (let x = 0; x < W; x += step) { const y = ridge(x), line = base - amp * 0.72; if (y < line) ctx.fillRect(x, sn(y), step, Math.max(step, (line - y) * (0.55 + 0.3 * hsh(Math.floor(x / step), 842 + ri)))); }
+      // the sun-side edge of each slope catches the light
+      ctx.fillStyle = rgb(mixc(snow, [255, 200, 150], 0.4), 0.5); for (let x = step; x < W; x += step) { const y = ridge(x), yl = ridge(x - step); if (y < yl) ctx.fillRect(x, sn(y), step, 2); }
+      if (ri >= 3) { ctx.fillStyle = rgb(mixc([16, 40, 30], geoCol(1600), far)); for (let k = 0; k < W / 14; k++) { const x = k * 14 + hsh(k, 850 + ri) * 8, y = ridge(x) + 30 + hsh(k, 851 + ri) * 50, h3 = 18 + hsh(k, 852 + ri) * 22; for (let s = 0; s < h3; s += 3) ctx.fillRect(sn(x - s * 0.3), sn(y - h3 + s), Math.max(2, s * 0.6), 3); } }
+      const mist = ctx.createLinearGradient(0, base - 30, 0, base + 60); mist.addColorStop(0, rgb(geoCol(1400), 0)); mist.addColorStop(0.5, rgb(mixc(geoCol(1400), [255, 240, 230], 0.4), 0.45 * (1 - far * 0.3))); mist.addColorStop(1, rgb(geoCol(1400), 0)); ctx.fillStyle = mist; ctx.fillRect(0, base - 30, W, 90);
+    }
+    // eagles circling the peaks
+    if (camS > 1000 && camS < 2000) for (let q = 0; q < 3; q++) { const ang = time * (0.3 + q * 0.07) + q * 2, cx2 = W * (0.3 + q * 0.2) + Math.cos(ang) * 90, cy2 = yp(1420 + q * 60, 0.75) + Math.sin(ang) * 30, fl = Math.round(Math.sin(time * 5 + q) * 3); ctx.fillStyle = '#2a1e16'; ctx.fillRect(sn(cx2 - 14), sn(cy2 + fl), 12, 3); ctx.fillRect(sn(cx2 - 3), sn(cy2), 6, 4); ctx.fillRect(sn(cx2 + 2), sn(cy2 + fl), 12, 3); ctx.fillStyle = '#f2efe6'; ctx.fillRect(sn(cx2 - 2), sn(cy2 - 2), 4, 2); }
+    // the coast:    // the coast: a cliff and a lighthouse on the right, the sea's surface, ships, and the sun on the water
+    if (ys > -200 && ys < H + 300) {
+      const cx = W * 0.8; ctx.fillStyle = '#2b2a2f'; ctx.beginPath(); ctx.moveTo(cx, ys + 2); ctx.lineTo(cx + 30, ys - 90); ctx.lineTo(W + 10, ys - 120); ctx.lineTo(W + 10, ys + 2); ctx.fill();
+      const lx = cx + 70, ly = ys - 118; ctx.fillStyle = '#e8e2d6'; ctx.fillRect(lx - 7, ly - 70, 14, 70); ctx.fillStyle = '#c0392b'; for (let k = 0; k < 3; k++) ctx.fillRect(lx - 7, ly - 62 + k * 22, 14, 8); ctx.fillStyle = '#ffe9a8'; ctx.fillRect(lx - 6, ly - 82, 12, 10); ctx.fillStyle = '#333'; ctx.fillRect(lx - 9, ly - 86, 18, 4);
+      ctx.globalCompositeOperation = 'lighter'; const ba = time * 0.9, bx = Math.cos(ba), bz = Math.abs(Math.sin(ba)) * 0.5 + 0.5;
+      const beam = ctx.createLinearGradient(lx, ly - 77, lx + bx * W, ly - 77); beam.addColorStop(0, 'rgba(255,240,180,' + (0.35 * bz).toFixed(2) + ')'); beam.addColorStop(1, 'rgba(255,240,180,0)'); ctx.fillStyle = beam; ctx.beginPath(); ctx.moveTo(lx, ly - 77); ctx.lineTo(lx + bx * W, ly - 77 - 60 * bz); ctx.lineTo(lx + bx * W, ly - 77 + 60 * bz); ctx.fill();
+      halo(lx, ly - 77, 40, '255,240,180', 0.6); ctx.globalCompositeOperation = 'source-over';
+      // waves
+      for (let r = 0; r < 4; r++) { ctx.fillStyle = 'rgba(255,255,255,' + (0.5 - r * 0.1).toFixed(2) + ')'; for (let x = 0; x < W; x += 8) { const y = ys + r * 7 + Math.sin(x * 0.04 + time * (1.5 + r * 0.3) + r) * 2.5; ctx.fillRect(x, sn(y), 5, 2); } }
+      ctx.globalCompositeOperation = 'lighter'; for (let k = 0; k < 40; k++) { const gy = ys + 4 + hsh(k, 830) * 60, gx = sunX + (hsh(k, 831) - 0.5) * (40 + (gy - ys) * 2), tw = Math.max(0, Math.sin(time * 4 + k * 1.7)); ctx.fillStyle = 'rgba(255,230,170,' + (0.7 * tw).toFixed(2) + ')'; ctx.fillRect(sn(gx), sn(gy), 6, 2); } ctx.globalCompositeOperation = 'source-over';
+      for (let q = 0; q < 2; q++) { const xx = mod(W * (0.2 + q * 0.4) + time * (8 + q * 5), W + 120) - 60, bob = Math.sin(time * 1.4 + q) * 2, y = ys - 2 + bob; ctx.fillStyle = '#3a2a1c'; ctx.fillRect(xx - 16, y - 4, 32, 5); ctx.fillRect(xx - 12, y + 1, 24, 3); ctx.fillRect(xx - 1, y - 30, 2, 26); ctx.fillStyle = '#f4ead6'; ctx.fillRect(xx + 1, y - 28, 12, 20); ctx.fillRect(xx - 13, y - 24, 12, 16); }
+      // gulls
+      ctx.fillStyle = 'rgba(30,30,40,0.7)'; for (let q = 0; q < 6; q++) { const gx = mod(hsh(q, 840) * W + time * (20 + q * 4), W + 60) - 30, gy = ys - 140 - hsh(q, 841) * 160 + Math.sin(time * 2 + q) * 6, fl = Math.round(Math.sin(time * 8 + q) * 2); ctx.fillRect(sn(gx - 6), sn(gy + fl), 6, 2); ctx.fillRect(sn(gx), sn(gy), 2, 2); ctx.fillRect(sn(gx + 2), sn(gy + fl), 6, 2); }
+    }
+    // below the surface: rays of light reaching down, and the shimmer of the surface overhead
+    if (camS > 1500 && camS < 4200) {
+      const a = Math.max(0, Math.min(1, (camS - 1700) / 400)) * Math.max(0, 1 - (camS - 2600) / 1600);
+      if (a > 0.01) { ctx.globalCompositeOperation = 'lighter'; for (let k = 0; k < 7; k++) { const x0 = W * (0.05 + k * 0.15) + Math.sin(time * 0.3 + k) * 30, top = Math.max(ys, -50), w0 = 30 + k * 6; const gr = ctx.createLinearGradient(0, top, 0, top + H * 0.9); gr.addColorStop(0, 'rgba(170,230,255,' + (0.16 * a).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(170,230,255,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(x0, top); ctx.lineTo(x0 + w0, top); ctx.lineTo(x0 + w0 * 3 + 120, top + H * 0.9); ctx.lineTo(x0 + 120, top + H * 0.9); ctx.fill(); } ctx.globalCompositeOperation = 'source-over'; }
+      if (ys > -10 && ys < H) { ctx.fillStyle = 'rgba(200,240,255,0.25)'; for (let x = 0; x < W; x += 10) for (let r = 1; r < 5; r++) ctx.fillRect(x + Math.sin(time * 2 + x * 0.05 + r) * 4, sn(ys + 14 + r * 9 + Math.sin(x * 0.07 + time * 1.3 + r * 2) * 3), 6, 1); }
+    }
+    // a kelp forest swaying up the sides, corals at its feet
+    if (camS > 1900 && camS < 4000) {
+      for (const side of [0, 1]) for (let k = 0; k < 9; k++) {
+        const rootM = 2600 + k * 120, ry = yp(rootM, 0.95); if (ry < -50 || ry > H + 500) continue;
+        const rx = side ? W - 20 - hsh(k, 855 + side) * 110 : 20 + hsh(k, 855 + side) * 110, len = 260 + hsh(k, 856) * 240;
+        ctx.fillStyle = side ? 'rgba(52,120,60,0.85)' : 'rgba(70,140,58,0.85)';
+        for (let s = 0; s < len; s += 6) { const sway = Math.sin(time * 1.1 + s * 0.012 + k) * (s / len) * 24, x = rx + sway; ctx.fillRect(sn(x), sn(ry - s), 4, 7); if (s % 30 === 0) { ctx.fillStyle = 'rgba(120,180,70,0.8)'; ctx.fillRect(sn(x + (s % 60 ? 4 : -10)), sn(ry - s), 10, 4); ctx.fillStyle = side ? 'rgba(52,120,60,0.85)' : 'rgba(70,140,58,0.85)'; } }
+      }
+      for (const side of [0, 1]) for (let k = 0; k < 30; k++) {
+        const y = yp(2200 + k * 55, 1); if (y < -80 || y > H + 80) continue;
+        const x = side ? W - 14 - hsh(k, 860 + side) * 90 : 14 + hsh(k, 860 + side) * 90, kind = Math.floor(hsh(k, 861 + side) * 3), c = ['#ff6f91', '#ffc75f', '#ff9671', '#c34a36', '#845ec2', '#00c9a7', '#f9f871'][Math.floor(hsh(k, 862 + side) * 7)];
+        ctx.fillStyle = c;
+        if (kind === 0) { for (let b = 0; b < 7; b++) { const a2 = -Math.PI / 2 + (b - 3) * 0.32 + Math.sin(time + k) * 0.05; for (let s = 0; s < 30; s += 3) ctx.fillRect(sn(x + Math.cos(a2) * s), sn(y + Math.sin(a2) * s), 3, 3); } }
+        else if (kind === 1) { ctx.beginPath(); ctx.arc(x, y - 12, 16, Math.PI, 0); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.2)'; for (let s = 0; s < 5; s++) ctx.fillRect(sn(x - 12 + s * 6), sn(y - 22 + (s % 2) * 6), 4, 2); }
+        else { for (let b = 0; b < 4; b++) { const hh = 20 + hsh(k * 4 + b, 863) * 26, bx = x + (b - 1.5) * 8 + Math.sin(time * 1.4 + k + b) * 2; ctx.fillRect(sn(bx), sn(y - hh), 5, hh); ctx.fillRect(sn(bx - 2), sn(y - hh), 9, 5); } }
+      }
+      ctx.fillStyle = 'rgba(220,245,255,0.6)'; for (let i = 0; i < 40; i++) { const y = mod(hsh(i, 864) * H - time * (30 + hsh(i, 865) * 40), H), x = hsh(i, 866) * W + Math.sin(time * 2 + i) * 5; ctx.beginPath(); ctx.arc(x, y, 1.5 + hsh(i, 867) * 2.5, 0, 6.283); ctx.fill(); }
+    }
+    // fish schools in the shallows
+    if (!fishInit) { fishInit = true; for (let s = 0; s < 6; s++) for (let i = 0; i < 30; i++) fish.push({ s, ox: R() * 120 - 60, oy: R() * 50 - 25, ph: R() * 6 }); }
+    if (camS > 1900 && camS < 4200) for (const f of fish) {
+      const m = 2200 + f.s * 300, y0 = yp(m, 0.9), dir = f.s % 2 ? -1 : 1, cx = mod(W * hsh(f.s, 868) + dir * time * (34 + f.s * 6), W + 300) - 150, x = cx + f.ox + Math.sin(time * 2 + f.ph) * 8, y = y0 + f.oy + Math.sin(time * 1.3 + f.ph + f.s) * 10;
+      if (y < -10 || y > H + 10) continue; const c = ['#ffd166', '#7fdbff', '#ff9f80', '#c3f0ca', '#ff7ad9', '#ffffff'][f.s];
+      ctx.fillStyle = c; ctx.fillRect(sn(x - 4), sn(y - 2), 9, 5); ctx.fillRect(sn(x - 4 - 4 * dir), sn(y - 3), 3, 7); ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(sn(x + 2 * dir), sn(y - 1), 1, 1);
+    }
+    // a manta ray and a sea turtle gliding past
+    { const y = yp(2550, 0.8); if (y > -80 && y < H + 80) { const x = mod(W - time * 18, W + 260) - 130, fl = Math.sin(time * 1.6) * 10; ctx.fillStyle = 'rgba(20,40,60,0.9)'; ctx.beginPath(); ctx.moveTo(x - 40, y); ctx.quadraticCurveTo(x, y - 20 - fl, x + 50, y - 34 - fl); ctx.lineTo(x + 20, y); ctx.lineTo(x + 50, y + 34 + fl); ctx.quadraticCurveTo(x, y + 20 + fl, x - 40, y); ctx.fill(); ctx.fillRect(x + 20, y - 1, 60, 2); } }
+    { const y = yp(2900, 0.85); if (y > -60 && y < H + 60) { const x = mod(time * 24, W + 200) - 100, fl = Math.sin(time * 2) * 6, s2 = 1.6; ctx.fillStyle = '#3d7a4f'; ctx.fillRect(x - 18 * s2, y - 9 * s2, 36 * s2, 18 * s2); ctx.fillStyle = '#5fa36b'; for (let a2 = 0; a2 < 3; a2++) for (let b2 = 0; b2 < 2; b2++) ctx.fillRect(x - 14 * s2 + a2 * 10 * s2, y - 6 * s2 + b2 * 6 * s2, 8 * s2, 5 * s2); ctx.fillStyle = '#c9a66b'; ctx.fillRect(x + 18 * s2, y - 4 * s2, 10 * s2, 8 * s2); ctx.fillRect(x - 10 * s2, y - 17 * s2 + fl, 8 * s2, 10 * s2); ctx.fillRect(x - 10 * s2, y + 9 * s2 - fl, 8 * s2, 10 * s2); ctx.fillRect(x + 8 * s2, y - 13 * s2 + fl, 7 * s2, 6 * s2); ctx.fillRect(x + 8 * s2, y + 7 * s2 - fl, 7 * s2, 6 * s2); } }
+    // the deep blue: glowing plankton, a giant squid, and a shipwreck with its treasure still shining
+    if (camS > 3300 && camS < 5600) {
+      const a = Math.min(1, (camS - 3300) / 400) * Math.min(1, (5600 - camS) / 400);
+      ctx.globalCompositeOperation = 'lighter'; for (let i = 0; i < 80; i++) { const y = mod(hsh(i, 874) * H * 2 - px * 0.5, H * 2) - H * 0.5, x = hsh(i, 875) * W + Math.sin(time * 0.7 + i) * 10, tw = 0.4 + 0.6 * Math.abs(Math.sin(time * 1.5 + i * 3)); ctx.fillStyle = 'rgba(90,240,255,' + (0.9 * a * tw).toFixed(2) + ')'; ctx.fillRect(sn(x), sn(y), 3, 3); } ctx.globalCompositeOperation = 'source-over';
+      { const y = yp(4300, 0.7); if (y > -200 && y < H + 300) { const x = W * 0.75 + Math.sin(time * 0.3) * 20; ctx.fillStyle = 'rgba(70,14,24,0.85)'; ctx.beginPath(); ctx.ellipse(x, y, 22, 60, 0, 0, 6.283); ctx.fill(); ctx.beginPath(); ctx.moveTo(x - 22, y - 50); ctx.lineTo(x, y - 90); ctx.lineTo(x + 22, y - 50); ctx.fill(); for (let t2 = 0; t2 < 8; t2++) { ctx.beginPath(); for (let s = 0; s < 18; s++) { const tx = x - 14 + t2 * 4 + Math.sin(time * 1.5 + s * 0.4 + t2) * s * 1.2, ty = y + 55 + s * 7; ctx.fillRect(sn(tx), sn(ty), 3, 7); } } ctx.fillStyle = 'rgba(255,220,120,0.9)'; ctx.fillRect(x - 8, y + 30, 4, 4); ctx.fillRect(x + 4, y + 30, 4, 4); } }
+      { const y = yp(4900, 1); if (y > -120 && y < H + 80) { const x = W * 0.3; ctx.fillStyle = 'rgba(30,24,18,0.95)'; ctx.beginPath(); ctx.moveTo(x - 110, y - 20); ctx.lineTo(x + 110, y - 36); ctx.lineTo(x + 90, y + 10); ctx.lineTo(x - 90, y + 20); ctx.fill(); ctx.fillRect(x - 20, y - 120, 6, 90); ctx.fillRect(x + 40, y - 96, 5, 64); ctx.fillStyle = 'rgba(60,50,40,0.9)'; ctx.fillRect(x - 60, y - 100, 50, 4); for (let w2 = 0; w2 < 4; w2++) ctx.fillRect(x - 70 + w2 * 40, y - 10, 10, 8);
+        ctx.globalCompositeOperation = 'lighter'; halo(x + 20, y - 4, 50, '255,210,90', 0.7 * a); for (let s = 0; s < 10; s++) { const tw = Math.max(0, Math.sin(time * 4 + s * 1.3)); ctx.fillStyle = 'rgba(255,230,140,' + (tw * a).toFixed(2) + ')'; ctx.fillRect(sn(x + 4 + hsh(s, 876) * 34), sn(y - 10 + hsh(s, 877) * 10), 2, 2); } ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#8a5a2b'; ctx.fillRect(x + 8, y - 8, 24, 12); ctx.fillStyle = '#ffd34d'; ctx.fillRect(x + 8, y - 10, 24, 4); } }
+    }
+    // marine snow and glowing jellyfish down in the dark
+    // marine snow and glowing jellyfish down in the dark
+    if (camS > 3000 && camS < 7400) {
+      const a = Math.min(1, (camS - 3000) / 600) * Math.min(1, (7400 - camS) / 400);
+      ctx.fillStyle = 'rgba(220,235,255,' + (0.5 * a).toFixed(2) + ')'; for (let i = 0; i < 70; i++) { const y = mod(hsh(i, 870) * H - px * (0.6 + hsh(i, 871) * 0.6) - time * 6, H); ctx.fillRect(sn(hsh(i, 872) * W + Math.sin(time + i) * 4), sn(y), 2, 2); }
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 30; i++) { const m = 3400 + i * 125, y = yp(m, 0.8) + Math.sin(time * 0.8 + i) * 14; if (y < -60 || y > H + 60) continue; const x = W * (0.1 + 0.8 * hsh(i, 873)) + Math.sin(time * 0.4 + i) * 20, pulse = 0.7 + 0.3 * Math.sin(time * 3 + i), c = ['255,120,220', '120,220,255', '190,140,255'][i % 3];
+        const js = 0.8 + 1.2 * hsh(i, 878); halo(x, y, 46 * js, c, 0.6 * a * pulse); ctx.fillStyle = 'rgba(' + c + ',' + (0.75 * a).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(x, y, 16 * js * pulse, Math.PI, 0); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,' + (0.5 * a).toFixed(2) + ')'; ctx.fillRect(sn(x - 6 * js), sn(y - 10 * js), 4, 3); ctx.fillStyle = 'rgba(' + c + ',' + (0.55 * a).toFixed(2) + ')'; for (let t2 = 0; t2 < 6; t2++) for (let s = 0; s < 10; s++) ctx.fillRect(sn(x - 12 * js + t2 * 5 * js + Math.sin(time * 2 + s * 0.6 + t2) * 3), sn(y + 2 + s * 6 * js), 2, 5); }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    if (camS > 3600 && camS < 7200) {
+      const a = Math.min(1, (camS - 3600) / 500) * Math.min(1, (7200 - camS) / 400);
+      ctx.globalCompositeOperation = 'lighter';
+      const col = ctx.createLinearGradient(W * 0.3, 0, W * 0.7, 0); col.addColorStop(0, 'rgba(60,120,200,0)'); col.addColorStop(0.5, 'rgba(60,120,200,' + (0.1 * a * Math.max(0, 1 - (camS - 3600) / 3000)).toFixed(3) + ')'); col.addColorStop(1, 'rgba(60,120,200,0)'); ctx.fillStyle = col; ctx.fillRect(0, 0, W, H);
+      for (let c2 = 0; c2 < 5; c2++) { const y0 = yp(4200 + c2 * 520, 0.75), x0 = W * (0.12 + 0.19 * c2) + Math.sin(time * 0.3 + c2) * 30; if (y0 < -400 || y0 > H + 100) continue; for (let b = 0; b < 26; b++) { const bx = x0 + Math.sin(time * 0.9 + b * 0.35 + c2) * (8 + b * 1.2), by = y0 + b * 12, tw = 0.5 + 0.5 * Math.sin(time * 4 - b * 0.5 + c2); halo(bx, by, 8, '120,200,255', 0.35 * a * tw); ctx.fillStyle = 'rgba(180,230,255,' + (0.8 * a * tw).toFixed(2) + ')'; ctx.fillRect(sn(bx) - 1, sn(by) - 1, 3, 3); } }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // the trench: black walls closing in, anglerfish lures and smoking vents
+    if (camS > 4600 && camS < 7600) {
+      const a = Math.min(1, (camS - 4600) / 500) * Math.min(1, (7600 - camS) / 400);
+      for (const side of [0, 1]) { ctx.fillStyle = 'rgba(14,26,40,' + (0.97 * a).toFixed(2) + ')'; for (let y = 0; y < H; y += 6) { const m = camS + (y - AY) * mpp, w2 = 40 + Math.max(0, (m - 4600) / 3000) * W * 0.18 + 18 * Math.sin(m * 0.02 + side * 3) + 10 * hsh(Math.floor(m / 20), 880 + side); ctx.fillRect(side ? W - w2 : 0, y, w2, 6); ctx.fillStyle = 'rgba(40,120,140,' + (0.55 * a).toFixed(2) + ')'; ctx.fillRect(side ? W - w2 : w2 - 2, y, 2, 6); if (hsh(Math.floor(m / 6), 882 + side) < 0.22) { ctx.fillStyle = 'rgba(80,255,220,' + (0.9 * a).toFixed(2) + ')'; ctx.fillRect(side ? W - w2 + 2 + hsh(Math.floor(m / 6), 883) * 20 : w2 - 6 - hsh(Math.floor(m / 6), 883) * 20, y, 3, 3); } ctx.fillStyle = 'rgba(14,26,40,' + (0.97 * a).toFixed(2) + ')'; } }
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 9; i++) { const y = yp(5200 + i * 220, 0.9); if (y < -40 || y > H + 40) continue; const x = W * (0.15 + 0.7 * hsh(i, 881)) + Math.sin(time * 0.5 + i) * 30, bob = Math.sin(time * 2 + i) * 4; halo(x, y + bob, 26, '140,255,200', 0.7 * a); ctx.fillStyle = 'rgba(200,255,220,0.95)'; ctx.fillRect(sn(x) - 2, sn(y + bob) - 2, 4, 4); ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(10,14,20,0.95)'; ctx.fillRect(x - 6, y + 10, 30, 16); ctx.fillRect(x - 2, y + 2 + bob, 2, 10); ctx.fillStyle = 'rgba(220,240,255,0.8)'; ctx.fillRect(x - 4, y + 20, 10, 2); ctx.globalCompositeOperation = 'lighter'; }
+      ctx.globalCompositeOperation = 'source-over';
+      for (let v = 0; v < 2; v++) { const y = yp(6700 + v * 180, 1), x = W * (0.3 + v * 0.4); if (y < -200 || y > H + 60) continue; ctx.fillStyle = '#1a1210'; ctx.fillRect(x - 14, y - 40, 28, 40); ctx.fillRect(x - 22, y - 10, 44, 12); halo(x, y - 40, 24, '255,90,40', 0.6); for (let p2 = 0; p2 < 14; p2++) { const t2 = mod(time * 0.4 + p2 / 14, 1); ctx.fillStyle = 'rgba(60,50,50,' + (0.5 * (1 - t2)).toFixed(2) + ')'; const r2 = 6 + t2 * 30; ctx.beginPath(); ctx.arc(x + Math.sin(t2 * 6 + p2) * 10 * t2, y - 44 - t2 * 200, r2, 0, 6.283); ctx.fill(); } }
+    }
+    // into the rock: strata, fossils and crystals in the crust
+    if (camS > 6600 && camS < 10600) {
+      const a = Math.min(1, (camS - 6600) / 500), band = 60, b0 = Math.floor((px - AY) / band) - 1, STR = [[92, 58, 36], [120, 80, 48], [76, 48, 32], [138, 98, 60], [104, 70, 44], [66, 42, 30]];
+      for (let b = b0; b < b0 + H / band + 3; b++) { const m = b * band * mpp; if (m < 7000) continue; const y = sn(AY + b * band - px), c = mixc(STR[mod(b, STR.length)], geoCol(m), 0.35); ctx.fillStyle = rgb(c, a); ctx.fillRect(0, y, W, band + 1); ctx.fillStyle = rgb(mixc(c, [0, 0, 0], 0.3), a); for (let x = 0; x < W; x += 6) ctx.fillRect(x, y + Math.round(Math.sin(x * 0.03 + b) * 3), 6, 2);
+        if (hsh(b, 890) < 0.35) { const fx2 = W * (0.1 + 0.8 * hsh(b, 891)), fy = y + band * 0.5; ctx.strokeStyle = 'rgba(240,226,200,' + (0.7 * a).toFixed(2) + ')'; ctx.lineWidth = 2; ctx.beginPath(); for (let t2 = 0; t2 < 12; t2 += 0.3) { const r2 = t2 * 1.4; t2 ? ctx.lineTo(fx2 + Math.cos(t2) * r2, fy + Math.sin(t2) * r2) : ctx.moveTo(fx2, fy); } ctx.stroke(); }
+        if (hsh(b, 892) < 0.3) { const gx = W * (0.1 + 0.8 * hsh(b, 893)), gy = y + band * 0.5, gc = ['160,120,255', '120,220,255', '255,120,180'][b % 3]; ctx.globalCompositeOperation = 'lighter'; halo(gx, gy, 22, gc, 0.5 * a); ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(' + gc + ',0.95)'; for (let c2 = 0; c2 < 5; c2++) { const h3 = 6 + hsh(b * 5 + c2, 894) * 12; ctx.fillRect(gx - 10 + c2 * 4, gy - h3 / 2, 3, h3); } }
+      }
+    }
+    // the mantle and the molten core: glowing veins and embers rising past you
+    if (camS > 8600) {
+      const a = Math.min(1, (camS - 8600) / 800);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let v = 0; v < 6; v++) { ctx.strokeStyle = 'rgba(255,' + (120 + v * 15) + ',40,' + (0.35 * a).toFixed(2) + ')'; ctx.lineWidth = 3; ctx.beginPath(); for (let y = 0; y <= H; y += 12) { const x = W * (0.1 + v * 0.16) + Math.sin(y * 0.02 + time * 0.6 + v) * 30 + Math.sin(y * 0.05 + v * 3 - px * 0.01) * 12; y ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+      for (let i = 0; i < 60; i++) { const y = mod(hsh(i, 900) * H - time * (40 + hsh(i, 901) * 80) - px * 0.3, H + 20) - 10, x = hsh(i, 902) * W + Math.sin(time * 2 + i) * 8, fl = 0.5 + 0.5 * Math.sin(time * 9 + i); ctx.fillStyle = 'rgba(255,' + Math.round(140 + 80 * fl) + ',60,' + (0.8 * a).toFixed(2) + ')'; ctx.fillRect(sn(x), sn(y), 3, 3); }
+      const core = Math.max(0, Math.min(1, (camS - 10200) / 1500)); if (core > 0) { const cg = ctx.createRadialGradient(W / 2, H * 1.15, 0, W / 2, H * 1.15, H * 1.1); cg.addColorStop(0, 'rgba(255,240,170,' + (0.9 * core).toFixed(2) + ')'); cg.addColorStop(0.4, 'rgba(255,170,60,' + (0.45 * core).toFixed(2) + ')'); cg.addColorStop(1, 'rgba(255,120,30,0)'); ctx.fillStyle = cg; ctx.fillRect(0, 0, W, H); }
+      ctx.globalCompositeOperation = 'source-over';
     }
     ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }

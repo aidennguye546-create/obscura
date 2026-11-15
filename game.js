@@ -84,6 +84,28 @@ function lev(a, b, max) {
 }
 // A looser spelling key so near-misses still land: ph/f, ck/k, z/s, y/i, doubled letters.
 // (runs of i are kept, so Henry VI and Henry VIII stay apart)
+// Two slips in one word are believable when they are the kind fingers make (a neighbouring key, a swapped
+// pair, a dropped or doubled letter, one vowel for another). Two unrelated letters changed is a different
+// word: "Hamburg" is not a typo of "Hofburg", "Shellos" is not "Swellow".
+const KEYPOS = {}; ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].forEach((r, y) => [...r].forEach((c, x) => { KEYPOS[c] = [x + y * 0.5, y]; }));
+const softSub = (a, b) => { if ('aeiouy'.includes(a) && 'aeiouy'.includes(b)) return true; const p = KEYPOS[a], q = KEYPOS[b]; if (p && q && Math.hypot(p[0] - q[0], p[1] - q[1]) < 1.3) return true; return /^(?:ck|kc|cs|sc|sz|zs|ij|ji|mn|nm|bp|pb|dt|td|fv|vf|gj|jg)$/.test(a + b) || (/\d/.test(a) && /\d/.test(b)); };
+function hardSubs(a, b) {
+  // fewest edits first, then fewest unrelated letter swaps
+  let pp = null, prev = Array.from({ length: b.length + 1 }, (_, i) => i * 100);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i * 100];
+    for (let j = 1; j <= b.length; j++) {
+      const same = a[i - 1] === b[j - 1];
+      let v = Math.min(prev[j] + 100, cur[j - 1] + 100, prev[j - 1] + (same ? 0 : softSub(a[i - 1], b[j - 1]) ? 100 : 101));
+      if (pp && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, pp[j - 2] + 100);
+      cur[j] = v;
+    }
+    pp = prev; prev = cur;
+  }
+  return prev[b.length] % 100;
+}
+// guesses that are real things in their own right and must never be "corrected" into a different answer
+const NOFIX = new Set(['hamburg', 'mounthood', 'clocktower', 'hadriansvilla', 'grandpalais', 'ohiostate', 'utep', 'p8_reflex:farting', 'p9_wedding:photos', 'p9_wedding:registry', 'p3_floridacity:indianriver', 'v1_haspages:playbook', 'p10_mice:mrrat', 'p10_mice:cheese', 'shellos', 'wingull', 'swoobat', 'goldeen', 'dragonite', 'latias', 'p8_reflex:heartpumping', 'esna', 'tellbrak', 'telarad']);
 const loose = k => k.replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/z/g, 's').replace(/y/g, 'i').replace(/([^i])\1+/g, '$1').replace(/e$/, '');
 const FILLER = new Set(['the', 'of', 'and', 'a', 'an', 'in', 'de', 'la', 'le', 'st', 'saint', 'mr', 'mrs', 'dr']);
 // Extra answers for existing prompts are merged in before anything is indexed.
@@ -343,7 +365,7 @@ function matchCore(topicId, input) {
   if (k.length > 4 && k.startsWith('st') && T.map.has('saint' + k.slice(2))) return { e: T.map.get('saint' + k.slice(2)), fix: false };
   if (k.length >= 4) for (const x of [k + 's', k + 'es', k.replace(/s$/, ''), k.replace(/(s|x|z|ch|sh|o)es$/, '$1'), k.replace(/ies$/, 'y')]) if (x && x !== k && T.map.has(x)) return { e: T.map.get(x), fix: false };
   for (const v of sayings(input)) { const kv = norm(v); if (kv && kv !== k && T.map.has(kv)) return { e: T.map.get(kv), fix: !droppedFits(T, input, v) }; }
-  if (k.length < 4) return null;
+  if (k.length < 4 || NOFIX.has(k) || NOFIX.has(topicId + ':' + k)) return null;
   const one = set => set.size === 1 ? { e: [...set][0], fix: true } : set.size ? { amb: true } : null;
   // A bare name or word shared by several answers is a lucky dip: it always resolves to the same
   // one for a given prompt, which may turn out common or very rare. The player still confirms it.
@@ -364,9 +386,18 @@ function matchCore(topicId, input) {
   for (const [key, e] of T.map) {
     if (key.length < 4 || (key[0] !== k[0] && loose(key)[0] !== lk[0])) continue;
     // a near miss as typed beats one that only works once the spelling is loosened
-    let d = lev(k, key, max); if (d > max) { const d2 = lev(lk, loose(key), max); if (d2 <= max) d = d2 + 0.5; }
+    let d = lev(k, key, max); if (d > max) { const lm = Math.max(1, max - 1), d2 = lev(lk, loose(key), lm); if (d2 <= lm) d = d2 + 0.5; }
+    else if (d >= 2 && hardSubs(k, key) > 1) continue;
     if (d < best) { best = d; hits = new Set([e]); longer = new Set(); } else if (d === best && d <= max + 0.5) hits.add(e);
     if (d === best && d <= max + 0.5 && key.length > k.length) longer.add(e);
+  }
+  // typed as several words: each word has to be a near miss of the matching word ("Mount Hood" is not "Mount Cook")
+  const tw = String(input).split(/[\s\-\/]+/).map(norm).filter(w => w && !FILLER.has(w));
+  if (tw.length >= 2 && hits.size) for (const e of [...hits]) {
+    // only judged when every other word is spelt exactly, so a slipped space ("arctiff ox") still counts as a typo
+    const odd = e.toks.filter(tk => tk.length === tw.length).map(tk => tk.map((a, i) => [a, tw[i]]).filter(([a, b]) => a !== b));
+    const one1 = odd.filter(o => o.length === 1 && Math.abs(o[0][0].length - o[0][1].length) <= 1).map(o => o[0]);
+    if (one1.length && odd.every(o => o.length === 1) && !one1.some(([a, b]) => { const d = lev(a, b, 2); return d <= Math.max(1, typoBudget(Math.max(a.length, b.length))) || (d === 2 && Math.min(a.length, b.length) >= 4 && hardSubs(a, b) <= 1); })) { hits.delete(e); longer.delete(e); }
   }
   if (hits.size === 1) return { e: [...hits][0], fix: true };
   // on a tie, a dropped letter is the likelier slip than an extra one

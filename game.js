@@ -110,7 +110,8 @@ function hardSubs(a, b) {
   return prev[b.length] % 100;
 }
 // guesses that are real things in their own right and must never be "corrected" into a different answer
-const NOFIX = new Set(['hamburg', 'mounthood', 'clocktower', 'hadriansvilla', 'grandpalais', 'ohiostate', 'utep', 'p8_reflex:farting', 'p9_wedding:photos', 'p9_wedding:registry', 'p3_floridacity:indianriver', 'v1_haspages:playbook', 'p10_mice:mrrat', 'p10_mice:cheese', 'shellos', 'wingull', 'swoobat', 'goldeen', 'dragonite', 'latias', 'p8_reflex:heartpumping', 'esna', 'tellbrak', 'telarad']);
+const COMMON = new Set(String(window.COMMON_WORDS || '').split(' ').filter(Boolean));
+const NOFIX = new Set(['hamburg', 'mounthood', 'clocktower', 'hadriansvilla', 'grandpalais', 'ohiostate', 'utep', 'p8_reflex:farting', 'p9_wedding:photos', 'p9_wedding:registry', 'p3_floridacity:indianriver', 'v1_haspages:playbook', 'p10_mice:mrrat', 'p10_mice:cheese', 'shellos', 'wingull', 'swoobat', 'goldeen', 'dragonite', 'latias', 'p8_reflex:heartpumping', 'esna', 'tellbrak', 'telarad', 'v3_bodymakes:eyeglasses', 'v2_berry:chokecherry', 'p2_pink:pinkworm', 'p4_texasteams:houstonaeros', 'p4_wheelsports:rollerracing', 'p5_cn:tomandjerry', 'p5_hpcreature:gryphon', 'p7_wiisports:skiing', 'p8_pirate:barbossa', 'q1_loudhouse:carolcasagrande', 'q2_carm:mwmotors', 'q2_colourb:bluish', 'q3_grandma:grandma', 'q3_ukinvented:pool', 'q6_acfish:anglerfish', 'q6_acfish:sawfish', 'q6_acfish:lakechub', 'q7_curedmeat:jesus', 'r1_savedbell:mrsbelding', 'r1_wreckit:mario', 'r2_soul_style:rocksoul', 'r2_soul_style:soulrock', 'r2_soul_style:gospelrock', 'r4_metrocityna:subway', 'r4_metrocityna:metro', 'r4_metrocityna:rapid', 'r5_bodydoctor:oncologist', 'r5_bodydoctor:neonatologist', 'r6_salonjob:hairtechnician', 'r8_afterlife:gimli', 'r8_catword:kauz', 'u2_hotname:hotpink', 'u2_nutname:chestnut', 'u4_baby:timtempleton', 'u4_billion:moana', 'u4_billion:insideout', 'u4_billion:jurassicparkiii', 'u4_seacreature:seamonster', 'u5_playset:playcastle', 'u5_track:gravitytrack', 'u6_athletesnack:bread', 'u6_athletesnack:chips', 'u6_athletesnack:cucumber', 'u6_lucy:lucia', 'u6_lucy:lucille', 'u6_lucy:lucypeacock', 'u6_personteam:blues', 'u6_personteam:bulls', 'u6_personteam:suns', 'u7_yellowapp:duolingo', 'u7_yellowapp:yellowpages', 'v1_canflip:game', 'v4_himym:tedmosbysr', 'v5_airname:airbrush', 'v5_drawapp:pixelartmaker', 'v5_pk5:pikachu', 'v5_wbox:sweetbox', 'v7_josh:joshuaharris', 'v7_josh:joshualee']);
 const loose = k => k.replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/z/g, 's').replace(/y/g, 'i').replace(/([^i])\1+/g, '$1').replace(/e$/, '');
 const FILLER = new Set(['the', 'of', 'and', 'a', 'an', 'in', 'de', 'la', 'le', 'st', 'saint', 'mr', 'mrs', 'dr']);
 // Extra answers for existing prompts are merged in before anything is indexed.
@@ -134,7 +135,8 @@ for (const [from, to] of Object.entries(window.FOLD || {})) {
 // ("prompt id::Answer" takes it out of just that prompt).
 {
   const ban = new Set((window.BAN || []).filter(x => !x.includes('::')).map(norm)), banIn = {};
-  for (const x of window.BAN || []) if (x.includes('::')) { const [id, n] = x.split('::'); (banIn[id] = banIn[id] || new Set()).add(norm(n)); }
+  const banForm = {};
+  for (const x of window.BAN || []) if (x.includes('::')) { const [id, n, f] = x.split('::'); if (f) (banForm[id] = banForm[id] || []).push([norm(n), norm(f)]); else (banIn[id] = banIn[id] || new Set()).add(norm(n)); }
   for (const t of window.BANK) {
     if (!t || !Array.isArray(t.t)) continue;
     const bad = f => ban.has(norm(f)) || (banIn[t.id] && banIn[t.id].has(norm(f)));
@@ -143,7 +145,9 @@ for (const [from, to] of Object.entries(window.FOLD || {})) {
       // a banned joke takes its whole entry with it; a spelling wrong for one prompt ("Czech Republic" for a
       // country ending in a vowel) leaves the entry's other spellings ("Czechia") standing
       if (!forms.length || ban.has(norm(forms[0]))) return '';
-      return forms.filter(f => !bad(f)).join('|');
+      // "id::Answer::spelling" takes one spelling off one answer and leaves it free for another
+      const off = (banForm[t.id] || []).filter(([h]) => h === norm(forms[0])).map(([, f]) => f);
+      return forms.filter(f => !bad(f) && !off.includes(norm(f))).join('|');
     }).filter(Boolean).join(', '));
   }
 }
@@ -412,8 +416,19 @@ function matchCore(topicId, input) {
   if (!T._pw) T._pw = new Set(String(T.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(w => w.length > 2 && !['name', 'that', 'with', 'from', 'have', 'something', 'thing', 'famous', 'type', 'kind'].includes(w)));
   const own = String(input).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(w => w && !T._pw.has(w) && !T._pw.has(w.replace(/s$/, ''))).join('');
   const max = own && own.length < k.length ? Math.min(typoBudget(k.length), Math.max(1, typoBudget(own.length))) : typoBudget(k.length);
+  // a whole word of some answers ("harrison") is not a slip for a different answer ("Harris"): the word wins
+  const exactWord = T.words.get(k);
+  if (exactWord && exactWord.size > 1) { if (crowd(exactWord)) return { amb: true }; const last = new Set([...exactWord].filter(e => e.toks.some(tk => tk[tk.length - 1] === k))); return last.size === 1 ? one(last) : dip(exactWord); }
   let best = max + 1, hits = new Set(), longer = new Set();
+  // an everyday word typed on its own ("horse", "tablet") is what the player meant, not a slip for another
+  // answer ("House", "Table"); only a spelling variant of it (grey/gray, color/colour) still counts
+  const plain = /^[a-z]+$/i.test(String(input).trim()) && (COMMON.has(k) || (k.endsWith('s') && COMMON.has(k.slice(0, -1))));
+  const bones = x => x.replace(/[aeiouy]/g, '').replace(/(.)\1+/g, '$1');
   for (const [key, e] of T.map) {
+    // a dropped letter is still the likeliest slip ("Founder" for Flounder), so only a longer answer gets past
+    if (plain && !((bones(key) === bones(k) || key.length === k.length + 1) && lev(k, key, 1) === 1)) continue;
+    // the first letter dropped ("The murfs" for The Smurfs) is a slip too, on a long enough answer
+    if (key.length >= 6 && key.slice(1) === k && /^the\s/i.test(String(input).trim())) { if (best > 1) { best = 1; hits = new Set([e]); longer = new Set([e]); } else if (best === 1) { hits.add(e); longer.add(e); } continue; }
     if (key.length < 4 || (key[0] !== k[0] && loose(key)[0] !== lk[0])) continue;
     // a near miss as typed beats one that only works once the spelling is loosened
     let d = lev(k, key, max); if (d > max) { const lm = Math.max(1, max - 1), d2 = lev(lk, loose(key), lm); if (d2 <= lm) d = d2 + 0.5; }

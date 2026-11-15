@@ -64,7 +64,12 @@ function norm(s) {
   s = String(s).toLowerCase().replace(/ø/g, 'o').replace(/ł/g, 'l').replace(/ß/g, 'ss').replace(/æ/g, 'ae').replace(/œ/g, 'oe').replace(/ı/g, 'i').replace(/đ/g, 'd').replace(/þ/g, 'th').normalize('NFD').replace(/[̀-ͯ]/g, '');
   s = s.replace(/\+\+/g, 'plusplus').replace(/#/g, 'sharp').replace(/&/g, ' and ');
   s = s.replace(/^\s*the\s+/, '').replace(/\bst\.?\s/g, 'saint ');
-  return s.replace(/[^a-z0-9]/g, '');
+  const r = s.replace(/[^a-z0-9]/g, '');
+  if (r) return r;
+  // an answer that is only a symbol ("÷", "+", "µ", an emoji) is kept as that symbol rather than vanishing
+  const sym = { '÷': 'divide', '+': 'plus', '×': 'multiply', 'x': 'multiply', '=': 'equals', '-': 'minus', '−': 'minus', 'µ': 'mu', 'μ': 'mu' };
+  const t = String(s).trim();
+  return sym[t] || t.replace(/\s+/g, '');
 }
 // Edit distance where a swapped pair of neighbouring letters counts as one slip.
 function lev(a, b, max) {
@@ -140,6 +145,31 @@ for (const [from, to] of Object.entries(window.FOLD || {})) {
       if (!forms.length || ban.has(norm(forms[0]))) return '';
       return forms.filter(f => !bad(f)).join('|');
     }).filter(Boolean).join(', '));
+  }
+}
+// Some long entries are really dozens of different answers run together with "|" (every Dodgers player as
+// spellings of one), which made unrelated guesses count as the same answer. Those are pulled apart again:
+// spellings stay together when one is contained in the other ("Strep" / "Streptococcus", "Saul" / "Saul Berenson").
+{
+  const tw = f => f.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(w => w && !['the', 'of', 'and', 'a', 'de', 'la', 'le'].includes(w));
+  const pull = forms => {
+    const n = forms.length, p = [...Array(n).keys()], F = i => p[i] === i ? i : (p[i] = F(p[i])), T = forms.map(tw), K = forms.map(norm);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const [a, b] = T[i].length <= T[j].length ? [i, j] : [j, i];
+      if ((T[a].length && T[a].every(w => T[b].includes(w))) || (K[a].length >= 3 && K[b].includes(K[a]))) p[F(a)] = F(b);
+    }
+    const g = new Map(); forms.forEach((f, i) => { const r = F(i); if (!g.has(r)) g.set(r, []); g.get(r).push(f); });
+    // keep the entry's own name first in its group
+    return [...g.values()].map(x => { const h = x.indexOf(forms[0]); return h > 0 ? [forms[0]].concat(x.filter(y => y !== forms[0])) : x; });
+  };
+  for (const t of window.BANK) {
+    if (!t || !Array.isArray(t.t)) continue;
+    t.t = t.t.map(str => String(str || '').split(',').map(raw => {
+      const forms = raw.split('|').map(x => x.trim()).filter(Boolean);
+      if (forms.length < 12) return raw;
+      const g = pull(forms);
+      return g.length >= 0.7 * forms.length ? g.map(x => x.join('|')).join(', ') : raw;
+    }).join(','));
   }
 }
 // Each prompt is indexed the first time it is needed, so loading stays quick however big the bank gets.

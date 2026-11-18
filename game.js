@@ -508,9 +508,22 @@ function markSeen(ids) {
   const drop = new Set(ids), list = seenList().filter(id => !drop.has(id)).concat(ids);
   ls.set('seen', JSON.stringify(list.slice(-SEEN_MAX)));
 }
+// Many prompts are the same question in disguise ("a country that uses the euro", "a country with a sun on
+// its flag"): they share a family, and seeing one counts as seeing them all, so the next country prompt waits
+// until everything else has had its turn.
+const FAMILY = window.FAMILY || {};
+const famOf = id => FAMILY[id] || id;
 function freshFirst(pool) {
-  const rank = new Map(seenList().map((id, i) => [id, i]));
-  return shuffle(pool.slice()).sort((a, b) => (rank.has(a) ? rank.get(a) : -1) - (rank.has(b) ? rank.get(b) : -1));
+  const rank = new Map(); seenList().forEach((id, i) => { rank.set(id, i); rank.set('f:' + famOf(id), i); });
+  const r = id => Math.max(rank.has(id) ? rank.get(id) : -1, rank.has('f:' + famOf(id)) ? rank.get('f:' + famOf(id)) : -1);
+  return shuffle(pool.slice()).sort((a, b) => r(a) - r(b));
+}
+// take n from an ordered list, at most one per family when that is possible
+function onePerFamily(list, n, ok) {
+  const out = [], fams = new Set(), spare = [];
+  for (const id of list) { if (ok && !ok(id)) continue; const f = famOf(id); if (fams.has(f)) { spare.push(id); continue; } fams.add(f); out.push(id); if (out.length === n) return out; }
+  for (const id of spare) { out.push(id); if (out.length === n) break; }
+  return out;
 }
 
 /* ---------- sound: synthesized in the browser, no audio files ---------- */
@@ -960,7 +973,7 @@ function seeded(seed) { let v = 2166136261; for (const ch of seed) v = Math.imul
 function pickSeven(pool, rnd) {
   let ids = pool.slice().sort(); for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
   if (rnd === Math.random) ids = freshFirst(ids); // play-as-often packs: unseen prompts first
-  const out = []; for (const id of ids) { if (usable(id)) out.push(id); if (out.length === 7) break; } return out;
+  return onePerFamily(ids, 7, usable);
 }
 const dayNoOf = key => { const p = key.split('-').map(Number); return Math.max(1, Math.floor((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 10, 9)) / 864e5) + 1); };
 // No repeats: the pool is shuffled once per cycle and dealt out seven a day until it runs out, then reshuffled.
@@ -1092,7 +1105,7 @@ function startRound(n) {
   let pool = TOPIC_IDS.filter(id => !used.includes(id));
   if (pool.length < 5) { used = []; pool = TOPIC_IDS.slice(); }
   const order = ordered().map(p => p.id), picks = [];
-  for (const id of freshFirst(pool)) { if (usable(id)) picks.push(id); if (picks.length === 5) break; }
+  picks.push(...onePerFamily(freshFirst(pool), 5, usable));
   markSeen(picks);
   patchRoom({
     phase: 'pick', round: n, options: picks, used,

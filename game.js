@@ -430,8 +430,9 @@ function matchCore(topicId, input) {
     // the first letter dropped ("The murfs" for The Smurfs) is a slip too, on a long enough answer
     if (key.length >= 6 && key.slice(1) === k && /^the\s/i.test(String(input).trim())) { if (best > 1) { best = 1; hits = new Set([e]); longer = new Set([e]); } else if (best === 1) { hits.add(e); longer.add(e); } continue; }
     if (key.length < 4 || (key[0] !== k[0] && loose(key)[0] !== lk[0])) continue;
-    // a near miss as typed beats one that only works once the spelling is loosened
-    let d = lev(k, key, max); if (d > max) { const lm = Math.max(1, max - 1), d2 = lev(lk, loose(key), lm); if (d2 <= lm) d = d2 + 0.5; }
+    // a near miss as typed beats one that only works once the spelling is loosened; the loosened spelling
+    // only rescues an answer one slip past the allowance as typed ("eephor" is three letters off "Error")
+    let d = lev(k, key, max + 1); if (d > max) { const lm = Math.max(1, max - 1), d2 = d <= max + 1 ? lev(lk, loose(key), lm) : lm + 1; if (d2 <= lm) d = d2 + 0.5; }
     else if (d >= 2 && hardSubs(k, key) > 1) continue;
     if (d < best) { best = d; hits = new Set([e]); longer = new Set(); } else if (d === best && d <= max + 0.5) hits.add(e);
     if (d === best && d <= max + 0.5 && key.length > k.length) longer.add(e);

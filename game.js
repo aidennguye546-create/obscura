@@ -2307,7 +2307,7 @@ addEventListener('online', checkIn);
   };
   window.__fx = fx;
   function build() {
-    W = innerWidth; H = innerHeight; DPR = window.__low ? 1 : Math.min(2, devicePixelRatio || 1); if (W * H * DPR * DPR > 3.4e6) DPR = Math.max(1, Math.sqrt(3.4e6 / (W * H))); mpp = MPS / H; barkP = null; fxInit();
+    W = innerWidth; H = innerHeight; DPR = window.__low ? 1 : Math.min(window.__dprCap || 2, devicePixelRatio || 1); if (W * H * DPR * DPR > 3.4e6) DPR = Math.max(1, Math.sqrt(3.4e6 / (W * H))); mpp = MPS / H; barkP = null; fxInit();
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     const mk = (n, par) => Array.from({ length: n }, () => ({ x: R() * W, y: R() * H, par: par * (0.6 + R() * 0.8), a: 0.25 + R() * 0.5, r: 2 + R() * 3, ph: R() * 9, c: ['#6fbf58', '#9bd66a', '#d9c24a', '#3f8f45', '#c98a3a'][R() * 5 | 0] }));
     leavesA = mk(Math.round(W * H / 22000), 0.55); leavesB = mk(Math.round(W * H / 40000), 1.25);
@@ -5386,8 +5386,27 @@ addEventListener('online', checkIn);
     fxFlush();
   }
   const easeIO = p => p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2, easeSine = p => -(Math.cos(Math.PI * p) - 1) / 2;
+  // Smoothness: the forest is drawn at most 60 times a second (120 Hz screens would otherwise draw it twice as often),
+  // not at all while the pack machine covers it, and a device that keeps falling behind gets a lighter picture:
+  // first a lower canvas resolution, then no bloom glow. The player's own "low" setting still overrides all of it.
+  let gateAcc = 0, gateLast = 0, slowT = 0, govCool = 0, emaMs = 16.7;
+  function govern(raw) {
+    if (raw > 200 || reduce) return; // a tab switch or a stall, not steady slowness
+    emaMs += (raw - emaMs) * 0.05; govCool = Math.max(0, govCool - raw);
+    slowT = emaMs > 25 ? slowT + raw : 0;
+    if (slowT < 2000 || govCool > 0) return;
+    slowT = 0; govCool = 4000;
+    if (!window.__low && DPR > 1.05) { window.__dprCap = DPR > 1.6 ? 1.5 : 1; build(); }
+    else if (!window.__noBloom) { window.__noBloom = true; if (bloomC) bloomC.style.display = 'none'; }
+  }
+  window.__perf = () => ({ fps: Math.round(1000 / emaMs), DPR, cap: window.__dprCap || null, bloom: !window.__noBloom });
   function frame(now) {
     requestAnimationFrame(frame);
+    if (document.body.classList.contains('incards')) { last = 0; gateLast = 0; return; }
+    const raw = gateLast ? now - gateLast : 16.7; gateLast = now; gateAcc += raw;
+    if (gateAcc < 14) return;
+    gateAcc = Math.max(0, Math.min(16.7, gateAcc - 16.7));
+    govern(now - (last || now) || 16.7);
     const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
     if (hold > 0) { hold -= dt; draw(0); return; }
     if (!reduce) time += dt;
@@ -5466,7 +5485,7 @@ addEventListener('online', checkIn);
     if (burstT > 0) { burstT += dt / 1.5; if (burstT >= 1) { burstT = 0; orbit = null; } }
     if (orbit && !orbit.keep && !window.__sink && !window.__lines && burstT === 0) orbit = null;
     draw(dt);
-    if (bloomX && !window.__low && cv.width > 0 && cv.height > 0 && W > 0 && H > 0 && (bloomN++ & 1) === 0) { const bw = Math.max(1, Math.ceil(W / 4)), bh = Math.max(1, Math.ceil(H / 4)); if (bloomC.width !== bw || bloomC.height !== bh) { bloomC.width = bw; bloomC.height = bh; } bloomX.drawImage(cv, 0, 0, bw, bh); const bo = (window.__theme === 'geo' ? (camS > 1900 && camS < 6800 ? 0.75 : 0.5) : window.__theme === 'sports' ? 0.55 : camS > FLOOR ? 0.78 : 0.5).toFixed(2); if (bloomC.style.opacity !== bo) bloomC.style.opacity = bo; }
+    if (bloomX && !window.__low && !window.__noBloom && cv.width > 0 && cv.height > 0 && W > 0 && H > 0 && (bloomN++ % 3) === 0) { const bw = Math.max(1, Math.ceil(W / 4)), bh = Math.max(1, Math.ceil(H / 4)); if (bloomC.width !== bw || bloomC.height !== bh) { bloomC.width = bw; bloomC.height = bh; } bloomX.drawImage(cv, 0, 0, bw, bh); const bo = (window.__theme === 'geo' ? (camS > 1900 && camS < 6800 ? 0.75 : 0.5) : window.__theme === 'sports' ? 0.55 : camS > FLOOR ? 0.78 : 0.5).toFixed(2); if (bloomC.style.opacity !== bo) bloomC.style.opacity = bo; }
   }
   addEventListener('pointerdown', e => { if (frog.hop > 0 || Math.hypot(e.clientX - frog.x, e.clientY - frog.y) > 36 || (e.target.closest && e.target.closest('button, input, select'))) return; frog.hop = 1; snd('ribbit'); { const pop = h('span', { class: 'ribbit', 'aria-hidden': 'true', text: (window.__pal && window.__pal.id !== 'frog') ? 'hey!' : 'ribbit!', style: 'left:' + Math.round(frog.x) + 'px;top:' + Math.round(frog.y - 34) + 'px' }); document.body.append(pop); setTimeout(() => pop.remove(), 1000); } for (let q = 0; q < 6; q++) fx.bubble(frog.x + D(-16, 26), frog.y - 16, 1 + 3 * R()); fx.burst(frog.x, frog.y, '#ff7a45', 10, 0.5); });
   // deep down, the pointer leaves a trail of sparks

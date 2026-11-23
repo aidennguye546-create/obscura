@@ -10,9 +10,12 @@
   // p: { x, y, vx, vy, g (gravity), drag, life (s), size, color, kind: dot|spark|ring|star|glow, to: {x,y} (homing), grow }
   const add = p => { p.t = 0; p.life = p.life || 1; p.drag = p.drag ?? 0.985; P.push(p); };
   let last = performance.now();
+  let blank = false;
   (function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
-    g.clearRect(0, 0, W, H);
+    // nothing to draw: leave the empty layer alone instead of wiping the whole screen every frame
+    if (!P.length && !bolts.length) { if (!blank) { g.clearRect(0, 0, W, H); blank = true; } requestAnimationFrame(loop); return; }
+    blank = false; g.clearRect(0, 0, W, H);
     for (let i = P.length - 1; i >= 0; i--) {
       const p = P[i]; p.t += dt; const k = 1 - p.t / p.life; if (k <= 0) { P.splice(i, 1); continue; }
       if (p.to) { const dx = p.to.x - p.x, dy = p.to.y - p.y, d = Math.hypot(dx, dy) || 1; p.vx += dx / d * (p.pull || 900) * dt; p.vy += dy / d * (p.pull || 900) * dt; if (d < 10) { P.splice(i, 1); continue; } }

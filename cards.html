@@ -227,6 +227,11 @@ body.quake #open .center { animation: quake 0.7s ease; }
 .card .face { position: absolute; inset: 0; border-radius: calc(var(--w) * 0.05); backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
 .card .inner { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform 0.75s cubic-bezier(.3,1.45,.5,1); transform: rotateY(180deg) rotateX(var(--rx)) rotateY(var(--ry)); }
 .card.up .inner { transform: rotateY(0deg) rotateX(var(--rx)) rotateY(var(--ry)); }
+/* only the side facing you is drawn: the browser's own backface hiding fails once a face holds holo, tags or particles,
+   so each side is switched off outright, at the moment the flip passes edge-on */
+.card .front { visibility: hidden; transition: visibility 0s linear 0.15s; }
+.card.up .front { visibility: visible; }
+.card.up .back { visibility: hidden; transition: visibility 0s linear 0.15s; }
 .card.pop .inner { animation: cpop 0.6s cubic-bezier(.3,1.6,.5,1); }
 @keyframes cpop { 0% { scale: 1.18; } 100% { scale: 1; } }
 /* the back */
@@ -546,7 +551,9 @@ const wallet = () => { const w = $('wallet'); if (shown == null) { shown = spore
   const cv = $('bg'), g = cv.getContext('2d'); let W, H; const flies = [];
   const size = () => { W = cv.width = innerWidth; H = cv.height = innerHeight; }; size(); addEventListener('resize', size);
   for (let i = 0; i < 46; i++) flies.push({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, a: Math.random() * 6, s: 0.2 + Math.random() * 0.5, z: 1 + Math.random() * 2 });
-  (function loop(t) { g.clearRect(0, 0, W, H); for (const f of flies) { f.a += 0.01 * f.s; f.x += Math.cos(f.a) * f.s; f.y += Math.sin(f.a * 0.7) * f.s - 0.08; if (f.y < -10) f.y = H + 10; if (f.x < -10) f.x = W + 10; if (f.x > W + 10) f.x = -10;
+  let lastT = 0;
+  (function loop(t) { if (t - lastT < 30 || $('open').classList.contains('on')) { requestAnimationFrame(loop); return; } lastT = t; // 30 fps is plenty for drifting fireflies, and none behind the opening screen
+    g.clearRect(0, 0, W, H); for (const f of flies) { f.a += 0.01 * f.s; f.x += Math.cos(f.a) * f.s; f.y += Math.sin(f.a * 0.7) * f.s - 0.08; if (f.y < -10) f.y = H + 10; if (f.x < -10) f.x = W + 10; if (f.x > W + 10) f.x = -10;
     const k = 0.4 + 0.6 * Math.abs(Math.sin(t / 900 + f.a * 3)); g.fillStyle = 'rgba(200,255,90,' + (0.12 + 0.35 * k) + ')'; g.fillRect(f.x | 0, f.y | 0, f.z, f.z); g.fillStyle = 'rgba(200,255,90,' + (0.05 * k) + ')'; g.fillRect((f.x - 3) | 0, (f.y - 3) | 0, f.z + 6, f.z + 6); }
     requestAnimationFrame(loop); })(0);
 })();

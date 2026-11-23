@@ -904,7 +904,15 @@ function leverControls() {
     setAng(a); if (a > 80) { dragging = false; fire(); } });
   const release = () => { if (!dragging) return; dragging = false; if (moved < 8) { M.fire(); return; } springBack(); };
   grab.addEventListener('pointerup', release); grab.addEventListener('pointercancel', release);
-  addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !$('open').classList.contains('on') && !document.querySelector('.sheet, .zoom') && !M.busy) { e.preventDefault(); M.fire(); } });
+  // Space or Enter always does the next thing: pull, open the pack in the tray, tear, flip, next card, pull again
+  addEventListener('keydown', e => {
+    if (e.key !== ' ' && e.key !== 'Enter') return;
+    if (e.repeat || /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '') || document.querySelector('.sheet, .zoom')) return;
+    e.preventDefault(); if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    if ($('open').classList.contains('on')) { if (NEXT) NEXT(); return; }
+    const waiting = [...M.tray.querySelectorAll('.pack.idle')].find(p => !p.dataset.used); if (waiting) { waiting.click(); return; }
+    if (!M.busy) M.fire();
+  });
   // spring back with a little overshoot
   function springBack() { let v = 0; (function step() { v += (-12 - ang) * 0.08; v *= 0.78; setAng(ang + v); if (Math.abs(v) > 0.05 || Math.abs(ang + 12) > 0.3) raf = requestAnimationFrame(step); else setAng(-12); })(); }
   async function fire() {
@@ -987,6 +995,7 @@ async function pull() {
 
 /* ================= OPENING ================= */
 async function openPack(k, ed, cards, mini, hintCard) {
+  NEXT = null;
   const ov = $('open'); ov.classList.add('on'); ov.querySelectorAll('.center,.rays,.hint,.summary').forEach(x => x.remove());
   const rays = h('div', { class: 'rays' }), center = h('div', { class: 'center' }), pack = packEl(k, ed), deck = h('div', { class: 'deck' });
   OPENED = { theme: k, ed };
@@ -1024,7 +1033,7 @@ async function openPack(k, ed, cards, mini, hintCard) {
   await wait(480); pack.remove();
   reveal(cards, els, deck, rays);
 }
-let OPENED = null;
+let OPENED = null, NEXT = null; // NEXT: what Space or Enter does on the opening screen right now
 // tear along the dashed line with a finger (or tap to tear it for you)
 function tear(pack, hc) {
   return new Promise(res => {
@@ -1038,6 +1047,7 @@ function tear(pack, hc) {
       const r = pack.getBoundingClientRect(), x = r.left + r.width * prog, y = r.top + r.height * 0.15; if (Math.random() < 0.7) FX.sparks(x, y, Math.random() < 0.5 ? '#fff' : hc, 3, -Math.PI / 2, 2);
       if (prog - lastTick > 0.04) { SFX.tearTick(); lastTick = prog; } if (prog >= 1 && !done) { done = true; res(); } };
     const auto = async () => { for (let f = 0; f <= 1.001; f += 0.05) { set(f); await wait(18); } };
+    NEXT = () => { if (!done) { NEXT = null; auto(); } };
     pack.addEventListener('pointerdown', e => { start = e.clientX; pack.setPointerCapture(e.pointerId); SFX.crinkle(3); });
     pack.addEventListener('pointermove', e => { if (start == null || done) return; set(Math.min(1, Math.abs(e.clientX - start) / (W * 0.8))); });
     pack.addEventListener('pointerup', e => { const moved = Math.abs(e.clientX - (start ?? e.clientX)); start = null; if (!done && moved < 8) auto(); });
@@ -1138,10 +1148,12 @@ function reveal(cards, els, deck, rays) {
     if (el.classList.contains('drag')) { if (Math.abs(dx) > 90) away(Math.sign(dx)); else { el.classList.remove('drag'); el.style.transform = ''; } return; }
     if (moved > 8 || busy) return;
     if (!el.classList.contains('up')) await flipCard(); else away(-1); });
+  NEXT = async () => { if (busy || i >= els.length) return; const el = els[i]; if (!el.classList.contains('up')) await flipCard(); else away(-1); };
 }
 
 /* ================= SUMMARY ================= */
 function summary(cards) {
+  NEXT = () => { const b = $('open').querySelector('.summary .btns .go'); if (b) b.click(); };
   const ov = $('open'); ov.querySelectorAll('.center,.rays,.hint,.skipall').forEach(x => x.remove());
   const b = best(cards), bi = cards.indexOf(b), T = TIERS[b.tier], E = b.ench && CardArt.ENCH[b.ench], col = E ? E.color : (b.tier >= 4 ? '#ffd24a' : T.color);
   const prev = h('div', { class: 'preview' }), bestBox = h('div', { class: 'best' }), bestCard = makeCard(b); bestCard.classList.add('up'); bestBox.append(bestCard);
@@ -1200,7 +1212,7 @@ function coinFountain(x, y, tx, ty, n, done) {
   for (let i = 0; i < n; i++) setTimeout(() => { const c = h('div', { class: 'flycoin', text: '✦' }); document.body.append(c); const mx = (x + tx) / 2 + (Math.random() - 0.5) * 160, my = Math.min(y, ty) - 60 - Math.random() * 80;
     c.animate([{ transform: 'translate(' + x + 'px,' + y + 'px) scale(0.6)' }, { transform: 'translate(' + mx + 'px,' + my + 'px) scale(1.1) rotateY(540deg)', offset: 0.5 }, { transform: 'translate(' + tx + 'px,' + ty + 'px) scale(0.5) rotateY(1080deg)' }], { duration: 650, easing: 'cubic-bezier(.4,0,.6,1)' }).onfinish = () => { c.remove(); SFX.coinhit(i); const wl = $('wallet'); wl.classList.remove('bump'); void wl.offsetWidth; wl.classList.add('bump'); if (i === n - 1) done(); }; }, i * 70);
 }
-function closeOpen() { const ov = $('open'); ov.classList.remove('on'); ov.querySelectorAll('.summary,.gallery,.center,.skipall').forEach(x => x.remove()); FX.clear(); $('open').querySelector('.vig').style.setProperty('--vc', 'transparent'); M.busy = false; ledIdle(); M.tray.querySelectorAll('.pack').forEach(p => { if (p.dataset.used) p.remove(); }); if (M.tray.querySelector('.pack')) { M.busy = true; ledSay('OPEN YOUR PACKS', true); } }
+function closeOpen() { NEXT = null; const ov = $('open'); ov.classList.remove('on'); ov.querySelectorAll('.summary,.gallery,.center,.skipall').forEach(x => x.remove()); FX.clear(); $('open').querySelector('.vig').style.setProperty('--vc', 'transparent'); M.busy = false; ledIdle(); M.tray.querySelectorAll('.pack').forEach(p => { if (p.dataset.used) p.remove(); }); if (M.tray.querySelector('.pack')) { M.busy = true; ledSay('OPEN YOUR PACKS', true); } }
 
 /* ================= gallery ================= */
 function gallery(ed = 'std') {

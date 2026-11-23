@@ -846,12 +846,12 @@ function readName(solo) {
   S.me.name = v; if (typed) ls.set('name', v);
   return v;
 }
-function freshMine(g, joinedAt) { return { name: S.me.name, joinedAt: joinedAt || Date.now(), g, rounds: {} }; }
+function freshMine(g, joinedAt) { return { name: S.me.name, joinedAt: joinedAt || Date.now(), g, rounds: {}, sc: myShowcase() }; }
 
 function startSolo() {
   if (!readName(true)) return;
   say('');
-  S.mode = 'solo'; S.code = 'SOLO';
+  S.mode = 'solo'; S.code = 'SOLO'; S._soloAt = Date.now();
   S.room = { host: S.me.id, phase: 'lobby', g: 1, round: 0, rounds: 3, dives: 5, secs: 25, used: [] };
   S.mine = freshMine(1);
   S.players = { [S.me.id]: S.mine };
@@ -897,7 +897,7 @@ async function joinRoom(code, silent) {
     const meRef = ref.collection('players').doc(S.me.id);
     const old = await withTimeout(meRef.get());
     const prev = old.exists ? clone(old.data()) : null;
-    const mine = prev && prev.g === room.g ? Object.assign(prev, { name: S.me.name, left: false }) : freshMine(room.g, prev && prev.joinedAt);
+    const mine = prev && prev.g === room.g ? Object.assign(prev, { name: S.me.name, left: false, sc: myShowcase() }) : freshMine(room.g, prev && prev.joinedAt);
     await withTimeout(meRef.set(clone(mine)));
     if (S.mode) return; // started something else while this was loading
     S.mode = 'online'; S.code = code; S.room = room; S.mine = mine;
@@ -1424,7 +1424,7 @@ function boardRows(withRound) {
     return h('li', { class: (p.id === S.me.id ? 'me' : '') + (up ? ' up' : '') },
       multi && h('span', { class: 'rk', style: 'color:' + (MEDAL[rank - 1] || '#8fae8f'), text: String(rank) }),
       icon('krill', colorOf(p.id), 24),
-      h('span', { class: 'who' }, h('span', { text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }), lead && h('i', { class: 'crown', 'aria-label': 'in the lead', text: '♛' })),
+      h('span', { class: 'who' }, h('span', { text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }), lead && h('i', { class: 'crown', 'aria-label': 'in the lead', text: '♛' }), scChip(p, true)),
       withRound && h('span', { class: 'count', text: roundOf(p, r.round).a.length + '/' + (r.dives || 5) }),
       multi && rank > 1 && top > 0 && h('small', { class: 'gap', text: '−' + fmt(top - total(p)) }),
       // depth stops at the bottom of the forest, so rivals are ranked and shown by points, which never cap
@@ -1562,12 +1562,95 @@ function openMenu() {
       tile('online', '', 'Party room', () => { goHome(); const n = $('nick'); if (n) n.focus(); }, ['krill', '#ff7a45']),
       tile('archive', '⟲', 'Archive', () => { goHome(); openArchive(); }),
       tile('packs', '▦', 'Themed packs', () => { goHome(); openPacks(); }),
+      tile('cards', '✦', 'Card packs', openCards),
       tile('me', '☻', 'My Obscura', openMe),
       tile('settings', '⚙', 'Settings', openSettings),
       tile('faq', '?', 'How to play', openHowto),
       S.mode && tile('home', '⌂', 'Home', goHome)),
     h('p', { class: 'fine', style: 'text-align:left', text: 'pure obscura.' }));
 }
+/* ---------- card packs: spores for every game, a pack machine in the corner, and your showcase card on show ---------- */
+// The machine itself is cards.html, opened over the game in a frame; it shares CardStore (cards-store.js) with this page.
+const CS = window.CardStore || null;
+function myShowcase() { const c = CS && CS.showcase(); return c ? { n: c.n, t: c.t, e: c.e || 0, f: c.f || 0, fa: c.fa || 0, em: c.em || '' } : null; }
+const ENCH = () => (window.CardArt && window.CardArt.ENCH) || {};
+const CARD_TIER = ['#d7e1f2', '#7deaff', '#ff4d4d', '#bfa7ff', '#ffe08a'];
+// a little card next to a name: the answer's picture, its name, and the enchantment's tag in that enchantment's colours
+function scChip(p, short) {
+  const c = p && p.sc; if (!c || !c.n) return null;
+  const E = c.e && ENCH()[c.e], col = E ? E.color : CARD_TIER[c.t] || '#d7e1f2', nm = short && c.n.length > 12 ? c.n.slice(0, 11) + '…' : c.n;
+  return h('span', { class: 'scc t' + c.t + (E ? ' ench' : '') + (c.f || c.fa ? ' foil' : ''), style: '--cc:' + col + (E ? ';--cg:' + E.glow : ''), title: (E ? E.name + ' ' : '') + (c.fa ? 'full art ' : '') + c.n },
+    h('i', { text: c.em || '◆' }), h('span', { text: nm }), E && h('b', { text: E.tag }));
+}
+function openCards() {
+  if ($('cardsfr')) return;
+  document.querySelectorAll('.modal').forEach(m => m.remove());
+  const f = h('iframe', { id: 'cardsfr', src: 'cards.html', title: 'Card packs', allow: 'autoplay' });
+  const w = h('div', { id: 'cardsov', class: 'cards-ov' }, f);
+  document.body.append(w); document.body.classList.add('incards');
+  const tc = $('trycards'); if (tc) tc.classList.add('gone');
+  f.addEventListener('load', () => { try { f.contentWindow.focus(); } catch (e) { /* fine */ } });
+}
+window.closeCards = () => {
+  const w = $('cardsov'); if (!w) return;
+  w.classList.add('out'); document.body.classList.remove('incards');
+  setTimeout(() => { w.remove(); cardsScreen(); }, 280);
+  // the machine may have switched the sound off or on
+  if (Sound.muted() !== (ls.get('mute') === '1')) { Sound.toggle(); const mb = $('mute'); if (mb) { mb.textContent = Sound.muted() ? 'Sound off' : 'Sound on'; mb.setAttribute('aria-pressed', String(Sound.muted())); } }
+  if (S.mine) { const sc = myShowcase(); if (JSON.stringify(sc) !== JSON.stringify(S.mine.sc)) { S.mine.sc = sc; saveMe(); refresh(); } }
+};
+// the "try me" pack peeking out of the bottom-right corner
+function tryPack() {
+  if ($('trycards') || !CS) return;
+  const n = h('b', { class: 'tc-n' }), bub = h('span', { class: 'tc-bub', text: 'Try me!' });
+  const el = h('button', { id: 'trycards', type: 'button', 'aria-label': 'Open card packs', onclick: () => { Sound.unlock(); snd('click'); openCards(); } },
+    bub, h('span', { class: 'tc-pack' }, h('span', { class: 'tc-foil' }), icon('moth', '#ffe08a', 30), h('span', { class: 'tc-word', text: 'PACKS' }), h('span', { class: 'tc-shine' })), n);
+  document.body.append(el);
+  const upd = () => { const k = CS.packsReady(); n.textContent = k ? k + (k > 1 ? ' packs' : ' pack') : CS.spores() + '✦'; el.classList.toggle('ready', k > 0);
+    bub.textContent = k > 1 ? k + ' packs ready!' : k ? 'A pack is ready!' : 'Try me!'; };
+  upd(); CS.on(upd);
+  // every so often it pops further out and says something
+  setInterval(() => { if (el.classList.contains('gone') || document.hidden) return; el.classList.remove('peek'); void el.offsetWidth; el.classList.add('peek'); }, 9000);
+  setTimeout(() => el.classList.add('peek'), 1600);
+}
+// which screens get the corner pack and which get the enchantment playing in the background
+function cardsScreen() {
+  tryPack();
+  const r = S.room, calm = !S.mode || !r || r.phase === 'lobby' || r.phase === 'final';
+  const tc = $('trycards'); if (tc) tc.classList.toggle('gone', !calm || !!$('cardsov'));
+  const sc = myShowcase(), E = sc && sc.e && ENCH()[sc.e], want = !!(E && S.mode && r && r.phase === 'play' && !SET.low);
+  let cv = $('encfx');
+  if (!want) { if (cv) cv.remove(); window.__encLand = null; return; }
+  if (cv && cv.dataset.k === sc.e) return; if (cv) cv.remove();
+  cv = h('canvas', { id: 'encfx', 'aria-hidden': 'true', width: 300, height: 420 }); cv.dataset.k = sc.e; document.body.append(cv);
+  window.CardArt.particles(cv, sc.e, 2.2);
+  window.__encLand = (fx, x, y, tier) => { try { (E.cols.concat(E.color)).forEach((c, i) => fx.burst(x, y, c, 10 + tier * 4, 0.6 + i * 0.15)); } catch (e) { /* effects are optional */ } };
+}
+// spores for a finished game, once per game, then a banner on the result screen
+function payout() {
+  const r = S.room; if (!CS || !S.mode || !r || r.phase !== 'final' || !S.mine) return;
+  const key = r.fixed ? 'run:' + r.kind + ':' + (r.day || dayKey()) + ':' + (r.daily ? 'd' : r.kind === 'daily' ? 'x' : 'f') + ':' + r.fixed.join(',')
+    : S.mode === 'online' ? 'room:' + S.code + ':' + (r.createdAt || '') + ':' + r.g : 'solo:' + (S._soloAt || 0) + ':' + r.g;
+  const ans = Object.values((S.mine.g === r.g && S.mine.rounds) || {}).flatMap(rd => rd.a || []), obs = ans.filter(a => a[1] === 4).length;
+  const label = r.fixed ? (r.kind === 'daily' ? 'daily descent' : PACKS[r.kind] ? PACKS[r.kind].label.toLowerCase() + ' pack' : 'run') : S.mode === 'online' ? 'party room' : 'free play';
+  const got = CS.earn(key, total(S.mine), obs, r.kind === 'daily' && !r.day, label);
+  if (!got) return;
+  const sec = document.querySelector('#app > section.final'); if (!sec) return;
+  const k = CS.packsReady();
+  const ban = h('div', { class: 'spores' }, h('div', { class: 'sp-n' }, h('b', { text: '+' + got + '✦' }), h('span', { text: 'spores earned' + (obs ? ' · +' + obs * 5 + ' for Obscuras' : '') })),
+    h('button', { class: 'pink', type: 'button', text: k ? 'Open ' + (k > 1 ? k + ' packs' : 'a pack') + ' →' : 'Pack machine →', onclick: openCards }));
+  const at = sec.querySelector('.bigscore') || sec.querySelector('#winner'); (at || sec.firstChild).after(ban);
+  snd('best');
+  // a few spores fly to the corner pack
+  const tc = $('trycards'), br = ban.getBoundingClientRect(); if (!tc || SET.low) return;
+  const tr = tc.getBoundingClientRect();
+  for (let i = 0; i < Math.min(10, 3 + Math.round(got / 6)); i++) setTimeout(() => { const s = h('i', { class: 'flyspore', text: '✦' }); document.body.append(s);
+    const sx = br.left + br.width * (0.2 + Math.random() * 0.3), sy = br.top + br.height / 2, ex = tr.left + tr.width / 2, ey = tr.top + 20;
+    s.animate([{ transform: 'translate(' + sx + 'px,' + sy + 'px) scale(1)' }, { transform: 'translate(' + ((sx + ex) / 2 + (Math.random() - 0.5) * 120) + 'px,' + (Math.min(sy, ey) - 80) + 'px) scale(1.4)', offset: 0.5 }, { transform: 'translate(' + ex + 'px,' + ey + 'px) scale(0.5)' }], { duration: 700, easing: 'cubic-bezier(.4,0,.6,1)' }).onfinish = () => { s.remove(); tc.classList.remove('bonk'); void tc.offsetWidth; tc.classList.add('bonk'); };
+  }, 300 + i * 80);
+}
+// changing your showcase while in a room shows it to everyone straight away
+if (CS) CS.on((st, why) => { if (why === 'showcase' && S.mine) { S.mine.sc = myShowcase(); saveMe(); if (S.mode) refresh(); } });
 function openHowto() { modal('howto', 'Obscura', 'How to play', h('ul', { class: 'howlist' }, HOWTO.map(tx => h('li', { text: tx }))), h('div', { class: 'ph' }, h('span', { text: 'The finds' })), tierLegend(),
   h('button', { class: 'small', type: 'button', style: 'align-self:center', text: '▶ Watch an Obscura land', onclick: () => { document.querySelectorAll('.modal').forEach(m => m.remove()); Sound.unlock(); snd('land', 4); window.__obscura(Math.round(innerHeight * 0.36)); } })); }
 function openPacks() {
@@ -1662,7 +1745,7 @@ function buildLobby() {
 function refreshLobby() {
   $('board').replaceChildren(...ordered().map(p => h('li', { class: p.id === S.me.id ? 'me' : '' },
     h('span', { class: 'dot', style: 'background:' + colorOf(p.id) }),
-    h('span', { class: 'who', text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }),
+    h('span', { class: 'who', text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }), scChip(p),
     p.id === S.room.host && h('span', { class: 'count', text: 'host' }))));
   $('o-rounds').value = S.room.rounds; $('o-dives').value = S.room.dives || 5; $('o-secs').value = S.room.secs;
 }
@@ -1916,7 +1999,7 @@ function refreshFinal() {
     const n = (p.g === S.room.g && p.rounds) ? Object.values(p.rounds).reduce((s, r) => s + r.a.filter(x => x[1] >= 0).length, 0) : 0;
     return h('li', { class: p.id === S.me.id ? 'me' : '' },
       h('span', { class: 'dot', style: 'background:' + colorOf(p.id) }),
-      h('span', { class: 'who', text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }),
+      h('span', { class: 'who', text: nameOf(p) + (p.id === S.me.id ? ' (you)' : '') }), scChip(p),
       h('span', { class: 'count', text: n + ' answers · reached the ' + zoneOf(depthOf(p)).toLowerCase() }),
       h('span', { class: 'depth', text: ps.length > 1 ? fmt(total(p)) + ' pts' : fmt(depthOf(p)) + ' m' }));
   }));
@@ -1972,7 +2055,8 @@ function render() {
     setTimeout(() => scr.classList.remove('enter'), 1800);
     app.replaceChildren(scr);
     if (S.mode) snd(r.phase === 'play' ? 'begin' : r.phase === 'final' ? 'surface' : r.phase === 'pick' ? 'pick' : 'click');
-    if (S.mode && r.phase === 'final') { const dpt = window.__depth || 0; window.__lines = null; window.__depth = 0; if (dpt > 20) window.__sink = { rise: true, to: 0, dur: Math.min(6, Math.max(2.4, dpt / 700)), start: performance.now() }; setTimeout(() => snd('fanfare'), Math.min(6, Math.max(2.4, dpt / 700)) * 1000); if (r.fixed) setTimeout(dailyStats, 50); }
+    cardsScreen();
+    if (S.mode && r.phase === 'final') { setTimeout(payout, 1400); const dpt = window.__depth || 0; window.__lines = null; window.__depth = 0; if (dpt > 20) window.__sink = { rise: true, to: 0, dur: Math.min(6, Math.max(2.4, dpt / 700)), start: performance.now() }; setTimeout(() => snd('fanfare'), Math.min(6, Math.max(2.4, dpt / 700)) * 1000); if (r.fixed) setTimeout(dailyStats, 50); }
     window.scrollTo(0, 0);
   }
   refresh();
@@ -5338,7 +5422,7 @@ addEventListener('online', checkIn);
       if (p >= 1) {
         window.__sink = null; window.__sinkP = 1;
         // landing, rarity by rarity as Krillion does it: no freeze-frame, no zoom jolt, no glow disc
-        flash = 0; punch = 0; hold = 0; snd('impact', tr); snd('land', tr);
+        flash = 0; punch = 0; hold = 0; snd('impact', tr); snd('land', tr); if (window.__encLand) window.__encLand(fx, W / 2, AY, tr);
         if (tr === 0) fx.burst(W / 2, AY, '#8fa3c4', 8, 0.4);
         else if (tr === 1) fx.burst(W / 2, AY, SPARK[1], 22, 0.8);
         else if (tr === 2) { fx.puff(W / 2, AY, 22); fx.burst(W / 2, AY, SPARK[2], 26, 0.9); fx.shake(); fx.flash('rgba(255,82,82,.45)', 1, 240); }

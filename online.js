@@ -44,5 +44,7 @@
     try { fs.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* settings already fixed */ }
     return { doc: function (p) { return doc(fs.doc(p)); }, collection: function (p) { return col(fs.collection(p)); } };
   });
+  // accounts (account.js) sign in through the same Firebase app; that part loading late or failing never holds up rooms
+  window.fbReady = ready.then(function () { return load(V + 'firebase-auth-compat.js'); }).then(function () { return firebase; });
   window.claude = { use: function (what) { return what === 'db' ? ready : Promise.resolve(null); } };
 })();

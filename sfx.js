@@ -48,6 +48,8 @@
   const S = {
     toggle() { ctx(); muted = !muted; try { muted ? localStorage.setItem('tr_mute', '1') : localStorage.removeItem('tr_mute'); } catch (e) { /* blocked */ } master.gain.setTargetAtTime(muted ? 0 : 0.9, ac.currentTime, 0.05); return !muted; },
     muted: () => muted,
+    // coming back after stop(): sound up again, following the game's switch in case it changed meanwhile
+    wake() { try { muted = localStorage.getItem('tr_mute') === '1'; } catch (e) { /* blocked */ } if (!ac) return; if (ac.state === 'suspended') ac.resume(); master.gain.setTargetAtTime(muted ? 0 : 0.9, ac.currentTime, 0.05); },
     // closing the machine: let everything ring out, then stop
     stop() { if (ac && ac.state === 'running') { master.gain.setTargetAtTime(0, ac.currentTime, 0.15); setTimeout(() => { try { ac.suspend(); } catch (e) { /* gone */ } }, 600); } },
     // a soft arcade hum under everything: two slow detuned pads and the odd distant bleep

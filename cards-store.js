@@ -53,7 +53,8 @@
     designs: () => Object.keys(st.designs).length,
     // the card you show off in party rooms; its enchantment dresses up your game
     showcase: () => st.sc,
-    setShowcase(c) { st.sc = c ? { n: c.name, p: c.prompt, t: c.tier, f: c.finish || 0, e: c.ench || 0, fa: c.full ? 1 : 0, em: c.emoji || '' } : null; save(false, 'showcase'); },
+    // a: the card's art, c: its type, o: its odds, so the game can draw your equipped card without the pack machine's files
+    setShowcase(c) { st.sc = c ? { n: c.name, p: c.prompt, t: c.tier, f: c.finish || 0, e: c.ench || 0, fa: c.full ? 1 : 0, em: c.emoji || '', a: c.art || '', c: c.cat || '', o: c.odds || 0, tn: c.themeName || '', s: c.set || '', no: c.no || 0 } : null; save(false, 'showcase'); },
     flush: () => emit('change'),
     // account.js: swap in or merge the copy saved with an account
     replace(next) { st = Object.assign(blank(), next || {}); try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* blocked */ } emit('sync'); },

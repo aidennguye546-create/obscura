@@ -1583,19 +1583,27 @@ function scChip(p, short) {
   return h('span', { class: 'scc t' + c.t + (E ? ' ench' : '') + (c.f || c.fa ? ' foil' : ''), style: '--cc:' + col + (E ? ';--cg:' + E.glow : ''), title: (E ? E.name + ' ' : '') + (c.fa ? 'full art ' : '') + c.n },
     h('i', { text: c.em || '◆' }), h('span', { text: nm }), E && h('b', { text: E.tag }));
 }
+// The machine stays loaded after the first visit: closing hides it (and it idles), opening again is instant.
 function openCards(hash) {
-  if ($('cardsfr')) return;
+  hash = typeof hash === 'string' ? hash : '';
   document.querySelectorAll('.modal').forEach(m => m.remove());
-  const f = h('iframe', { id: 'cardsfr', src: 'cards.html' + (typeof hash === 'string' ? hash : ''), title: 'Card packs', allow: 'autoplay' });
+  const old = $('cardsov');
+  if (old) { if (document.body.classList.contains('incards')) return;
+    old.classList.remove('out', 'hid'); old.style.animation = 'none'; void old.offsetWidth; old.style.animation = ''; document.body.classList.add('incards');
+    const tc = $('trycards'); if (tc) tc.classList.add('gone'); const ef = $('eqfloat'); if (ef) ef.classList.add('gone');
+    try { const cw = $('cardsfr').contentWindow; cw.focus(); if (cw.__resume) cw.__resume(hash); } catch (e) { /* fine */ }
+    return; }
+  const f = h('iframe', { id: 'cardsfr', src: 'cards.html' + hash, title: 'Card packs', allow: 'autoplay' });
   const w = h('div', { id: 'cardsov', class: 'cards-ov' }, f);
   document.body.append(w); document.body.classList.add('incards');
   const tc = $('trycards'); if (tc) tc.classList.add('gone');
   f.addEventListener('load', () => { try { f.contentWindow.focus(); } catch (e) { /* fine */ } });
 }
 window.closeCards = () => {
-  const w = $('cardsov'); if (!w) return;
+  const w = $('cardsov'); if (!w || !document.body.classList.contains('incards')) return;
   w.classList.add('out'); document.body.classList.remove('incards');
-  setTimeout(() => { w.remove(); cardsScreen(); }, 280);
+  try { const cw = $('cardsfr').contentWindow; if (cw.__pause) cw.__pause(); } catch (e) { /* fine */ }
+  setTimeout(() => { if (!document.body.classList.contains('incards')) w.classList.add('hid'); cardsScreen(); }, 280);
   // the machine may have switched the sound off or on
   if (Sound.muted() !== (ls.get('mute') === '1')) { Sound.toggle(); const mb = $('mute'); if (mb) { mb.textContent = Sound.muted() ? 'Sound off' : 'Sound on'; mb.setAttribute('aria-pressed', String(Sound.muted())); } }
   if (S.mine) { const sc = myShowcase(); if (JSON.stringify(sc) !== JSON.stringify(S.mine.sc)) { S.mine.sc = sc; saveMe(); refresh(); } }
@@ -1614,18 +1622,51 @@ function tryPack() {
   setInterval(() => { if (el.classList.contains('gone') || document.hidden) return; el.classList.remove('peek'); void el.offsetWidth; el.classList.add('peek'); }, 9000);
   setTimeout(() => el.classList.add('peek'), 1600);
 }
-// which screens get the corner pack and which get the enchantment playing in the background
+// The equipped card is a real card in your hand: it sits in the bottom-left corner (the packs sit in the bottom-right),
+// moves to the side of the screen while you play, pulses when your answer lands, and its type and enchantment
+// fill the background with their own particles.
+const fmtO = n => { const k = (v, u) => (v >= 100 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, '')) + u; return n >= 1e15 ? k(n / 1e15, 'Q') : n >= 1e12 ? k(n / 1e12, 'T') : n >= 1e9 ? k(n / 1e9, 'B') : n >= 1e6 ? k(n / 1e6, 'M') : n >= 1e5 ? Math.round(n / 1e3) + 'K' : n.toLocaleString(); };
+const eqType = c => { const A = window.CardArt; if (!A || !c) return null; return A.TYPES[c.c || A.catOf(c.p || '')] || A.TYPES.room; };
+function eqCard(c) {
+  const A = window.CardArt; if (!A || !c) return null;
+  const cat = c.c || A.catOf(c.p || ''), TY = eqType(c), E = c.e && ENCH()[c.e], art = c.a || A.pixelEmoji(c.em || '✨', 48);
+  return h('div', { class: 'eqc t' + c.t + (c.f || c.fa ? ' foil' : '') + (E ? ' ench' : ''), title: 'Your equipped card: ' + c.n + ' · tap to change it', style: '--tc:' + TY.col + ';--rc:' + CARD_TIER[c.t] + (E ? ';--ec:' + E.color + ';--eg:' + E.glow : '') },
+    h('span', { class: 'eqlab', text: '⚔ EQUIPPED' }),
+    h('div', { class: 'eqf' },
+      h('div', { class: 'eqh' }, h('b', { text: c.n }), E && h('i', { text: E.tag })),
+      h('div', { class: 'eqw' }, h('img', { class: 'eqs', src: A.scene(cat, c.n + (c.p || '')), alt: '' }), h('img', { class: 'eqa', src: art, alt: '' })),
+      h('div', { class: 'eqt' }, h('span', { text: TY.sym + ' ' + TY.name }), h('span', { text: ['◆', '◆◆', '★', '★★', '★★★'][c.t] || '' })),
+      c.o ? h('div', { class: 'eqo', text: '1 in ' + fmtO(c.o) }) : null),
+    h('div', { class: 'eqshine' }));
+}
+function eqFloat() {
+  const sc = CS && CS.showcase(), r = S.room, phase = !S.mode ? 'home' : (r && r.phase) || 'home', play = phase === 'play' || phase === 'pick' || phase === 'reveal';
+  let el = $('eqfloat'); const key = sc ? [sc.n, sc.p, sc.e, sc.f, sc.fa, sc.a ? 1 : 0].join('|') : 'none';
+  if (!el || el.dataset.k !== key) {
+    if (el) el.remove();
+    el = sc ? eqCard(sc) : (window.CardArt && CS ? h('div', { class: 'eqc empty' }, h('span', { class: 'eqlab', text: '⚔ NO CARD' }), h('div', { class: 'eqf' }, h('b', { text: '+' }), h('small', { text: 'equip a card' }))) : null);
+    if (!el) return;
+    el.id = 'eqfloat'; el.dataset.k = key; el.addEventListener('click', () => { Sound.unlock(); snd('click'); openCards(sc ? '#binder' : ''); });
+    document.body.append(el);
+  }
+  el.classList.toggle('inplay', play); el.classList.toggle('gone', document.body.classList.contains('incards') || (play && !sc));
+  const TY = eqType(sc); document.body.classList.toggle('eqon', !!sc); if (TY) document.body.style.setProperty('--eq', TY.col);
+}
+// which screens get the corner pack, and the equipped card's ambience while you play
 function cardsScreen() {
-  tryPack();
+  tryPack(); eqFloat();
   const r = S.room, calm = !S.mode || !r || r.phase === 'lobby' || r.phase === 'final';
-  const tc = $('trycards'); if (tc) tc.classList.toggle('gone', !calm || !!$('cardsov'));
-  const sc = myShowcase(), E = sc && sc.e && ENCH()[sc.e], want = !!(E && S.mode && r && r.phase === 'play' && !SET.low);
+  const tc = $('trycards'); if (tc) tc.classList.toggle('gone', !calm || document.body.classList.contains('incards'));
+  const full = CS && CS.showcase(), sc = myShowcase(), E = sc && sc.e && ENCH()[sc.e], TY = eqType(full);
+  const spec = E ? sc.e : TY ? { fx: TY.fx, cols: TY.cols } : null, k = E ? sc.e : TY ? 'type:' + TY.name : '';
+  // your answer landing: a burst in your card's colours, and the card itself flashes
+  window.__encLand = spec ? (fx, x, y, tier) => { try { const cols = E ? E.cols.concat(E.color) : TY.cols; cols.forEach((c, i) => fx.burst(x, y, c, 8 + tier * 4, 0.6 + i * 0.15)); const f = $('eqfloat'); if (f) { f.classList.remove('hit'); void f.offsetWidth; f.classList.add('hit'); } } catch (e) { /* effects are optional */ } } : null;
+  const want = !!(spec && S.mode && r && r.phase === 'play' && !SET.low);
   let cv = $('encfx');
-  if (!want) { if (cv) cv.remove(); window.__encLand = null; return; }
-  if (cv && cv.dataset.k === sc.e) return; if (cv) cv.remove();
-  cv = h('canvas', { id: 'encfx', 'aria-hidden': 'true', width: 300, height: 420 }); cv.dataset.k = sc.e; document.body.append(cv);
-  window.CardArt.particles(cv, sc.e, 2.2);
-  window.__encLand = (fx, x, y, tier) => { try { (E.cols.concat(E.color)).forEach((c, i) => fx.burst(x, y, c, 10 + tier * 4, 0.6 + i * 0.15)); } catch (e) { /* effects are optional */ } };
+  if (!want) { if (cv) cv.remove(); return; }
+  if (cv && cv.dataset.k === k) return; if (cv) cv.remove();
+  cv = h('canvas', { id: 'encfx', 'aria-hidden': 'true', width: 300, height: 420 }); cv.dataset.k = k; document.body.append(cv);
+  window.CardArt.particles(cv, spec, E ? 2.4 : 1.6);
 }
 // spores for a finished game, once per game, then a banner on the result screen
 function payout() {
@@ -1641,7 +1682,7 @@ function payout() {
   const ban = h('div', { class: 'spores' }, h('div', { class: 'sp-n' }, h('b', { text: '+' + got + '✦' }), h('span', { text: 'spores earned' + (obs ? ' · +' + obs * 5 + ' for Obscuras' : '') })),
     h('button', { class: 'pink', type: 'button', text: k ? 'Open ' + (k > 1 ? k + ' packs' : 'a pack') + ' →' : 'Pack machine →', onclick: openCards }));
   const at = sec.querySelector('.bigscore') || sec.querySelector('#winner'); (at || sec.firstChild).after(ban);
-  snd('best');
+  snd('best'); { const f = $('eqfloat'); if (f) { f.classList.remove('cheer'); void f.offsetWidth; f.classList.add('cheer'); } }
   // a few spores fly to the corner pack
   const tc = $('trycards'), br = ban.getBoundingClientRect(); if (!tc || SET.low) return;
   const tr = tc.getBoundingClientRect();
@@ -1651,7 +1692,7 @@ function payout() {
   }, 300 + i * 80);
 }
 // changing your showcase while in a room shows it to everyone straight away
-if (CS) CS.on((st, why) => { if (why === 'showcase' && S.mine) { S.mine.sc = myShowcase(); saveMe(); if (S.mode) refresh(); } });
+if (CS) CS.on((st, why) => { if (why === 'showcase' || why === 'sync') { cardsScreen(); if (S.mine) { S.mine.sc = myShowcase(); saveMe(); if (S.mode) refresh(); } } });
 function openHowto() { modal('howto', 'Obscura', 'How to play', h('ul', { class: 'howlist' }, HOWTO.map(tx => h('li', { text: tx }))), h('div', { class: 'ph' }, h('span', { text: 'The finds' })), tierLegend(),
   h('button', { class: 'small', type: 'button', style: 'align-self:center', text: '▶ Watch an Obscura land', onclick: () => { document.querySelectorAll('.modal').forEach(m => m.remove()); Sound.unlock(); snd('land', 4); window.__obscura(Math.round(innerHeight * 0.36)); } })); }
 function openPacks() {

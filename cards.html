@@ -595,6 +595,16 @@ button.ghost.hot { color: #050d08; background: var(--lime); border-color: var(--
 .deck .card.inpack { opacity: 0; transform: translateY(14%) scale(0.62); }
 .deck .card.peek { opacity: 1; transform: translateY(-40%) scale(0.82) rotate(var(--pr, 0deg)); }
 .deck .counter { top: -30px; bottom: auto; }
+
+/* ================= equipping ================= */
+.eqslot { display: inline-flex; align-items: center; gap: 6px; color: #fff !important; border-color: var(--ec, #2c4a35) !important; box-shadow: 0 0 10px color-mix(in srgb, var(--ec, transparent) 40%, transparent); }
+.eqslot img { width: 22px; height: 22px; image-rendering: pixelated; }
+.eqslot.pop { animation: eqpop 0.6s cubic-bezier(.3,1.8,.5,1); }
+@keyframes eqpop { 30% { transform: scale(1.35); box-shadow: 0 0 26px var(--ec, #c8ff5a); } }
+.eqfly { position: fixed; z-index: 80; pointer-events: none; transform-origin: 50% 50%; }
+.eqfly .card { position: absolute; left: 0; top: 0; }
+.skipall { position: absolute; right: 14px; bottom: 60px; z-index: 12; }
+@media (max-width: 520px) { .eqslot span { display: none; } .skipall { bottom: 54px; right: 8px; } }
 </style>
 </head>
 <body>
@@ -602,12 +612,17 @@ button.ghost.hot { color: #050d08; background: var(--lime); border-color: var(--
 <div id="crt"></div><div id="flash"></div>
 <div class="wallet" id="wallet" title="Spores: earn them by playing any mode"></div>
 <div class="topbar"><button class="ghost" id="back" type="button">← game</button><button class="ghost mute" id="mute" type="button">♪ sound on</button></div>
-<div class="topbar2"><button class="ghost" id="binder" type="button">my cards</button><button class="ghost" id="acct" type="button">account</button></div>
+<div class="topbar2"><button class="ghost eqslot" id="eqslot" type="button" title="Your equipped card"></button><button class="ghost" id="binder" type="button">my cards</button><button class="ghost" id="acct" type="button">account</button></div>
 <header><h1>OBSCURA</h1><p>the pack machine</p></header>
 <div id="stage"></div>
 <div id="open"><div class="vig"></div><div class="dark"></div></div>
 <div class="buyinfo" id="buyinfo"><b>10✦ = 1 pack</b><span>5 cards · each card is a real answer from the game · rarer answers make rarer cards</span><button class="ghost" id="odds" type="button">what's inside?</button></div>
 <div class="demos" id="demos"></div>
+<script>
+// while the game has this page hidden, every animation loop idles at four steps a second instead of sixty
+(function () { const raf = window.requestAnimationFrame.bind(window); window.__paused = false;
+  window.requestAnimationFrame = cb => window.__paused ? setTimeout(() => window.requestAnimationFrame(cb), 250) : raf(cb); })();
+</script>
 <script>
 // opened over the game: use the game's own wallet and account, so both always agree
 try { if (parent !== window && parent.CardStore) { window.CardStore = parent.CardStore; window.Account = parent.Account; window.EMBED = true; } } catch (e) { /* not the same site */ }
@@ -1018,6 +1033,8 @@ function reveal(cards, els, deck, rays) {
   deck.append(label, counter); const pt = center.querySelector('.packtitle'); if (pt) pt.classList.add('gone');
   const hint = h('div', { class: 'hint', style: 'bottom:24px', text: 'tap to flip the card · tap again for the next one' }); ov.append(hint);
   let i = 0, busy = false;
+  const skip = h('button', { class: 'ghost skipall', type: 'button', text: 'reveal all ⏩', onclick: e => { e.stopPropagation(); SFX.whoosh(1); clearInterval(reveal.glow); i = els.length; deck.querySelectorAll('.oddspop').forEach(x => x.remove()); setTimeout(() => summary(cards), 150); } });
+  ov.append(skip);
   const show = () => { counter.textContent = (i + 1) + ' / ' + cards.length; els.forEach((el, j) => { el.style.setProperty('--k', String(Math.max(0, j - i))); });
     const c = cards[i]; if (i === els.length - 1 && (c.tier >= 2 || c.ench || c.full)) els[i].classList.add('tease'); };
   show();
@@ -1086,14 +1103,16 @@ function reveal(cards, els, deck, rays) {
 
 /* ================= SUMMARY ================= */
 function summary(cards) {
-  const ov = $('open'); ov.querySelectorAll('.center,.rays,.hint').forEach(x => x.remove());
+  const ov = $('open'); ov.querySelectorAll('.center,.rays,.hint,.skipall').forEach(x => x.remove());
   const b = best(cards), bi = cards.indexOf(b), T = TIERS[b.tier], E = b.ench && CardArt.ENCH[b.ench], col = E ? E.color : (b.tier >= 4 ? '#ffd24a' : T.color);
   const prev = h('div', { class: 'preview' }), bestBox = h('div', { class: 'best' }), bestCard = makeCard(b); bestCard.classList.add('up'); bestBox.append(bestCard);
   const row = h('div', { class: 'row' });
   const sum = h('div', { class: 'summary' },
     packLine(), h('div', { class: 'bestlbl', style: '--lc:' + col, text: '★ BEST PULL ★' }), bestBox, row,
-    h('p', { class: 'note2', text: 'tap a card to make it your showcase · it shows next to your name in party rooms' }), prev,
-    h('div', { class: 'btns' }, h('button', { class: 'go', text: 'Back to the machine', onclick: closeOpen })));
+    h('p', { class: 'note2', text: 'tap a card to preview it in your game · ⚔ equip puts it there for real' }), prev,
+    h('div', { class: 'btns' },
+      h('button', { class: 'go', text: spores >= Store.PULL ? 'Pull again · ' + Store.PULL + '✦' : 'Back to the machine', onclick: () => { const again = spores >= Store.PULL; closeOpen(); if (again) setTimeout(() => M.fire(), 350); } }),
+      spores >= Store.PULL && h('button', { class: 'ghost', type: 'button', text: 'back to the machine', onclick: closeOpen })));
   ov.append(sum);
   const br = bestBox.getBoundingClientRect(); setTimeout(() => { FX.burst(br.left + br.width / 2, br.top + br.height / 2, [col, '#fff'], 50, { power: 0.9 }); SFX.reveal(Math.min(3, b.tier)); }, 300);
   // the meter: an Obscura resets it, anything else fills it
@@ -1117,16 +1136,16 @@ function packLine() {
   return h('div', { class: 'packline' }, mini, h('div', null, h('b', { text: OPENED.theme.name + ' pack · ' + E.name }), h('small', { text: (E.perk ? E.perk + ' · ' : '') + 'pack designs collected: ' + Store.designs() + ' of ' + (THEMES.length * 6).toLocaleString() })), fresh && h('span', { class: 'newdesign', text: 'NEW PACK DESIGN' }));
 }
 function showcase(c, box, make) {
-  if (make) { Store.setShowcase(c); }
+  if (make) { equip(c, null, true); }
   const mine = Store.showcase(), isMine = mine && mine.n === c.name && mine.p === c.prompt && (mine.e || 0) === (c.ench || 0) && (mine.f || 0) === (c.finish || 0);
   const T = TIERS[c.tier], E = c.ench && CardArt.ENCH[c.ench], cv = h('canvas', { class: 'gamefx', width: 560, height: 150 });
   const mini = makeCard(c); mini.classList.add('up');
   box.replaceChildren(
-    h('div', { class: 'pv-head', style: 'display:flex;justify-content:space-between;align-items:center;gap:8px' }, h('span', { text: 'In a party room' }), h('button', { class: 'scbtn' + (isMine ? ' done' : ''), type: 'button', text: isMine ? '✓ your showcase' : 'make this my showcase', onclick: () => showcase(c, box, true) })),
+    h('div', { class: 'pv-head', style: 'display:flex;justify-content:space-between;align-items:center;gap:8px' }, h('span', { text: 'In a party room' }), h('button', { class: 'scbtn' + (isMine ? ' done' : ''), type: 'button', text: isMine ? '✓ equipped' : '⚔ equip this card', onclick: () => { showcase(c, box, true); const best = document.querySelector('.summary .best .card'); equip(c, best); } })),
     h('div', { class: 'pv-row' + (E ? ' aura e-' + c.ench : ''), style: E ? '--ec:' + E.color + ';--eg:' + E.glow : null },
       h('span', { class: 'pv-mini' }, mini), h('b', { text: (window.Account && Account.name) || 'You' }), h('span', { class: 'pv-tag' }, (c.full ? 'Full art ' : c.finish ? FINISHES[c.finish].name + ' ' : '') + c.name + ' ', E && h('i', { class: 'etag et-' + c.ench, text: E.tag, style: '--w:150px' }), ' · ' + T.name), h('span', { class: 'pv-pts', text: '1,240 pts' })),
     h('div', { class: 'pv-row other' }, h('span', { class: 'pv-dot' }), h('b', { text: 'Sam' }), h('span', { class: 'pv-tag', text: 'no showcase' }), h('span', { class: 'pv-pts', text: '980 pts' })),
-    h('div', { class: 'pv-head', text: E ? 'While you play · ' + E.name + ': ' + E.game : 'While you play · no enchantment (1 in 20 cards has one; ' + Object.keys(CardArt.ENCH).length + ' kinds)' }),
+    h('div', { class: 'pv-head', text: E ? 'While you play · ' + E.name + ' particles fill the screen and burst when your answers land' : 'While you play · ' + (CardArt.TYPES[CardArt.catOf(c.prompt)] || CardArt.TYPES.room).game + ' (enchanted cards, 1 in 20, bring their own; ' + Object.keys(CardArt.ENCH).length + ' kinds)' }),
     h('div', { class: 'pv-game' }, cv, h('div', { class: 'pv-ans', text: '“' + c.name + '”  +' + T.pts })));
   if (E) CardArt.particles(cv, c.ench, 2.2);
   const ans = box.querySelector('.pv-ans'); clearInterval(showcase.t); const go = () => { ans.classList.remove('drop'); void ans.offsetWidth; ans.classList.add('drop'); }; go(); showcase.t = setInterval(() => ans.isConnected ? go() : clearInterval(showcase.t), 2600);
@@ -1142,7 +1161,7 @@ function coinFountain(x, y, tx, ty, n, done) {
   for (let i = 0; i < n; i++) setTimeout(() => { const c = h('div', { class: 'flycoin', text: '✦' }); document.body.append(c); const mx = (x + tx) / 2 + (Math.random() - 0.5) * 160, my = Math.min(y, ty) - 60 - Math.random() * 80;
     c.animate([{ transform: 'translate(' + x + 'px,' + y + 'px) scale(0.6)' }, { transform: 'translate(' + mx + 'px,' + my + 'px) scale(1.1) rotateY(540deg)', offset: 0.5 }, { transform: 'translate(' + tx + 'px,' + ty + 'px) scale(0.5) rotateY(1080deg)' }], { duration: 650, easing: 'cubic-bezier(.4,0,.6,1)' }).onfinish = () => { c.remove(); SFX.coinhit(i); const wl = $('wallet'); wl.classList.remove('bump'); void wl.offsetWidth; wl.classList.add('bump'); if (i === n - 1) done(); }; }, i * 70);
 }
-function closeOpen() { const ov = $('open'); ov.classList.remove('on'); ov.querySelectorAll('.summary,.gallery,.center').forEach(x => x.remove()); FX.clear(); $('open').querySelector('.vig').style.setProperty('--vc', 'transparent'); M.busy = false; ledIdle(); M.tray.querySelectorAll('.pack').forEach(p => { if (p.dataset.used) p.remove(); }); if (M.tray.querySelector('.pack')) { M.busy = true; ledSay('OPEN YOUR PACKS', true); } }
+function closeOpen() { const ov = $('open'); ov.classList.remove('on'); ov.querySelectorAll('.summary,.gallery,.center,.skipall').forEach(x => x.remove()); FX.clear(); $('open').querySelector('.vig').style.setProperty('--vc', 'transparent'); M.busy = false; ledIdle(); M.tray.querySelectorAll('.pack').forEach(p => { if (p.dataset.used) p.remove(); }); if (M.tray.querySelector('.pack')) { M.busy = true; ledSay('OPEN YOUR PACKS', true); } }
 
 /* ================= gallery ================= */
 function gallery(ed = 'std') {
@@ -1160,8 +1179,12 @@ function gallery(ed = 'std') {
 const demos = $('demos'); if (!/[?&]dev\b/.test(location.search)) demos.style.display = 'none';
 demos.append(h('button', { class: 'ghost', text: 'all pack designs', onclick: () => gallery() }));
 [['pull (random)', null], ['rare', 'rare'], ['epic', 'epic'], ['obscura', 'legend'], ['enchanted', 'ench'], ['god pack', 'god'], ['rare edition', 'edition'], ['fever ×3', 'fever']].forEach(([t, rig]) => demos.append(h('button', { class: 'ghost', text: 'demo: ' + t, onclick: () => { if (!M || M.busy) return; M.rig = rig; M.fire(); } })));
-wallet(); if (location.hash === '#account') setTimeout(() => account(), 0);
-PackArt.preload(THEMES).then(machine).then(() => { if (location.hash === '#account') return; const st = Store.get(); if (st.gift && st.pulls === 0) toast('Welcome! Here are ' + st.gift + '✦ to start. Pull the lever!'); });
+wallet(); eqSlot(); Store.on((st, why) => { if (why === 'sync' || why === 'showcase') eqSlot(); });
+if (location.hash === '#account') setTimeout(() => account(), 0); if (location.hash === '#binder') setTimeout(() => binder(), 0);
+// the game hides this page instead of closing it; it calls these when it does
+window.__pause = () => { window.__paused = true; SFX.stop(); };
+window.__resume = hash => { window.__paused = false; SFX.wake(); $('mute').textContent = SFX.muted() ? '♪ sound off' : '♪ sound on'; wallet(); eqSlot(); document.querySelectorAll('.sheet, .zoom').forEach(x => x.remove()); if (hash === '#binder') binder(); else if (hash === '#account') account(); };
+PackArt.preload(THEMES).then(machine).then(() => { if (location.hash === '#account' || location.hash === '#binder') return; const st = Store.get(); if (st.gift && st.pulls === 0) toast('Welcome! Here are ' + st.gift + '✦ to start. Pull the lever!'); });
 $('mute').addEventListener('click', () => { const on = SFX.toggle(); $('mute').textContent = on ? '♪ sound on' : '♪ sound off'; });
 $('mute').textContent = SFX.muted() ? '♪ sound off' : '♪ sound on';
 $('back').addEventListener('click', () => { SFX.click(); if (window.EMBED && parent.closeCards) parent.closeCards(); else location.href = './'; });
@@ -1180,6 +1203,33 @@ function sheet(title, ...kids) {
 // ================= the binder: every card you own, best first =================
 const FACTS = new Map(ALLCARDS.map(c => [c.name + '|' + c.prompt, c.fact]));
 const rank = c => c.tier * 1000 + (c.ench ? 300 + (CardArt.ENCH[c.ench].grade === 'Ultra' ? 200 : CardArt.ENCH[c.ench].grade === 'Mythic' ? 100 : 0) : 0) + (c.full ? 250 : 0) + (c.finish ? FINISHES[c.finish].odds / 10 : 0) + (c.misprint ? 40 : 0) + (c.first ? 5 : 0);
+// ================= equipping: the card you carry into the game =================
+function equip(c, fromEl, quiet) {
+  const A = CardArt;
+  Store.setShowcase(Object.assign({}, c, { art: A.cardArt(c.name, c.prompt).src, cat: A.catOf(c.prompt), odds: oddsN(c), emoji: c.emoji || A.pickEmoji(c.name, c.prompt) }));
+  eqSlot();
+  if (quiet) return;
+  SFX.stamp(); buzz([20, 40, 20]);
+  const slot = $('eqslot'), t = slot.getBoundingClientRect();
+  const land = () => { FX.burst(t.left + t.width / 2, t.top + t.height / 2, ['#c8ff5a', '#ffffff', (A.TYPES[A.catOf(c.prompt)] || A.TYPES.room).col], 36, { power: 0.6 }); SFX.ding(); slot.classList.remove('pop'); void slot.offsetWidth; slot.classList.add('pop'); };
+  if (fromEl && fromEl.isConnected) { // a copy of the card flies up into the equipped slot
+    const r = fromEl.getBoundingClientRect(), ghost = makeCard(c); ghost.classList.add('up'); ghost.style.setProperty('--w', r.width + 'px');
+    const wrap = h('div', { class: 'eqfly', style: 'left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px' }, ghost); document.body.append(wrap);
+    const dx = t.left + t.width / 2 - (r.left + r.width / 2), dy = t.top + t.height / 2 - (r.top + r.height / 2), sc = Math.max(0.08, t.height / r.height);
+    wrap.animate([{ transform: 'none' }, { transform: 'translate(' + dx * 0.35 + 'px,' + (dy * 0.35 - 80) + 'px) scale(0.75) rotate(-10deg)', offset: 0.45 }, { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sc + ') rotate(0deg)', opacity: 0.3 }],
+      { duration: 700, easing: 'cubic-bezier(.5,0,.3,1)' }).onfinish = () => { wrap.remove(); land(); };
+  } else land();
+  const TY = A.TYPES[A.catOf(c.prompt)] || A.TYPES.room, E = c.ench && A.ENCH[c.ench];
+  toast('⚔ Equipped! While you play, ' + (E ? E.name + ' particles fill the screen' : TY.game.replace(' while you play', '')) + ' and burst when your answers land. It also sits on your home screen and next to your name.');
+}
+// the slot in the top bar shows what you have equipped; tap it to look at the card
+function eqSlot() {
+  const sc = Store.showcase(), b = $('eqslot'); if (!b) return;
+  if (!sc) { b.replaceChildren(h('span', { text: '⚔ equip a card' })); b.onclick = () => { SFX.click(); binder(); }; return; }
+  b.replaceChildren(h('img', { src: sc.a || CardArt.pixelEmoji(sc.em || '✨', 24), alt: '' }), h('span', { text: '⚔ ' + (sc.n.length > 12 ? sc.n.slice(0, 11) + '…' : sc.n) }));
+  b.style.setProperty('--ec', ['#d7e1f2', '#7deaff', '#ff4d4d', '#bfa7ff', '#ffe08a'][sc.t]);
+  b.onclick = () => { SFX.click(); zoom({ name: sc.n, prompt: sc.p, tier: sc.t, finish: sc.f || null, foil: !!sc.f, ench: sc.e || null, full: !!sc.fa, set: sc.s || 'OBX', no: sc.no || 1, themeName: sc.tn, emoji: sc.em, fact: FACTS.get(sc.n + '|' + sc.p) }); };
+}
 function oddsSheet() {
   const pct = p => (p * 100 >= 1 ? Math.round(p * 100) : (p * 100).toFixed(1)) + '%';
   const row = (col, name, sub, right) => h('div', { class: 'oddsrow', style: 'color:' + col }, h('i'), h('div', { style: 'color:#e6f2dc' }, name, h('small', { text: sub })), h('b', { style: 'font-weight:normal;color:' + col, text: right }));
@@ -1211,7 +1261,7 @@ function binder(filter = 'all') {
   // draw a screenful at a time; each card carries its own art and particles
   let i = 0; const more = () => { const end = Math.min(pick.length, i + 24); for (; i < end; i++) { const c = pick[i], el = makeCard(c); el.classList.add('up');
       const isSc = sc && sc.n === c.name && sc.p === c.prompt && (sc.e || 0) === (c.ench || 0) && (sc.f || 0) === (c.finish || 0);
-      grid.append(h('div', { class: 'bslot', onclick: () => zoom(c) }, el, c.count > 1 && h('span', { class: 'cnt', text: '×' + c.count }), isSc && h('span', { class: 'scmark', text: 'SHOWCASE' }))); }
+      grid.append(h('div', { class: 'bslot', onclick: () => zoom(c) }, el, c.count > 1 && h('span', { class: 'cnt', text: '×' + c.count }), isSc && h('span', { class: 'scmark', text: '⚔ EQUIPPED' }))); }
     if (i < pick.length) { const b = h('button', { class: 'ghost', type: 'button', style: 'display:block;margin:16px auto', text: 'show more (' + (pick.length - i) + ')', onclick: () => { b.remove(); more(); } }); grid.after(b); } };
   more();
 }
@@ -1219,8 +1269,8 @@ function zoom(c) {
   SFX.flip(); const el = makeCard(c); el.classList.add('up', 'pop'); const sc = Store.showcase(), isSc = sc && sc.n === c.name && sc.p === c.prompt && (sc.e || 0) === (c.ench || 0) && (sc.f || 0) === (c.finish || 0);
   const E = c.ench && CardArt.ENCH[c.ench];
   const z = h('div', { class: 'zoom', onclick: e => { if (e.target === z) z.remove(); } }, h('div', { class: 'zc' }, el),
-    E && h('p', { class: 'note2', style: 'max-width:min(420px,90vw);text-align:center', text: '✧ ' + E.name + ' in the game: ' + E.game }),
-    h('div', { class: 'btns' }, h('button', { class: 'scbtn' + (isSc ? ' done' : ''), type: 'button', text: isSc ? '✓ your showcase' : 'make this my showcase', onclick: e => { Store.setShowcase(c); SFX.stamp(); e.currentTarget.textContent = '✓ your showcase'; e.currentTarget.classList.add('done'); document.querySelectorAll('.sheet').forEach(x => x.remove()); } }), h('button', { class: 'ghost', type: 'button', text: 'close', onclick: () => z.remove() })));
+    E && h('p', { class: 'note2', style: 'max-width:min(420px,90vw);text-align:center', text: '✧ Equipped, ' + E.name + ' particles fill your game and burst when your answers land' }),
+    h('div', { class: 'btns' }, h('button', { class: 'scbtn' + (isSc ? ' done' : ''), type: 'button', text: isSc ? '✓ equipped' : '⚔ Equip', onclick: e => { equip(c, el); e.currentTarget.textContent = '✓ equipped'; e.currentTarget.classList.add('done'); setTimeout(() => { z.remove(); document.querySelectorAll('.sheet').forEach(x => x.remove()); }, 700); } }), h('button', { class: 'ghost', type: 'button', text: 'close', onclick: () => z.remove() })));
   document.body.append(z); const r = el.getBoundingClientRect(); if (c.tier >= 2 || E) FX.burst(r.left + r.width / 2, r.top + r.height / 2, [E ? E.color : TIERS[c.tier].color, '#fff'], 30, { power: 0.6 });
 }
 // ================= account: a username and password keep your cards on any device =================

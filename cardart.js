@@ -86,9 +86,16 @@
   ];
   // each category is a card type, like the energy types on trading cards: a name, a colour and a symbol
   const TYPES = {
-    sport: { name: 'Sport', col: '#ff8a3a', sym: '✪' }, geo: { name: 'Places', col: '#e0b060', sym: '⌖' }, wild: { name: 'Nature', col: '#5fcf4a', sym: '❦' },
-    food: { name: 'Food', col: '#ff5a4a', sym: '♨' }, space: { name: 'Science', col: '#a07aff', sym: '✦' }, stage: { name: 'Showbiz', col: '#ff6ab0', sym: '♪' },
-    arcade: { name: 'Games', col: '#ffd23a', sym: '▶' }, hall: { name: 'Legends', col: '#b8c4d8', sym: '♛' }, room: { name: 'Everyday', col: '#e8dcc0', sym: '⌂' },
+    // fx and cols: the ambience an equipped card of this type brings to your game (the same particle styles as enchantments)
+    sport: { name: 'Sport', col: '#ff8a3a', sym: '✪', fx: 'fall', cols: ['#ff5d5d', '#ffd166', '#4d9bff', '#ffffff'], game: 'confetti drifts down while you play' },
+    geo: { name: 'Places', col: '#e0b060', sym: '⌖', fx: 'drift', cols: ['#e0b060', '#f4e2b8', '#7fb8f0'], game: 'map-dust blows across the screen' },
+    wild: { name: 'Nature', col: '#5fcf4a', sym: '❦', fx: 'drift', cols: ['#7fd35a', '#3fae2a', '#c8ff5a'], game: 'leaves tumble past while you play' },
+    food: { name: 'Food', col: '#ff5a4a', sym: '♨', fx: 'rise', cols: ['#ffffff', '#ffe0c0', '#ffb08a'], game: 'warm steam rises behind your answers' },
+    space: { name: 'Science', col: '#a07aff', sym: '✦', fx: 'glint', cols: ['#ffffff', '#bfa7ff', '#7deaff'], game: 'stars glint all around your game' },
+    stage: { name: 'Showbiz', col: '#ff6ab0', sym: '♪', fx: 'streak', cols: ['#ffe08a', '#ff6ab0'], game: 'spotlight streaks shoot across the sky' },
+    arcade: { name: 'Games', col: '#ffd23a', sym: '▶', fx: 'rise', cols: ['#ff3aa8', '#3ae0ff', '#ffe86a'], game: 'neon pixels float up while you play' },
+    hall: { name: 'Legends', col: '#b8c4d8', sym: '♛', fx: 'glint', cols: ['#ffd24a', '#fff3c4'], game: 'gold glints sparkle around your game' },
+    room: { name: 'Everyday', col: '#e8dcc0', sym: '⌂', fx: 'drift', cols: ['#e8dcc0', '#ffffff'], game: 'cosy dust motes float in the light' },
   };
   const catOf = prompt => { const p = String(prompt).toLowerCase(); for (const [k, re] of CATS) if (re.test(p)) return k; return 'room'; };
   // Each category gets a small pixel painting, 128 by 80, built pixel by pixel: dithered skies and light,
@@ -401,7 +408,9 @@
   }
   // particles drawn over an enchanted card (and reused for the in-game preview)
   function particles(canvas, kind, density = 1) {
-    const g = canvas.getContext('2d'), E = ENCH[kind]; if (!E) return () => {}; const fx = E.fx, C = E.cols; let alive = true, t = 0; const ps = [];
+    const g = canvas.getContext('2d'), E = typeof kind === 'object' ? kind : ENCH[kind]; if (!E) return () => {}; const fx = E.fx, C = E.cols; let alive = true, t = 0, vis = true; const ps = [];
+    // off screen (a card further down the binder, a hidden page) costs nothing
+    if ('IntersectionObserver' in window) { const io = new IntersectionObserver(es => { vis = es[es.length - 1].isIntersecting; }); io.observe(canvas); }
     const col = () => C[Math.floor(Math.random() * C.length)];
     const spawn = () => {
       const w = canvas.width, hh = canvas.height, R = Math.random;
@@ -423,7 +432,7 @@
     };
     const rate = { rise: 0.5, fall: 0.35, drift: 0.25, bubble: 0.3, zap: 0.08, streak: 0.06, ghost: 0.12, ring: 0.03, corona: 0.5, glint: 0.12, pull: 0.4, aurora: 0.04, rainbow: 0.2, pillar: 0.05, orbit: 0.05 }[fx] * density;
     (function step() {
-      if (!alive || !canvas.isConnected) return; t++; const w = canvas.width, hh = canvas.height; g.clearRect(0, 0, w, hh);
+      if (!alive || !canvas.isConnected) return; if (!vis || document.hidden) { requestAnimationFrame(step); return; } t++; const w = canvas.width, hh = canvas.height; g.clearRect(0, 0, w, hh);
       if (Math.random() < rate) spawn();
       if (fx === 'aurora') { for (let b = 0; b < 3; b++) { g.beginPath(); for (let x = 0; x <= w; x += 4) { const y = hh * (0.18 + b * 0.1) + Math.sin(x * 0.03 + t * 0.03 + b) * hh * 0.06; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.strokeStyle = ['rgba(0,255,160,0.35)', 'rgba(140,90,255,0.3)', 'rgba(0,200,255,0.25)'][b]; g.lineWidth = 8 + b * 3; g.stroke(); } }
       if (fx === 'corona') { g.fillStyle = 'rgba(0,0,0,0.55)'; g.beginPath(); g.arc(w / 2, hh * 0.3, w * 0.22, 0, 7); g.fill(); g.strokeStyle = 'rgba(255,200,100,0.6)'; g.lineWidth = 2; g.stroke(); }

@@ -63,7 +63,7 @@
     g.restore();
     // the art
     const img = theme._img;
-    const lay = Math.floor(r() * 6); const ready = !!(img && img.complete && img.naturalWidth); const drawE = (x, y, s, rot = 0) => { if (!ready) return; g.save(); g.translate(x, y); g.rotate(rot); g.drawImage(img, -s / 2, -s / 2, s, s); g.restore(); };
+    const lay = Math.floor(r() * 6); const ready = !!(img && img.complete && img.naturalWidth); const drawE = (x, y, s, rot = 0) => { if (!ready) return; g.save(); g.imageSmoothingEnabled = false; g.translate(x, y); g.rotate(rot); g.drawImage(img, -s / 2, -s / 2, s, s); g.restore(); };
     const glow = (x, y, rad) => { const gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, P.acc); gr.addColorStop(0.4, alpha(P.acc, 0.33)); gr.addColorStop(1, 'transparent'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); };
     if (lay === 0) { glow(W / 2, 100, 70); drawE(W / 2, 100, 96); }
     else if (lay === 1) { g.globalAlpha = 0.35; for (let y = 30; y < H; y += 28) for (let x = (y / 28 % 2) * 14; x < W + 14; x += 28) drawE(x, y, 18, 0.2); g.globalAlpha = 1; g.fillStyle = P.bg2; g.beginPath(); g.arc(W / 2, 100, 44, 0, 7); g.fill(); g.strokeStyle = P.acc; g.lineWidth = 3; g.stroke(); drawE(W / 2, 100, 66); }
@@ -91,7 +91,7 @@
   const loadImg = src => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(i); i.src = src; });
   async function preload(themes) {
     await document.fonts.load('30px VT323');
-    await Promise.all(themes.map(async t => { t._img = await loadImg(A.pixelEmoji(t.emoji, 24)); t._scene = await loadImg(A.scene(A.catOf(t.word), t.id)); }));
+    await Promise.all(themes.map(async t => { t._img = await loadImg(A.pixelEmoji(t.emoji, 48)); t._scene = await loadImg(A.scene(A.catOf(t.word), t.id)); }));
   }
   window.PackArt = { drawPack, palette, EDITIONS, rollEdition, preload };
 })();

@@ -286,7 +286,7 @@ body.quake #open .center { animation: quake 0.7s ease; }
   background: repeating-conic-gradient(from 0deg, rgba(255,255,255,0.3) 0deg 8deg, transparent 8deg 22deg); -webkit-mask: radial-gradient(circle, #000 0%, transparent 55%); mask: radial-gradient(circle, #000 0%, transparent 55%); animation: spin 14s linear infinite; }
 .card.t2 .win .wrays, .card.t3 .win .wrays, .card.t4 .win .wrays { display: block; }
 .card .win .subj { position: absolute; left: 50%; top: 52%; width: 46%; transform: translate(calc(-50% + (var(--mx) - 50%) * 0.1), -50%); image-rendering: pixelated; filter: drop-shadow(0 4px 0 rgba(0,0,0,0.4)); animation: sbob 3s ease-in-out infinite; z-index: 2; }
-@keyframes sbob { 50% { margin-top: -5px; } }
+@keyframes sbob { 50% { translate: 0 -5px; } } /* translate, not margin: no layout work every frame */
 .card .win .badge { position: absolute; right: 4px; bottom: 3px; width: 22%; image-rendering: pixelated; filter: drop-shadow(0 0 4px var(--rc)) drop-shadow(0 2px 0 #000); z-index: 3; }
 .card .win .first { position: absolute; left: 5px; top: 5px; z-index: 3; font-size: calc(var(--w) * 0.045); padding: 1px 4px; color: #050d08; background: #f4f7ee; border-radius: 50%; box-shadow: 0 0 0 2px #050d08; transform: rotate(-12deg); }
 .card .type { font-size: calc(var(--w) * 0.05); letter-spacing: 0.12em; color: var(--dim); text-transform: uppercase; display: flex; justify-content: space-between; border-bottom: 1px solid #2c4a35; padding-bottom: 3px; }
@@ -605,6 +605,26 @@ button.ghost.hot { color: #050d08; background: var(--lime); border-color: var(--
 .eqfly .card { position: absolute; left: 0; top: 0; }
 .skipall { position: absolute; right: 14px; bottom: 60px; z-index: 12; }
 @media (max-width: 520px) { .eqslot span { display: none; } .skipall { bottom: 54px; right: 8px; } }
+
+/* the odds count-up: a pulse on every new digit, heat colour, milestone words */
+.oddspop span { color: var(--hc, #fff); text-shadow: 0 0 18px var(--hc, var(--lc)), 0 0 40px color-mix(in srgb, var(--hc, var(--lc)) 50%, transparent), 0 3px 0 #000; transition: color 0.2s; }
+.oddspop span.beat, .card .ft .odds.beat { animation: obeat 0.28s cubic-bezier(.3,1.9,.5,1); }
+@keyframes obeat { 35% { transform: scale(1.4); filter: brightness(1.6); } }
+.oddspop .ms { display: block; height: 0; font-style: normal; font-size: 22px; letter-spacing: 0.3em; color: var(--hc, #fff); text-shadow: 0 0 12px var(--hc, #fff), 0 2px 0 #000; opacity: 0; }
+.oddspop .ms.on { animation: msin 0.9s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes msin { 0% { opacity: 0; transform: translateY(-30px) scale(2.2); } 25% { opacity: 1; transform: translateY(4px) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(10px); } }
+.oddspop.done span { animation: oslam 0.6s cubic-bezier(.3,1.8,.5,1); }
+@keyframes oslam { 0% { transform: scale(1.7); filter: brightness(2.2); } 100% { transform: scale(1); } }
+.card .ft .odds { transition: color 0.2s; }
+
+/* ================= still cards for the binder grid: everything that moves or blends is switched off ================= */
+.card.lite, .card.lite * { animation: none !important; transition: none !important; }
+.card.lite .sheen, .card.lite .shine, .card.lite .twinkle, .card.lite .cosmos, .card.lite .glare, .card.lite .wrays, .card.lite .win::before, .card.lite .win::after, .card.lite .frame::before { display: none !important; }
+.card.lite .holo { mix-blend-mode: normal; opacity: 0.16; }
+.card.lite.ench .front { box-shadow: 0 0 0 2px var(--ec), inset 0 2px 0 rgba(255,255,255,0.7); }
+.card.lite .front { box-shadow: inset 0 2px 0 rgba(255,255,255,0.7), inset 0 -3px 0 rgba(0,0,0,0.35); }
+.bslot { content-visibility: auto; contain-intrinsic-size: 170px 238px; }
+.bgrid { contain: layout paint; }
 </style>
 </head>
 <body>
@@ -712,17 +732,19 @@ const fmtOdds = n => { const k = (v, u) => (v >= 100 ? Math.round(v) : v.toFixed
   return n >= 1e15 ? k(n / 1e15, 'Q') : n >= 1e12 ? k(n / 1e12, 'T') : n >= 1e9 ? k(n / 1e9, 'B') : n >= 1e6 ? k(n / 1e6, 'M') : n >= 1e5 ? Math.round(n / 1e3) + 'K' : n.toLocaleString(); };
 function oneIn(c) { return fmtOdds(oddsN(c)); }
 // roll a "1 in N" up from 1 to N: it races through the small numbers and slows down as it climbs
-function countUp(els, n, ms, tick) {
-  const t0 = performance.now(), L = Math.log(n); let lastT = 0;
+function countUp(els, n, ms, tick, onDigit) {
+  const t0 = performance.now(), L = Math.log(n); let lastT = 0, mag = 0;
   return new Promise(done => (function step(now) {
-    const f = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - f, 2.4), v = f >= 1 ? n : Math.max(1, Math.round(Math.exp(L * e)));
+    const f = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - f, 3.2), v = f >= 1 ? n : Math.max(1, Math.round(Math.exp(L * e)));
     els.forEach(el => { el.textContent = '1 in ' + fmtOdds(v); });
+    const m = Math.floor(Math.log10(v) + 1e-9); if (onDigit && m > mag) { mag = m; onDigit(m, v); }
     if (tick && now - lastT > 55 && f < 1) { lastT = now; tick(f); }
     if (f < 1) requestAnimationFrame(step); else done();
   })(t0));
 }
 const CRACKS = ['M50 8 L46 30 L54 44 L44 62 L52 80', 'M14 40 L30 46 L36 60 L50 62', 'M86 30 L70 40 L66 56 L52 64', 'M30 92 L40 80 L50 86 L60 78 L72 94'];
-function makeCard(c) {
+// lite: a still card for grids (the binder), with no particles, no tilt and no moving layers
+function makeCard(c, lite) {
   const T = TIERS[c.tier], A = CardArt, E = c.ench && A.ENCH[c.ench];
   const emo = A.pickEmoji(c.name, c.prompt), cat = A.catOf(c.prompt), TY = A.TYPES[cat] || A.TYPES.room;
   const orbs = n => h('span', { class: 'orbs' }, Array.from({ length: n }, () => h('i')));
@@ -752,6 +774,7 @@ function makeCard(c) {
         h('span', { class: 'tag f', text: c.finish ? '◈ ' + FINISHES[c.finish].name.toUpperCase() : '' }), h('span', { class: 'tag fa', text: 'FULL ART' }), h('span', { class: 'tag mp', text: 'MISPRINT' }),
         E && h('span', { class: 'ribbon', text: '✧ ' + E.name.toUpperCase() }),
         h('div', { class: 'sheen' }), h('div', { class: 'holo' }), h('div', { class: 'cosmos' }), h('div', { class: 'shine' }), h('div', { class: 'twinkle' }), fx, h('div', { class: 'glare' }))));
+  if (lite) { el.classList.add('lite'); fx.remove(); return el; }
   if (E) CardArt.particles(fx, c.ench, 3);
   tilt(el);
   return el;
@@ -1028,6 +1051,7 @@ function flyTop(top) {
 
 /* ================= REVEAL ================= */
 function reveal(cards, els, deck, rays) {
+  els.forEach(el => { const b = el.querySelector('.odds'); if (b) b.textContent = '1 in ???'; });
   const ov = $('open'), center = deck.parentElement, dark = ov.querySelector('.dark'), vig = ov.querySelector('.vig');
   const label = h('div', { class: 'label' }), counter = h('div', { class: 'counter' });
   deck.append(label, counter); const pt = center.querySelector('.packtitle'); if (pt) pt.classList.add('gone');
@@ -1065,9 +1089,24 @@ function reveal(cards, els, deck, rays) {
     el.classList.remove('hover'); el.classList.add('up', 'pop'); SFX.flip(); SFX.combo(i); setTimeout(() => el.classList.remove('pop'), 700);
     buzz(c.tier >= 4 ? [60, 40, 120, 40, 220] : c.tier >= 2 ? [30, 40, 30] : 12);
     deck.querySelectorAll('.oddspop').forEach(x => x.remove()); hint.style.visibility = 'hidden';
-    { const n = oddsN(c), num = h('span', { text: '1 in 1' }), pop = h('div', { class: 'oddspop', style: '--lc:' + (E ? E.color : col) }, h('small', { text: 'THE ODDS OF THIS CARD' }), num), badge = el.querySelector('.odds');
-      setTimeout(() => { deck.append(pop); const ms = 450 + 300 * Math.log10(n);
-        countUp([num, badge], n, ms, f => SFX.tick(f)).then(() => { pop.classList.add('done'); SFX.stamp(); if (n >= 1e6) { const rr = pop.getBoundingClientRect(); FX.burst(rr.left + rr.width / 2, rr.top + rr.height / 2, [E ? E.color : col, '#fff', '#ffe08a'], n >= 1e9 ? 90 : 45, { power: 0.9 }); SFX.sparkle(6, 1600); } }); }, 300); }
+    { const n = oddsN(c), num = h('span', { text: '1 in 1' }), word = h('em', { class: 'ms' }), pop = h('div', { class: 'oddspop', style: '--lc:' + (E ? E.color : col) }, h('small', { text: 'THE ODDS OF THIS CARD' }), num, word), badge = el.querySelector('.odds');
+      badge.textContent = '1 in ???';
+      // the number heats up as it climbs: white, cyan, violet, pink, gold
+      const HEAT = ['#ffffff', '#ffffff', '#ffffff', '#7deaff', '#7deaff', '#bfa7ff', '#bfa7ff', '#ff6ab0', '#ff6ab0', '#ffd24a', '#ffd24a', '#ffe08a', '#fff3c4'];
+      const WORDS = { 3: 'THOUSANDS!', 6: 'MILLIONS!!', 9: 'BILLIONS!!!', 12: 'TRILLIONS!!!!', 15: 'QUADRILLIONS' };
+      const beat = (m) => { const hc = HEAT[Math.min(HEAT.length - 1, m)]; pop.style.setProperty('--hc', hc); badge.style.color = hc;
+        num.classList.remove('beat'); void num.offsetWidth; num.classList.add('beat'); badge.classList.remove('beat'); void badge.offsetWidth; badge.classList.add('beat');
+        SFX.combo(Math.min(5, Math.floor(m / 2))); buzz(10 + m * 3);
+        const rr = num.getBoundingClientRect(); FX.burst(rr.left + rr.width / 2, rr.top + rr.height / 2, [hc, '#ffffff'], 6 + m * 3, { power: 0.35 + m * 0.04 }); FX.ring(rr.left + rr.width / 2, rr.top + rr.height / 2, hc, { grow: 160 + m * 40, size: 2 + m * 0.3, life: 0.45 });
+        if (WORDS[m]) { word.textContent = WORDS[m]; word.classList.remove('on'); void word.offsetWidth; word.classList.add('on'); SFX.riser(0.5);
+          if (m >= 6) { vig.style.setProperty('--vc', hc + '66'); deck.animate([{ transform: 'translate(-50%,0)' }, { transform: 'translate(calc(-50% - ' + (m - 3) + 'px),' + (m / 3) + 'px)' }, { transform: 'translate(calc(-50% + ' + (m - 3) + 'px),-' + (m / 3) + 'px)' }, { transform: 'translate(-50%,0)' }], { duration: 300 }); }
+          if (m >= 9) { const fl = $('flash'); fl.style.opacity = ''; fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); FX.rain([hc, '#ffffff'], 60, 1.6); } } };
+      setTimeout(() => { deck.append(pop); const ms = 600 + 430 * Math.log10(n);
+        countUp([num, badge], n, ms, f => SFX.tick(f), beat).then(() => {
+          pop.classList.add('done'); SFX.stamp(); SFX.reveal(Math.min(4, Math.floor(Math.log10(n) / 3)));
+          const rr = num.getBoundingClientRect(), hc = HEAT[Math.min(HEAT.length - 1, Math.floor(Math.log10(n)))];
+          FX.burst(rr.left + rr.width / 2, rr.top + rr.height / 2, [hc, '#fff', E ? E.color : col], 30 + Math.floor(Math.log10(n)) * 8, { power: 0.9 }); FX.ring(rr.left + rr.width / 2, rr.top + rr.height / 2, hc, { grow: 700, size: 5, life: 0.6 });
+          if (n >= 1e6) SFX.sparkle(6, 1600); }); }, 300); }
     const pop = h('div', { class: 'ptspop', style: '--lc:' + (E ? E.color : col), text: '+' + T.pts + ' PTS' }); center.append(pop); setTimeout(() => pop.remove(), 1400);
     dark.style.opacity = 0;
     setTimeout(() => SFX.reveal(c.tier), 90);
@@ -1259,7 +1298,7 @@ function binder(filter = 'all') {
     all.length ? grid : h('div', { class: 'bempty' }, h('p', { text: 'No cards yet.' }), h('button', { class: 'go', type: 'button', text: 'Pull the lever', onclick: () => s.remove() })));
   if (all.length && !pick.length) grid.append(h('div', { class: 'bempty', text: 'None of these yet. Keep pulling.' }));
   // draw a screenful at a time; each card carries its own art and particles
-  let i = 0; const more = () => { const end = Math.min(pick.length, i + 24); for (; i < end; i++) { const c = pick[i], el = makeCard(c); el.classList.add('up');
+  let i = 0; const more = () => { const end = Math.min(pick.length, i + 24); for (; i < end; i++) { const c = pick[i], el = makeCard(c, true); el.classList.add('up');
       const isSc = sc && sc.n === c.name && sc.p === c.prompt && (sc.e || 0) === (c.ench || 0) && (sc.f || 0) === (c.finish || 0);
       grid.append(h('div', { class: 'bslot', onclick: () => zoom(c) }, el, c.count > 1 && h('span', { class: 'cnt', text: '×' + c.count }), isSc && h('span', { class: 'scmark', text: '⚔ EQUIPPED' }))); }
     if (i < pick.length) { const b = h('button', { class: 'ghost', type: 'button', style: 'display:block;margin:16px auto', text: 'show more (' + (pick.length - i) + ')', onclick: () => { b.remove(); more(); } }); grid.after(b); } };

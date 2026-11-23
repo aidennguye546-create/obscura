@@ -1,0 +1,4 @@
+# Old answer banks: the site loads catalog.js + shards/ instead, so these are never served.
+bank-*.js
+!bank-cut.js
+!bank-obx.js

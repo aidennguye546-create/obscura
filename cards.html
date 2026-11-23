@@ -625,6 +625,16 @@ button.ghost.hot { color: #050d08; background: var(--lime); border-color: var(--
 .card.lite .front { box-shadow: inset 0 2px 0 rgba(255,255,255,0.7), inset 0 -3px 0 rgba(0,0,0,0.35); }
 .bslot { content-visibility: auto; contain-intrinsic-size: 170px 238px; }
 .bgrid { contain: layout paint; }
+
+/* ================= levels and finds ================= */
+.card .win .found { position: absolute; left: 0; right: 0; top: 0; z-index: 3; text-align: center; font-size: calc(var(--w) * 0.042); letter-spacing: 0.16em; color: #050d08; background: linear-gradient(90deg, transparent, #c8ff5a 20%, #c8ff5a 80%, transparent); }
+.card .win .lvb { position: absolute; left: 4px; bottom: 4px; z-index: 3; padding: 0 5px; font-size: calc(var(--w) * 0.05); color: #050d08; background: #c8ff5a; box-shadow: 0 0 0 2px #050d08; }
+.card .win .lvb.max { background: linear-gradient(90deg, #ffe08a, #fff3c4, #ffb12a); }
+.zxp { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; width: min(360px, 86vw); font-size: 18px; color: #cfe6c4; }
+.zxp b { font-weight: normal; padding: 0 6px; color: #050d08; background: #c8ff5a; }
+.zxp small { grid-column: 1 / -1; color: var(--dim); font-size: 15px; text-align: center; }
+.zxp .xpbar { height: 10px; background: #050d08; box-shadow: 0 0 0 2px #1f4a30; }
+.zxp .xpbar i { display: block; height: 100%; background: linear-gradient(90deg, #3fae5a, #7dffb0, #c8ff5a); box-shadow: 0 0 10px #c8ff5a; }
 </style>
 </head>
 <body>
@@ -724,6 +734,7 @@ function oddsN(c) {
   let p = ODDS[c.tier];
   THEME_BY_NAME = THEME_BY_NAME || new Map(THEMES.map(t => [t.name, t]));
   const t = THEME_BY_NAME.get(c.themeName); if (t) p *= 1 / THEMES.length / Math.max(1, t.cards.filter(x => x[2] === c.tier).length);
+  if (c.found) p *= [0, 0, 0.06, 0.15, 0.45][c.tier] || 0.01; // found in play: the chance a rare answer turned into a card
   p *= c.finish ? 1 / FINISHES[c.finish].odds : 1; p *= c.full ? 1 / LUCK.full : 1; p *= c.misprint ? 1 / LUCK.misprint : 1; p *= c.first ? 1 / LUCK.first : 1;
   if (c.ench) { const E = CardArt.ENCH, tot = Object.values(E).reduce((t, e) => t + e.odds, 0); p *= (1 / 20) * (E[c.ench].odds / tot); }
   return Math.max(2, Math.round(1 / p));
@@ -762,7 +773,7 @@ function makeCard(c, lite) {
             h('div', { class: 'wrays' }),
             h('div', { class: 'shadow' }), h('img', { class: 'subj', src: A.cardArt(c.name, c.prompt).src, alt: '' }),
             h('img', { class: 'badge', src: sprite(T.art), alt: '' }),
-            c.first && h('span', { class: 'first', text: '1ST' })),
+            c.first && h('span', { class: 'first', text: '1ST' }), c.found && h('span', { class: 'found', text: 'FOUND IN PLAY' }), c.level > 1 && h('span', { class: 'lvb' + (c.level >= 7 ? ' max' : ''), text: c.level >= 7 ? 'MAX' : 'LV ' + c.level })),
           h('div', { class: 'type' }, h('span', { text: 'NO.' + String(c.no).padStart(3, '0') + ' · ' + TY.name + ' answer' }), h('span', { text: T.name + ' tier' })),
           h('div', { class: 'txt' }, h('q', { text: c.prompt }),
             h('div', { class: 'moves' },
@@ -1301,8 +1312,8 @@ function oddsSheet() {
 function binder(filter = 'all') {
   const all = Store.cards().map(c => Object.assign(c, { fact: FACTS.get(c.name + '|' + c.prompt), size: 0 })).sort((a, b) => rank(b) - rank(a) || b.at - a.at);
   const total = all.reduce((t, c) => t + c.count, 0), sc = Store.showcase();
-  const F = [['all', 'all'], ['4', 'obscura'], ['3', 'epic'], ['2', 'rare'], ['1', 'uncommon'], ['0', 'common'], ['ench', '✧ enchanted'], ['foil', '◈ holo']];
-  const pick = all.filter(c => filter === 'all' ? true : filter === 'ench' ? c.ench : filter === 'foil' ? (c.finish || c.full) : c.tier === Number(filter));
+  const F = [['all', 'all'], ['found', '✦ found in play'], ['4', 'obscura'], ['3', 'epic'], ['2', 'rare'], ['1', 'uncommon'], ['0', 'common'], ['ench', '✧ enchanted'], ['foil', '◈ holo']];
+  const pick = all.filter(c => filter === 'all' ? true : filter === 'found' ? c.found : filter === 'ench' ? c.ench : filter === 'foil' ? (c.finish || c.full) : c.tier === Number(filter));
   const grid = h('div', { class: 'bgrid' });
   const s = sheet('My cards',
     h('div', { class: 'bstats' }, h('span', null, h('b', { text: String(total) }), ' cards'), h('span', null, h('b', { text: String(all.length) }), ' different'), h('span', null, h('b', { text: String(all.filter(c => c.ench).length) }), ' enchanted'), h('span', null, h('b', { text: String(all.filter(c => c.tier === 4).length) }), ' obscura'), h('span', null, h('b', { text: Store.designs() + '/' + THEMES.length * 6 }), ' pack designs')),
@@ -1320,6 +1331,7 @@ function zoom(c) {
   SFX.flip(); const el = makeCard(c); el.classList.add('up', 'pop'); const sc = Store.showcase(), isSc = sc && sc.n === c.name && sc.p === c.prompt && (sc.e || 0) === (c.ench || 0) && (sc.f || 0) === (c.finish || 0);
   const E = c.ench && CardArt.ENCH[c.ench];
   const z = h('div', { class: 'zoom', onclick: e => { if (e.target === z) z.remove(); } }, h('div', { class: 'zc' }, el),
+    c.xp > 0 && (() => { const sp = Store.levelSpan(c.xp); return h('div', { class: 'zxp' }, h('b', { text: sp.l >= 7 ? 'MAX LEVEL' : 'LV ' + sp.l }), h('div', { class: 'xpbar' }, h('i', { style: 'width:' + Math.round(sp.f * 100) + '%' })), h('small', { text: c.xp.toLocaleString() + ' XP' + (sp.need ? ' · ' + sp.need.toLocaleString() + ' to LV ' + (sp.l + 1) : '') })); })(),
     E && h('p', { class: 'note2', style: 'max-width:min(420px,90vw);text-align:center', text: '✧ Equipped, ' + E.name + ' particles fill your game and burst when your answers land' }),
     h('div', { class: 'btns' }, h('button', { class: 'scbtn' + (isSc ? ' done' : ''), type: 'button', text: isSc ? '✓ equipped' : '⚔ Equip', onclick: e => { equip(c, el); e.currentTarget.textContent = '✓ equipped'; e.currentTarget.classList.add('done'); setTimeout(() => { z.remove(); document.querySelectorAll('.sheet').forEach(x => x.remove()); }, 700); } }), h('button', { class: 'ghost', type: 'button', text: 'close', onclick: () => z.remove() })));
   document.body.append(z); const r = el.getBoundingClientRect(); if (c.tier >= 2 || E) FX.burst(r.left + r.width / 2, r.top + r.height / 2, [E ? E.color : TIERS[c.tier].color, '#fff'], 30, { power: 0.6 });

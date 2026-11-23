@@ -982,6 +982,48 @@ body.incards .eqc { opacity: 0; }
 
 @media (max-width: 520px) { .eqc { --ew: 74px; bottom: max(-30px, calc(env(safe-area-inset-bottom, 0px) - 30px)); } .eqc.inplay { --ew: 52px; top: 30%; } }
 @media (prefers-reduced-motion: reduce) { .eqc, .eqc .eqa, .eqc .eqshine { animation: none !important; } }
+
+/* ---------- card levels on the equipped card ---------- */
+.eqc .eqlv { position: absolute; left: 2px; top: 2px; z-index: 2; padding: 0 3px; font-size: calc(var(--ew) * 0.1); line-height: 1.2; color: #050d08; background: #c8ff5a; box-shadow: 0 0 0 1px #050d08; }
+.eqc .eqlv.max { background: linear-gradient(90deg, #ffe08a, #fff3c4, #ffb12a); }
+.eqc .eqxp { height: calc(var(--ew) * 0.04); background: #050d08; box-shadow: 0 0 0 1px #2c4a35; }
+.eqc .eqxp i { display: block; height: 100%; background: linear-gradient(90deg, #7dffb0, #c8ff5a); box-shadow: 0 0 6px #c8ff5a; }
+.eqc.inplay .eqxp { display: none; }
+.eqc.levelup { animation: eqlvup 1.4s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes eqlvup { 15% { transform: rotate(-6deg) translate(20px, -70px) scale(1.35); filter: drop-shadow(0 0 26px #ffe08a) brightness(1.5); } 40% { transform: rotate(8deg) translate(10px, -40px) scale(1.2); } 70% { transform: rotate(4deg) translate(0, -6px) scale(1.05); } }
+.scc .lv { margin-left: 2px; padding: 0 3px; font-size: 11px; color: #050d08; background: #c8ff5a; }
+/* ---------- XP on the results banner ---------- */
+.xprow { flex-basis: 100%; display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 4px 10px; padding-top: 6px; border-top: 1px dashed #2c4a35; font-size: 17px; letter-spacing: 0.06em; color: #cfe6c4; }
+.xprow .xp-lv { font-weight: normal; padding: 0 6px; color: #050d08; background: #c8ff5a; }
+.xprow .xp-lv.up { animation: lvpop 0.8s cubic-bezier(.3, 1.9, .5, 1); background: #ffe08a; }
+@keyframes lvpop { 30% { transform: scale(1.8) rotate(-6deg); box-shadow: 0 0 20px #ffe08a; } }
+.xprow small { font-size: 14px; color: #8fae8f; }
+.xpbar { height: 10px; background: #050d08; box-shadow: 0 0 0 2px #1f4a30; overflow: hidden; }
+.xpbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3fae5a, #7dffb0, #c8ff5a); box-shadow: 0 0 10px #c8ff5a; transition: width 0.9s cubic-bezier(.3, 1, .4, 1); }
+.xprow.lvup { animation: lvrow 1s ease; }
+@keyframes lvrow { 20% { background: rgba(255, 224, 138, 0.25); } }
+@media (max-width: 520px) { .xprow { grid-template-columns: 1fr auto; } .xprow .xpbar { grid-column: 1 / -1; } }
+/* ---------- a card found in play ---------- */
+.dropwrap { position: fixed; left: calc(50% + 300px); top: 16%; z-index: 65; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 10px; transform: translateX(-50%); }
+.eqc.drop { --ew: 128px; position: relative; left: auto; bottom: auto; transform: none; animation: dropin 0.9s cubic-bezier(.2, 1.4, .4, 1) both; filter: drop-shadow(0 0 22px var(--rc)); }
+@keyframes dropin { 0% { transform: perspective(600px) rotateY(900deg) scale(0.1); opacity: 0; } 60% { transform: perspective(600px) rotateY(-12deg) scale(1.18); opacity: 1; } 100% { transform: perspective(600px) rotateY(0) scale(1); } }
+.eqc.drop .eqlab { top: -18px; font-size: 14px; background: #ffe08a; animation: lvpop 0.8s 0.6s cubic-bezier(.3, 1.9, .5, 1) both; }
+.dropcap { text-align: center; animation: capin 0.5s 0.7s cubic-bezier(.3, 1.6, .5, 1) both; }
+.dropcap small { display: block; font-size: 15px; letter-spacing: 0.16em; color: #cfe6c4; text-shadow: 0 2px 0 #000; }
+.dropcap b { font-weight: normal; font-size: 30px; color: #fff; text-shadow: 0 0 14px var(--rc), 0 3px 0 #000; }
+@keyframes capin { from { opacity: 0; transform: scale(1.8); } }
+/* ---------- the lineup at the start of a game ---------- */
+#lineup { position: fixed; left: 0; right: 0; bottom: 10%; z-index: 30; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 26px 0 30px; background: linear-gradient(180deg, transparent, rgba(5, 13, 8, 0.88) 22%, rgba(5, 13, 8, 0.88) 78%, transparent); }
+#lineup .lu-t { font-weight: normal; font-size: 26px; letter-spacing: 0.3em; color: #fff3c4; text-shadow: 0 0 16px #ffb12a, 0 3px 0 #000; animation: capin 0.5s cubic-bezier(.3, 1.6, .5, 1) both; }
+#lineup .lu-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding: 0 12px; }
+#lineup .lu-slot { position: relative; }
+#lineup .eqc.lu { --ew: 92px; position: relative; left: auto; bottom: auto; transform: none; animation: luin 0.6s cubic-bezier(.2, 1.5, .4, 1) both; filter: drop-shadow(0 0 12px var(--pc)); }
+#lineup .eqc.lu .eqlab { background: var(--pc); top: -16px; }
+@keyframes luin { 0% { transform: translateY(160px) rotate(14deg) scale(0.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+#lineup.out { animation: luout 0.6s ease-in forwards; }
+@keyframes luout { to { opacity: 0; transform: translateY(40px); } }
+@media (max-width: 1000px) { .dropwrap { left: 50%; top: auto; bottom: 20%; } }
+@media (max-width: 520px) { #lineup .eqc.lu { --ew: 70px; } #lineup .lu-t { font-size: 20px; } .eqc.drop { --ew: 108px; } }
 </style>
 </head>
 <body>

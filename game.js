@@ -1573,7 +1573,7 @@ function openMenu() {
 /* ---------- card packs: spores for every game, a pack machine in the corner, and your showcase card on show ---------- */
 // The machine itself is cards.html, opened over the game in a frame; it shares CardStore (cards-store.js) with this page.
 const CS = window.CardStore || null;
-function myShowcase() { const c = CS && CS.showcase(); return c ? { n: c.n, t: c.t, e: c.e || 0, f: c.f || 0, fa: c.fa || 0, em: c.em || '' } : null; }
+function myShowcase() { const c = CS && CS.showcase(), lv = CS && CS.equippedLevel(); return c ? { n: c.n, t: c.t, e: c.e || 0, f: c.f || 0, fa: c.fa || 0, em: c.em || '', c: c.c || '', lv: lv ? lv.l : 1 } : null; }
 const ENCH = () => (window.CardArt && window.CardArt.ENCH) || {};
 const CARD_TIER = ['#d7e1f2', '#7deaff', '#ff4d4d', '#bfa7ff', '#ffe08a'];
 // a little card next to a name: the answer's picture, its name, and the enchantment's tag in that enchantment's colours
@@ -1581,7 +1581,7 @@ function scChip(p, short) {
   const c = p && p.sc; if (!c || !c.n) return null;
   const E = c.e && ENCH()[c.e], col = E ? E.color : CARD_TIER[c.t] || '#d7e1f2', nm = short && c.n.length > 12 ? c.n.slice(0, 11) + '…' : c.n;
   return h('span', { class: 'scc t' + c.t + (E ? ' ench' : '') + (c.f || c.fa ? ' foil' : ''), style: '--cc:' + col + (E ? ';--cg:' + E.glow : ''), title: (E ? E.name + ' ' : '') + (c.fa ? 'full art ' : '') + c.n },
-    h('i', { text: c.em || '◆' }), h('span', { text: nm }), E && h('b', { text: E.tag }));
+    h('i', { text: c.em || '◆' }), h('span', { text: nm }), E && h('b', { text: E.tag }), c.lv > 1 && h('small', { class: 'lv', text: 'LV' + c.lv }));
 }
 // The machine stays loaded after the first visit: closing hides it (and it idles), opening again is instant.
 function openCards(hash) {
@@ -1627,24 +1627,25 @@ function tryPack() {
 // fill the background with their own particles.
 const fmtO = n => { const k = (v, u) => (v >= 100 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, '')) + u; return n >= 1e15 ? k(n / 1e15, 'Q') : n >= 1e12 ? k(n / 1e12, 'T') : n >= 1e9 ? k(n / 1e9, 'B') : n >= 1e6 ? k(n / 1e6, 'M') : n >= 1e5 ? Math.round(n / 1e3) + 'K' : n.toLocaleString(); };
 const eqType = c => { const A = window.CardArt; if (!A || !c) return null; return A.TYPES[c.c || A.catOf(c.p || '')] || A.TYPES.room; };
-function eqCard(c) {
+function eqCard(c, lvl) {
   const A = window.CardArt; if (!A || !c) return null;
   const cat = c.c || A.catOf(c.p || ''), TY = eqType(c), E = c.e && ENCH()[c.e], art = c.a || A.pixelEmoji(c.em || '✨', 48);
   return h('div', { class: 'eqc t' + c.t + (c.f || c.fa ? ' foil' : '') + (E ? ' ench' : ''), title: 'Your equipped card: ' + c.n + ' · tap to change it', style: '--tc:' + TY.col + ';--rc:' + CARD_TIER[c.t] + (E ? ';--ec:' + E.color + ';--eg:' + E.glow : '') },
     h('span', { class: 'eqlab', text: '⚔ EQUIPPED' }),
     h('div', { class: 'eqf' },
       h('div', { class: 'eqh' }, h('b', { text: c.n }), E && h('i', { text: E.tag })),
-      h('div', { class: 'eqw' }, h('img', { class: 'eqs', src: A.scene(cat, c.n + (c.p || '')), alt: '' }), h('img', { class: 'eqa', src: art, alt: '' })),
+      h('div', { class: 'eqw' }, h('img', { class: 'eqs', src: A.scene(cat, c.n + (c.p || '')), alt: '' }), h('img', { class: 'eqa', src: art, alt: '' }), lvl && h('span', { class: 'eqlv' + (lvl.l >= 7 ? ' max' : ''), text: lvl.l >= 7 ? 'MAX' : 'LV ' + lvl.l })),
+      lvl && h('div', { class: 'eqxp' }, h('i', { style: 'width:' + Math.round((lvl.f || 0) * 100) + '%' })),
       h('div', { class: 'eqt' }, h('span', { text: TY.sym + ' ' + TY.name }), h('span', { text: ['◆', '◆◆', '★', '★★', '★★★'][c.t] || '' })),
       c.o ? h('div', { class: 'eqo', text: '1 in ' + fmtO(c.o) }) : null),
     h('div', { class: 'eqshine' }));
 }
 function eqFloat() {
   const sc = CS && CS.showcase(), r = S.room, phase = !S.mode ? 'home' : (r && r.phase) || 'home', play = phase === 'play' || phase === 'pick' || phase === 'reveal';
-  let el = $('eqfloat'); const key = sc ? [sc.n, sc.p, sc.e, sc.f, sc.fa, sc.a ? 1 : 0].join('|') : 'none';
+  const lvl = sc && CS.equippedLevel(); let el = $('eqfloat'); const key = sc ? [sc.n, sc.p, sc.e, sc.f, sc.fa, sc.a ? 1 : 0, lvl ? lvl.l + ':' + Math.round(lvl.f * 20) : ''].join('|') : 'none';
   if (!el || el.dataset.k !== key) {
     if (el) el.remove();
-    el = sc ? eqCard(sc) : (window.CardArt && CS ? h('div', { class: 'eqc empty' }, h('span', { class: 'eqlab', text: '⚔ NO CARD' }), h('div', { class: 'eqf' }, h('b', { text: '+' }), h('small', { text: 'equip a card' }))) : null);
+    el = sc ? eqCard(sc, lvl) : (window.CardArt && CS ? h('div', { class: 'eqc empty' }, h('span', { class: 'eqlab', text: '⚔ NO CARD' }), h('div', { class: 'eqf' }, h('b', { text: '+' }), h('small', { text: 'equip a card' }))) : null);
     if (!el) return;
     el.id = 'eqfloat'; el.dataset.k = key; el.addEventListener('click', () => { Sound.unlock(); snd('click'); openCards(sc ? '#binder' : ''); });
     document.body.append(el);
@@ -1652,9 +1653,58 @@ function eqFloat() {
   el.classList.toggle('inplay', play); el.classList.toggle('gone', document.body.classList.contains('incards') || (play && !sc));
   const TY = eqType(sc); document.body.classList.toggle('eqon', !!sc); if (TY) document.body.style.setProperty('--eq', TY.col);
 }
+/* ---------- cards found in play: a rare answer can become a card of that exact answer ---------- */
+const DROP = [0, 0, 0.06, 0.15, 0.45], TODDS = [0.6, 0.25, 0.11, 0.035, 0.005], DUPE_SP = [1, 2, 4, 8, 25];
+const FINS = [['goldrush', 500], ['rainbow', 300], ['galaxy', 200], ['etched', 120], ['ice', 80], ['cosmos', 40], ['holo', 15], ['reverse', 12]];
+function dropOdds(c) { let p = TODDS[c.tier] * DROP[c.tier]; const fo = FINS.find(f => f[0] === c.finish); if (fo) p /= fo[1]; if (c.full) p /= 200; if (c.misprint) p /= 400;
+  if (c.ench) { const E = ENCH(), tot = Object.values(E).reduce((t, e) => t + e.odds, 0); p *= (1 / 20) * (E[c.ench].odds / tot); } return Math.max(2, Math.round(1 / p)); }
+window.__onLand = (tier, x, y) => {
+  const r = S.room; if (!CS || !window.CardArt || !S.mine || !r || Math.random() >= (DROP[tier] || 0)) return;
+  const gk = S.code + ':' + r.g + ':' + (r.createdAt || S._soloAt || r.day || ''); if (S._dropKey !== gk) { S._dropKey = gk; S._drops = 0; } if (S._drops >= 2) return;
+  const rd = S.mine.rounds && S.mine.rounds[r.round], a = rd && rd.a[rd.a.length - 1], T = TOPICS[r.topic]; if (!a || !T || a[1] < 2) return;
+  S._drops++;
+  const A = window.CardArt, c = { name: a[0], prompt: T.name, tier: a[1], finish: (FINS.find(f => Math.random() < 1 / f[1]) || [null])[0], ench: A.rollEnchant(), full: Math.random() < 1 / 200, misprint: Math.random() < 1 / 400, first: false,
+    set: String(r.topic).replace(/^[a-z0-9]+_/, '').slice(0, 3).toUpperCase(), no: 1 + Math.floor(Math.random() * 240), found: true, themeName: '' };
+  c.foil = !!c.finish; c.emoji = A.pickEmoji(c.name, c.prompt);
+  const dupe = CS.own(c); if (dupe) CS.add(DUPE_SP[c.tier], 'duplicate card'); else CS.flush();
+  // wait for the game's own landing moment (an Obscura has a long one) before showing the card
+  setTimeout(() => showDrop(c, dupe), c.tier >= 4 ? 3500 : 1100);
+};
+function showDrop(c, dupe) {
+  const A = window.CardArt;
+  const odds = dropOdds(c), card = eqCard({ n: c.name, p: c.prompt, t: c.tier, e: c.ench || 0, f: c.finish || 0, fa: c.full ? 1 : 0, a: A.cardArt(c.name, c.prompt).src, c: A.catOf(c.prompt), o: odds });
+  if (!card) return;
+  card.classList.add('drop'); card.querySelector('.eqlab').textContent = dupe ? 'ALREADY HAD · +' + DUPE_SP[c.tier] + '✦' : '✦ CARD FOUND!';
+  const cap = h('div', { class: 'dropcap', style: '--rc:' + CARD_TIER[c.tier] }, h('small', { text: 'this answer is now a card' }), h('b', { text: '1 in ' + fmtO(odds) }));
+  const wrap = h('div', { class: 'dropwrap', 'aria-hidden': 'true' }, card, cap); document.body.append(wrap);
+  snd('best'); setTimeout(() => snd('land', Math.min(4, c.tier + 1)), 250);
+  if (window.__fx) { const fxs = window.__fx; for (const col of [CARD_TIER[c.tier], '#ffffff', '#ffe08a']) fxs.burst(innerWidth / 2, innerHeight * 0.32, col, 18 + c.tier * 6, 0.9); }
+  // after a moment it flies down into your hand (the equipped card on the left) and the collection
+  setTimeout(() => {
+    const target = $('eqfloat'), tr = target && !target.classList.contains('gone') ? target.getBoundingClientRect() : { left: 10, top: innerHeight - 60, width: 40, height: 56 }, cr = card.getBoundingClientRect();
+    wrap.animate([{ transform: 'none', opacity: 1 }, { transform: 'translate(' + (tr.left + tr.width / 2 - (cr.left + cr.width / 2)) + 'px,' + (tr.top + tr.height / 2 - (cr.top + cr.height / 2)) + 'px) scale(0.25) rotate(-20deg)', opacity: 0.2 }], { duration: 650, easing: 'cubic-bezier(.5,0,.75,.4)', fill: 'forwards' })
+      .onfinish = () => { wrap.remove(); const f = $('eqfloat'); if (f) { f.classList.remove('hit'); void f.offsetWidth; f.classList.add('hit'); } snd('click'); };
+  }, 2300);
+};
+// at the start of a game, every explorer's equipped card slides in like a team intro
+function lineup() {
+  const r = S.room; if (!r || !CS || !window.CardArt) return;
+  const key = S.code + ':' + r.g + ':' + (r.createdAt || S._soloAt || r.day || r.kind || ''); if (S._lineup === key) return; S._lineup = key;
+  const ps = (S.mode === 'online' ? ordered() : [{ id: S.me.id, ...S.mine }]).filter(p => p.id === S.me.id ? CS.showcase() : p.sc && p.sc.n);
+  if (!ps.length || SET.low) return;
+  const old = $('lineup'); if (old) old.remove();
+  const el = h('div', { id: 'lineup', 'aria-hidden': 'true' }, h('b', { class: 'lu-t', text: S.mode === 'online' && ps.length > 1 ? 'THE LINEUP' : 'YOUR CARD DIVES WITH YOU' }),
+    h('div', { class: 'lu-row' }, ps.slice(0, 8).map((p, i) => { const mine = p.id === S.me.id, sc = mine ? CS.showcase() : p.sc;
+      const card = eqCard(mine ? sc : { n: sc.n, p: '', t: sc.t, e: sc.e, f: sc.f, fa: sc.fa, em: sc.em, c: sc.c }, mine ? CS.equippedLevel() : sc.lv > 1 ? { l: sc.lv, f: 0 } : null);
+      card.classList.add('lu'); card.style.animationDelay = (0.15 + i * 0.14) + 's'; card.querySelector('.eqlab').textContent = nameOf(p) + (mine ? ' (you)' : '');
+      return h('div', { class: 'lu-slot', style: '--pc:' + colorOf(p.id) }, card); })));
+  document.body.append(el); snd('pick');
+  setTimeout(() => el.classList.add('out'), 2200); setTimeout(() => el.remove(), 2800);
+}
 // which screens get the corner pack, and the equipped card's ambience while you play
 function cardsScreen() {
   tryPack(); eqFloat();
+  if (S.mode && S.room && S.room.phase === 'play' && S.room.round === 1) lineup();
   const r = S.room, calm = !S.mode || !r || r.phase === 'lobby' || r.phase === 'final';
   const tc = $('trycards'); if (tc) tc.classList.toggle('gone', !calm || document.body.classList.contains('incards'));
   const full = CS && CS.showcase(), sc = myShowcase(), E = sc && sc.e && ENCH()[sc.e], TY = eqType(full);
@@ -1682,6 +1732,14 @@ function payout() {
   const ban = h('div', { class: 'spores' }, h('div', { class: 'sp-n' }, h('b', { text: '+' + got + '✦' }), h('span', { text: 'spores earned' + (obs ? ' · +' + obs * 5 + ' for Obscuras' : '') })),
     h('button', { class: 'pink', type: 'button', text: k ? 'Open ' + (k > 1 ? k + ' packs' : 'a pack') + ' →' : 'Pack machine →', onclick: openCards }));
   const at = sec.querySelector('.bigscore') || sec.querySelector('#winner'); (at || sec.firstChild).after(ban);
+  // the equipped card's XP: every point you scored, with a bar that fills (and a level-up if it gets there)
+  const xp = CS.gainXP(key, total(S.mine));
+  if (xp) { const sp0 = CS.levelSpan(xp.before), bar = h('i', { style: 'width:' + Math.round(sp0.f * 100) + '%' }), lvT = h('b', { class: 'xp-lv', text: 'LV ' + xp.lvBefore });
+    const row = h('div', { class: 'xprow' }, h('span', { text: '⚔ ' + xp.name + ' +' + fmt(xp.after - xp.before) + ' XP' }), lvT, h('div', { class: 'xpbar' }, bar), h('small', { text: xp.span.need ? fmt(xp.span.need) + ' XP to LV ' + (xp.lvAfter + 1) : 'max level' }));
+    ban.append(row);
+    setTimeout(() => { if (xp.lvAfter > xp.lvBefore) { bar.style.width = '100%'; setTimeout(() => { bar.style.transition = 'none'; bar.style.width = '0%'; void bar.offsetWidth; bar.style.transition = ''; bar.style.width = Math.round(xp.span.f * 100) + '%'; lvT.textContent = 'LV ' + xp.lvAfter + '!'; lvT.classList.add('up'); row.classList.add('lvup'); snd('fanfare');
+        const f = $('eqfloat'); if (f) { cardsScreen(); const f2 = $('eqfloat'); if (f2) { f2.classList.add('levelup'); const rr = f2.getBoundingClientRect(); if (window.__fx) for (const col of ['#ffe08a', '#ffffff', '#c8ff5a']) window.__fx.burst(rr.left + rr.width / 2, rr.top + rr.height / 2, col, 26, 1); } } }, 900); }
+      else { bar.style.width = Math.round(xp.span.f * 100) + '%'; cardsScreen(); } }, 900); }
   snd('best'); { const f = $('eqfloat'); if (f) { f.classList.remove('cheer'); void f.offsetWidth; f.classList.add('cheer'); } }
   // a few spores fly to the corner pack
   const tc = $('trycards'), br = ban.getBoundingClientRect(); if (!tc || SET.low) return;
@@ -5483,7 +5541,7 @@ addEventListener('online', checkIn);
       if (p >= 1) {
         window.__sink = null; window.__sinkP = 1;
         // landing, rarity by rarity as Krillion does it: no freeze-frame, no zoom jolt, no glow disc
-        flash = 0; punch = 0; hold = 0; snd('impact', tr); snd('land', tr); if (window.__encLand) window.__encLand(fx, W / 2, AY, tr);
+        flash = 0; punch = 0; hold = 0; snd('impact', tr); snd('land', tr); if (window.__encLand) window.__encLand(fx, W / 2, AY, tr); if (window.__onLand) window.__onLand(tr, W / 2, AY);
         if (tr === 0) fx.burst(W / 2, AY, '#8fa3c4', 8, 0.4);
         else if (tr === 1) fx.burst(W / 2, AY, SPARK[1], 22, 0.8);
         else if (tr === 2) { fx.puff(W / 2, AY, 22); fx.burst(W / 2, AY, SPARK[2], 26, 0.9); fx.shake(); fx.flash('rgba(255,82,82,.45)', 1, 240); }

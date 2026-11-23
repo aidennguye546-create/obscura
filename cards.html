@@ -987,7 +987,8 @@ function gallery(ed = 'std') {
 const demos = $('demos'); if (!/[?&]dev\b/.test(location.search)) demos.style.display = 'none';
 demos.append(h('button', { class: 'ghost', text: 'all pack designs', onclick: () => gallery() }));
 [['pull (random)', null], ['rare', 'rare'], ['epic', 'epic'], ['obscura', 'legend'], ['enchanted', 'ench'], ['god pack', 'god'], ['rare edition', 'edition'], ['fever ×3', 'fever']].forEach(([t, rig]) => demos.append(h('button', { class: 'ghost', text: 'demo: ' + t, onclick: () => { if (!M || M.busy) return; M.rig = rig; M.fire(); } })));
-wallet(); PackArt.preload(THEMES).then(machine).then(() => { const st = Store.get(); if (st.gift && st.pulls === 0) toast('Welcome! Here are ' + st.gift + '✦ to start. Pull the lever!'); });
+wallet(); if (location.hash === '#account') setTimeout(() => account(), 0);
+PackArt.preload(THEMES).then(machine).then(() => { if (location.hash === '#account') return; const st = Store.get(); if (st.gift && st.pulls === 0) toast('Welcome! Here are ' + st.gift + '✦ to start. Pull the lever!'); });
 $('mute').addEventListener('click', () => { const on = SFX.toggle(); $('mute').textContent = on ? '♪ sound on' : '♪ sound off'; });
 $('mute').textContent = SFX.muted() ? '♪ sound off' : '♪ sound on';
 $('back').addEventListener('click', () => { SFX.click(); if (window.EMBED && parent.closeCards) parent.closeCards(); else location.href = './'; });

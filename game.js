@@ -1562,7 +1562,8 @@ function openMenu() {
       tile('online', '', 'Party room', () => { goHome(); const n = $('nick'); if (n) n.focus(); }, ['krill', '#ff7a45']),
       tile('archive', '⟲', 'Archive', () => { goHome(); openArchive(); }),
       tile('packs', '▦', 'Themed packs', () => { goHome(); openPacks(); }),
-      tile('cards', '✦', 'Card packs', openCards),
+      tile('cards', '✦', 'Card packs', () => openCards()),
+      tile('account', '@', window.Account && Account.state === 'user' ? Account.name : 'Account', () => openCards('#account')),
       tile('me', '☻', 'My Obscura', openMe),
       tile('settings', '⚙', 'Settings', openSettings),
       tile('faq', '?', 'How to play', openHowto),
@@ -1582,10 +1583,10 @@ function scChip(p, short) {
   return h('span', { class: 'scc t' + c.t + (E ? ' ench' : '') + (c.f || c.fa ? ' foil' : ''), style: '--cc:' + col + (E ? ';--cg:' + E.glow : ''), title: (E ? E.name + ' ' : '') + (c.fa ? 'full art ' : '') + c.n },
     h('i', { text: c.em || '◆' }), h('span', { text: nm }), E && h('b', { text: E.tag }));
 }
-function openCards() {
+function openCards(hash) {
   if ($('cardsfr')) return;
   document.querySelectorAll('.modal').forEach(m => m.remove());
-  const f = h('iframe', { id: 'cardsfr', src: 'cards.html', title: 'Card packs', allow: 'autoplay' });
+  const f = h('iframe', { id: 'cardsfr', src: 'cards.html' + (typeof hash === 'string' ? hash : ''), title: 'Card packs', allow: 'autoplay' });
   const w = h('div', { id: 'cardsov', class: 'cards-ov' }, f);
   document.body.append(w); document.body.classList.add('incards');
   const tc = $('trycards'); if (tc) tc.classList.add('gone');

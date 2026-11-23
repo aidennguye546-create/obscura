@@ -79,10 +79,10 @@
     if (bs === 0) { g.fillStyle = P.acc; g.fillRect(6, ty - 15, W - 12, 28); g.beginPath(); g.moveTo(6, ty - 15); g.lineTo(0, ty - 1); g.lineTo(6, ty + 13); g.moveTo(W - 6, ty - 15); g.lineTo(W, ty - 1); g.lineTo(W - 6, ty + 13); g.fill(); g.fillStyle = P.ink; g.fillText(title, W / 2, ty); }
     else if (bs === 1) { g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(10, ty - 15, W - 20, 28); g.strokeStyle = P.acc; g.lineWidth = 1; g.strokeRect(12, ty - 13, W - 24, 24); g.fillStyle = P.title; g.fillText(title, W / 2, ty); }
     else { g.lineWidth = 4; g.strokeStyle = P.ink; g.strokeText(title, W / 2, ty); g.fillStyle = P.acc; g.fillText(title, W / 2, ty); g.fillStyle = P.light; g.fillRect(30, ty + 13, W - 60, 1); }
-    g.font = '11px VT323'; g.fillStyle = P.light; const series = SERIES[Math.floor(r() * SERIES.length)]; g.fillText(series + ' · ' + theme.n + ' PROMPTS', W / 2, ty + (lay === 2 ? 22 : 24));
+    g.font = '11px VT323'; g.fillStyle = P.light; const series = SERIES[Math.floor(r() * SERIES.length)]; g.fillText('5 ANSWER CARDS', W / 2, ty + (lay === 2 ? 22 : 24));
     // edition mark
     if (ed !== 'std') { const E = EDITIONS.find(x => x.id === ed); g.font = '11px VT323'; g.textAlign = 'left'; g.fillStyle = ed === 'shadow' ? P.acc : '#fff3c4'; g.fillText('✦ ' + E.name.toUpperCase(), 8, H - 20); }
-    g.textAlign = 'right'; g.font = '11px VT323'; g.fillStyle = '#fff'; g.fillText('5 CARDS', W - 8, H - 20);
+    g.textAlign = 'right'; g.font = '11px VT323'; g.fillStyle = '#fff'; g.fillText(series, W - 8, H - 20);
     const out = { url: cv.toDataURL(), pal: P, ready };
     if (ready) cache[key] = out;
     return out;

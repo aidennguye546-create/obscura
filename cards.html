@@ -12,9 +12,9 @@
   --r0: #d7e1f2; --r1: #7deaff; --r2: #ff4d4d; --r3: #bfa7ff; --r4: #ffe08a;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at 50% 30%, #0c2416 0%, var(--deep) 45%, var(--abyss) 100%); color: var(--text); font-family: 'VT323', monospace; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; }
+html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at 50% 28%, #2a6b40 0%, #143a24 42%, #0a1f13 100%); color: var(--text); font-family: 'VT323', monospace; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; }
 #bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-#crt { position: fixed; inset: 0; pointer-events: none; z-index: 60; opacity: 0.3; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.2) 0 1px, transparent 1px 3px); }
+#crt { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 60; opacity: 0.3; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.2) 0 1px, transparent 1px 3px); }
 #fxc { position: fixed; inset: 0; z-index: 45; pointer-events: none; }
 #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
 #flash.go { animation: flash 1s ease-out; }
@@ -37,7 +37,7 @@ button.go:active { transform: translateY(3px); box-shadow: 0 0 0 2px #050d08, 0 
 /* ================= THE MACHINE ================= */
 .machine { position: relative; width: 340px; height: 520px; transform-origin: 50% 100%; }
 .machine.shake { animation: mshake 0.12s linear infinite; }
-@keyframes mshake { 25% { transform: translate(-2px, 1px) rotate(-0.4deg); } 75% { transform: translate(2px, -1px) rotate(0.4deg); } }
+@keyframes mshake { 25% { transform: translate(-1px, 0); } 75% { transform: translate(1px, 0); } }
 .machine.kick { animation: kick 0.35s cubic-bezier(.3,1.6,.5,1); }
 @keyframes kick { 30% { transform: scaleY(0.96) scaleX(1.03); } }
 .mbody { position: absolute; left: 10px; right: 40px; top: 70px; bottom: 0; border-radius: 22px 22px 10px 10px;
@@ -48,7 +48,7 @@ button.go:active { transform: translateY(3px); box-shadow: 0 0 0 2px #050d08, 0 
 /* marquee sign with chasing bulbs */
 .mq { position: absolute; left: 0; right: 30px; top: 0; height: 84px; border-radius: 18px; z-index: 3;
   background: linear-gradient(180deg, #3a1a5a, #160828); box-shadow: inset 0 0 0 4px #e0b13a, inset 0 0 0 7px #3a2208, 0 0 30px rgba(224,177,58,0.35), 0 10px 20px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
-.mq b { font-weight: normal; font-size: 46px; letter-spacing: 0.2em; color: #ffe08a; text-shadow: 0 0 8px #ffb12a, 0 0 22px #ff7a00, 0 3px 0 #5a2a00; animation: buzz 3.7s steps(1) infinite; }
+.mq b { font-weight: normal; font-size: 46px; letter-spacing: 0.2em; color: #ffe08a; text-shadow: 0 0 8px #ffb12a, 0 0 22px #ff7a00, 0 3px 0 #5a2a00; }
 @keyframes buzz { 0%, 100% { opacity: 1; } 91% { opacity: 1; } 92% { opacity: 0.4; } 93% { opacity: 1; } 95% { opacity: 0.6; } 96% { opacity: 1; } }
 .bulbs { position: absolute; inset: 0; pointer-events: none; }
 .bulbs i { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #6a4a10; box-shadow: inset 0 0 0 1px #000; animation: bulb 1.2s steps(1) infinite; }
@@ -192,7 +192,7 @@ button.go:active { transform: translateY(3px); box-shadow: 0 0 0 2px #050d08, 0 
 .pack.hinted .halo { opacity: 0.9; animation: pulse 1.1s ease-in-out infinite; }
 
 /* ================= OPENING OVERLAY ================= */
-#open { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 50%, rgba(10,30,18,0.92), rgba(1,3,2,0.97) 70%); }
+#open { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 45%, rgba(40,96,60,0.9), rgba(10,28,17,0.95) 75%); }
 #open.on { display: flex; animation: fadeIn 0.4s ease both; }
 @keyframes fadeIn { from { opacity: 0; } }
 #open .vig { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 160px 40px var(--vc, transparent); transition: box-shadow 0.6s; z-index: 1; }
@@ -429,6 +429,18 @@ body.quake #open .center { animation: quake 0.7s ease; }
 }
 
 /* ================= the real page: top bar, binder, account ================= */
+.buyinfo { position: fixed; left: 0; right: 0; bottom: 12px; z-index: 6; display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; align-items: center; padding: 0 12px; text-align: center; font-size: 20px; color: #cfe6c4; letter-spacing: 0.04em; }
+.buyinfo b { font-weight: normal; color: var(--lime); font-size: 24px; letter-spacing: 0.1em; }
+#open.on ~ .buyinfo { display: none; }
+@media (max-width: 520px) { .buyinfo { font-size: 16px; bottom: 6px; } .buyinfo b { font-size: 20px; } .packtitle b { font-size: 26px; } .packtitle small { font-size: 16px; } }
+.packtitle { position: absolute; left: 50%; bottom: 100%; z-index: 6; transform: translateX(-50%); margin-bottom: 14px; width: max-content; max-width: 92vw; text-align: center; pointer-events: none; animation: ptin 0.5s cubic-bezier(.3,1.6,.5,1) both; }
+.packtitle b { display: block; font-weight: normal; font-size: 34px; letter-spacing: 0.14em; color: #fff; text-shadow: 0 0 14px var(--pc, var(--lime)), 0 3px 0 #050d08; }
+.packtitle small { display: block; font-size: 19px; color: #cfe6c4; letter-spacing: 0.06em; }
+.packtitle i { font-style: normal; color: #ffe08a; }
+@keyframes ptin { from { opacity: 0; transform: translate(-50%, 14px) scale(0.8); } }
+.oddsrow { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; font-size: 21px; padding: 6px 4px; border-bottom: 1px dashed #1f4a30; }
+.oddsrow i { width: 18px; height: 18px; display: block; box-shadow: 0 0 10px currentColor; background: currentColor; }
+.oddsrow small { color: var(--dim); font-size: 17px; display: block; }
 .topbar { position: fixed; top: 10px; left: 12px; z-index: 56; display: flex; gap: 8px; }
 .topbar2 { position: fixed; top: 48px; right: 14px; z-index: 56; display: flex; gap: 8px; }
 .mute { position: static; }
@@ -480,6 +492,7 @@ button.ghost.hot { color: #050d08; background: var(--lime); border-color: var(--
 <header><h1>OBSCURA</h1><p>the pack machine</p></header>
 <div id="stage"></div>
 <div id="open"><div class="vig"></div><div class="dark"></div></div>
+<div class="buyinfo" id="buyinfo"><b>10✦ = 1 pack</b><span>5 cards · each card is a real answer from the game · rarer answers make rarer cards</span><button class="ghost" id="odds" type="button">what's inside?</button></div>
 <div class="demos" id="demos"></div>
 <script>
 // opened over the game: use the game's own wallet and account, so both always agree
@@ -526,7 +539,7 @@ Object.defineProperty(window, 'pity', { get: () => Store.get().pity || 0, set: v
 const DUPE = [1, 2, 4, 8, 25];
 const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* no vibration */ } };
 let shown = null; Store.on((st, why) => { if (why === 'sync' || why === 'earn') wallet(); });
-const wallet = () => { const w = $('wallet'); if (shown == null) { shown = spores; w.textContent = spores + ' ✦'; } clearInterval(wallet.t); wallet.t = setInterval(() => { if (shown === spores) return clearInterval(wallet.t); shown += Math.sign(spores - shown) * Math.max(1, Math.round(Math.abs(spores - shown) / 6)); w.textContent = shown + ' ✦'; if (shown > spores - 1 && shown !== spores) SFX.tick(); }, 40); w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump'); };
+const wallet = () => { const w = $('wallet'); if (shown == null) { shown = spores; w.textContent = spores + ' ✦ spores'; } clearInterval(wallet.t); wallet.t = setInterval(() => { if (shown === spores) return clearInterval(wallet.t); shown += Math.sign(spores - shown) * Math.max(1, Math.round(Math.abs(spores - shown) / 6)); w.textContent = shown + ' ✦ spores'; if (shown > spores - 1 && shown !== spores) SFX.tick(); }, 40); w.classList.remove('bump'); void w.offsetWidth; w.classList.add('bump'); };
 
 /* ================= ambient fireflies ================= */
 (function () {
@@ -578,12 +591,12 @@ function makeCard(c) {
             h('div', { class: 'shadow' }), h('img', { class: 'subj', src: A.pixelEmoji(emo, 32), alt: '' }),
             h('img', { class: 'badge', src: sprite(T.art), alt: '' }),
             c.first && h('span', { class: 'first', text: '1ST' })),
-          h('div', { class: 'type' }, h('span', { text: 'Answer · ' + T.name }), h('span', { text: E ? '✧ ' + E.name : T.label })),
+          h('div', { class: 'type' }, h('span', { text: T.name + ' tier' }), h('span', { text: E ? '✧ ' + E.name : T.label })),
           h('div', { class: 'txt' }, h('q', { text: c.prompt }),
             h('div', { class: 'moves' },
-              h('div', { class: 'mv' }, h('span', { class: 'cost', text: T.stars }), h('b', { text: 'Drop' }), h('span', { class: 'dmg', text: (T.pts * 3) + ' m' })),
+              h('div', { class: 'mv' }, h('span', { class: 'cost', text: T.stars }), h('b', { text: 'Rarity' }), h('span', { class: 'dmg', text: T.label.charAt(0) + T.label.slice(1).toLowerCase() })),
               E ? h('div', { class: 'mv ench' }, h('span', { class: 'cost', text: '✧' }), h('b', { text: E.name + ' · ' + E.grade }), h('span', { class: 'dmg', text: 'enchanted' }))
-                : h('div', { class: 'mv' }, h('span', { class: 'cost', text: '◎' }), h('b', { text: 'Spotted by' }), h('span', { class: 'dmg', text: ['most divers', 'many divers', 'a few divers', 'almost nobody', '1 in 1000'][c.tier] }))),
+                : h('div', { class: 'mv' }, h('span', { class: 'cost', text: '◎' }), h('b', { text: 'Said by' }), h('span', { class: 'dmg', text: ['most players', 'many players', 'a few players', 'almost nobody', 'hardly anyone ever'][c.tier] }))),
             h('em', { text: c.fact || ['Loud, bright, impossible to miss.', 'A good spot. Plenty of people know it.', 'Easy to walk past. Well found.', 'Almost nobody ever sees one.', 'The rarest thing in the forest.'][c.tier] })),
           h('div', { class: 'ft' }, h('span', { class: 'stars', text: T.stars }), h('span', { class: 'odds', text: '1 in ' + oneIn(c) }), h('span', { text: c.set + ' ' + String(c.no).padStart(3, '0') }))),
         h('span', { class: 'tag f', text: c.finish ? '◈ ' + FINISHES[c.finish].name.toUpperCase() : '' }), h('span', { class: 'tag fa', text: 'FULL ART' }), h('span', { class: 'tag mp', text: 'MISPRINT' }),
@@ -659,7 +672,7 @@ function machine() {
     h('div', { class: 'mq' }, h('b', { text: 'OBSCURA' }), bulbs),
     h('div', { class: 'dome' }, ballCv, h('div', { class: 'hole' }), h('div', { class: 'glass' })),
     h('div', { class: 'panel' }, led, h('div', { class: 'coin' })),
-    h('div', { class: 'meter' }, h('i'), h('span', { text: 'OBSCURA METER' }), h('b')),
+    h('div', { class: 'meter' }, h('i'), h('span', { text: 'GUARANTEED OBSCURA' }), h('b')),
     chute,
     h('div', { class: 'lever' }, h('div', { class: 'plate' }), rod, h('div', { class: 'pivot' })),
     h('div', { class: 'pullme', text: 'PULL ME!' }),
@@ -725,7 +738,7 @@ function leverControls() {
 // the LED: a scrolling ticker while idle, a fixed message while working
 const TICKER = ['PULL · 10✦', '1 IN 500: OBSCURA EDITION', '242 PACK DESIGNS', '17 ENCHANTMENTS', 'GOLD EDITION: RARE OR BETTER', 'FIND THE Ω', 'CRACKED ICE · GALAXY · GOLD RUSH'];
 function meter(bump) {
-  const m = M.mach.querySelector('.meter'), f = Math.min(1, pity / PITY_MAX); m.querySelector('i').style.width = (f * 100) + '%'; m.querySelector('b').textContent = pity + '/' + PITY_MAX;
+  const m = M.mach.querySelector('.meter'), f = Math.min(1, pity / PITY_MAX); m.querySelector('i').style.width = (f * 100) + '%'; m.querySelector('b').textContent = 'in ' + (PITY_MAX - pity) + ' packs';
   m.classList.toggle('hot', f >= 0.75); if (bump) { m.classList.remove('bump'); void m.offsetWidth; m.classList.add('bump'); }
 }
 function heat() { M.mach.dataset.heat = String(streak); }
@@ -785,7 +798,8 @@ async function openPack(k, ed, cards, mini, hintCard) {
   const ov = $('open'); ov.classList.add('on'); ov.querySelectorAll('.center,.rays,.hint,.summary').forEach(x => x.remove());
   const rays = h('div', { class: 'rays' }), center = h('div', { class: 'center' }), pack = packEl(k, ed), deck = h('div', { class: 'deck' });
   OPENED = { theme: k, ed };
-  center.append(deck, pack); ov.append(rays, center);
+  const Ed = PackArt.EDITIONS.find(x => x.id === ed), pal0 = PackArt.palette(k, ed);
+  center.append(h('div', { class: 'packtitle', style: '--pc:' + pal0.acc }, h('b', { text: k.name.toUpperCase() + ' PACK' }), h('small', null, '5 answer cards from ' + k.name.toLowerCase() + ' prompts', ed !== 'std' ? h('i', { text: ' · ' + Ed.name + (Ed.perk ? ': ' + Ed.perk : '') }) : null)), deck, pack); ov.append(rays, center);
   // fly from the tray to the middle
   const from = mini.getBoundingClientRect(); mini.style.visibility = 'hidden'; M.chute.classList.remove('lit');
   const to = center.getBoundingClientRect(); const s = from.width / to.width;
@@ -800,7 +814,7 @@ async function openPack(k, ed, cards, mini, hintCard) {
   // cards wait inside
   const els = cards.map(c => makeCard(c));
   els.slice().reverse().forEach((el, j) => { el.classList.add('inpack'); el.style.zIndex = j + 1; el.style.setProperty('--pr', ((Math.random() - 0.5) * 6).toFixed(1) + 'deg'); deck.append(el); });
-  const hint = h('div', { class: 'hint', style: 'bottom:40px', text: 'swipe across the top to tear it open →' }); ov.append(hint);
+  const hint = h('div', { class: 'hint', style: 'bottom:40px', text: 'swipe across the top to tear it open (or just tap it)' }); ov.append(hint);
   await tear(pack, hc);
   hint.remove();
   // the top flies off, light pours out, cards rise
@@ -847,7 +861,7 @@ function reveal(cards, els, deck, rays) {
   const ov = $('open'), center = deck.parentElement, dark = ov.querySelector('.dark'), vig = ov.querySelector('.vig');
   const label = h('div', { class: 'label' }), counter = h('div', { class: 'counter' });
   center.append(label, counter);
-  const hint = h('div', { class: 'hint', style: 'bottom:24px', text: 'tap to flip · swipe it away' }); ov.append(hint);
+  const hint = h('div', { class: 'hint', style: 'bottom:24px', text: 'tap to flip the card · tap again for the next one' }); ov.append(hint);
   let i = 0, busy = false;
   const show = () => { counter.textContent = (i + 1) + ' / ' + cards.length; els.forEach((el, j) => { el.style.setProperty('--k', String(Math.max(0, j - i))); });
     const c = cards[i]; if (i === els.length - 1 && (c.tier >= 2 || c.ench || c.full)) els[i].classList.add('tease'); };
@@ -861,12 +875,12 @@ function reveal(cards, els, deck, rays) {
     // the build-up, bigger for rarer cards
     if (c.tier >= 3 || c.full) { center.style.transition = 'transform 1.6s cubic-bezier(.3,0,.2,1)'; center.style.transform = 'scale(1.08)'; }
     if (c.tier === 4 || c.full) {
-      dark.style.opacity = 0.92; vig.style.setProperty('--vc', '#ffb12a66'); el.classList.add('hover', 'cracking');
+      dark.style.opacity = 0.55; vig.style.setProperty('--vc', '#ffb12a66'); el.classList.add('hover', 'cracking');
       for (let b = 0; b < 3; b++) { SFX.heartbeat(); el.classList.add('jit'); setTimeout(() => el.classList.remove('jit'), 260); FX.ring(cx, cy, '#ffd24a', { grow: 300, size: 4, life: 0.6 }); await wait(620); }
       SFX.riser(1.1); FX.converge(cx, cy, '#ffd24a', 90, 520); el.classList.add('jit', 'leak'); for (let k = 0; k < 10; k++) { FX.lightning(rectOf(el), '#ffd24a', 1); if (k % 3 === 0) SFX.zap(); await wait(100); }
       el.classList.remove('jit', 'leak', 'cracking');
     } else if (c.tier === 3) {
-      dark.style.opacity = 0.7; vig.style.setProperty('--vc', '#9a6bff66'); el.classList.add('jit', 'leak'); SFX.riser(1); SFX.crackle(1);
+      dark.style.opacity = 0.4; vig.style.setProperty('--vc', '#9a6bff66'); el.classList.add('jit', 'leak'); SFX.riser(1); SFX.crackle(1);
       for (let k = 0; k < 9; k++) { FX.lightning(rectOf(el), '#bfa7ff', 1 + (k % 2)); if (k % 2) SFX.zap(); await wait(110); }
       el.classList.remove('jit', 'leak');
     } else if (c.tier === 2) {
@@ -927,7 +941,7 @@ function summary(cards) {
   const gotObs = cards.some(c => c.tier === 4); pity = gotObs ? 0 : pity + 1;
   cards.forEach((c, i) => { const dupe = Store.own(c);
     const el = makeCard(c); el.classList.add('up'); el.style.animationDelay = (0.5 + i * 0.12) + 's';
-    const st = h('span', { class: 'stampn' + (dupe ? ' dupe' : ''), text: dupe ? 'DUPE +' + DUPE[c.tier] + '✦' : 'NEW' });
+    const st = h('span', { class: 'stampn' + (dupe ? ' dupe' : ''), text: dupe ? 'ALREADY HAD · +' + DUPE[c.tier] + '✦' : 'NEW' });
     const slot = h('div', { class: 'slot', onclick: () => { showcase(c, prev, true); row.querySelectorAll('.slot').forEach(x => x.classList.toggle('pick', x === slot)); } }, el, st); row.append(slot);
     setTimeout(() => { SFX.whoosh(1); }, 500 + i * 120);
     setTimeout(() => { st.classList.add('on'); SFX.stamp(); buzz(15);
@@ -941,7 +955,7 @@ function summary(cards) {
 function packLine() {
   if (!OPENED) return null; const fresh = Store.design(OPENED.theme.id + ':' + OPENED.ed);
   const E = PackArt.EDITIONS.find(x => x.id === OPENED.ed), mini = packEl(OPENED.theme, OPENED.ed, 'mini');
-  return h('div', { class: 'packline' }, mini, h('div', null, h('b', { text: OPENED.theme.name + ' pack · ' + E.name }), h('small', { text: (E.perk ? E.perk + ' · ' : '') + 'designs found: ' + Store.designs() + ' / ' + THEMES.length * 6 })), fresh && h('span', { class: 'newdesign', text: 'NEW DESIGN' }));
+  return h('div', { class: 'packline' }, mini, h('div', null, h('b', { text: OPENED.theme.name + ' pack · ' + E.name }), h('small', { text: (E.perk ? E.perk + ' · ' : '') + 'pack designs collected: ' + Store.designs() + ' of ' + (THEMES.length * 6).toLocaleString() })), fresh && h('span', { class: 'newdesign', text: 'NEW PACK DESIGN' }));
 }
 function showcase(c, box, make) {
   if (make) { Store.setShowcase(c); }
@@ -969,7 +983,7 @@ function coinFountain(x, y, tx, ty, n, done) {
   for (let i = 0; i < n; i++) setTimeout(() => { const c = h('div', { class: 'flycoin', text: '✦' }); document.body.append(c); const mx = (x + tx) / 2 + (Math.random() - 0.5) * 160, my = Math.min(y, ty) - 60 - Math.random() * 80;
     c.animate([{ transform: 'translate(' + x + 'px,' + y + 'px) scale(0.6)' }, { transform: 'translate(' + mx + 'px,' + my + 'px) scale(1.1) rotateY(540deg)', offset: 0.5 }, { transform: 'translate(' + tx + 'px,' + ty + 'px) scale(0.5) rotateY(1080deg)' }], { duration: 650, easing: 'cubic-bezier(.4,0,.6,1)' }).onfinish = () => { c.remove(); SFX.coinhit(i); const wl = $('wallet'); wl.classList.remove('bump'); void wl.offsetWidth; wl.classList.add('bump'); if (i === n - 1) done(); }; }, i * 70);
 }
-function closeOpen() { const ov = $('open'); ov.classList.remove('on'); ov.querySelectorAll('.summary,.gallery,.center').forEach(x => x.remove()); FX.clear(); $('open').querySelector('.vig').style.setProperty('--vc', 'transparent'); M.busy = false; ledIdle(); M.tray.querySelectorAll('.pack').forEach(p => { if (p.dataset.used) p.remove(); }); if (M.tray.querySelector('.pack')) { M.busy = true; ledSay('OPEN THE REST', true); } }
+function closeOpen() { const ov = $('open'); ov.classList.remove('on'); ov.querySelectorAll('.summary,.gallery,.center').forEach(x => x.remove()); FX.clear(); $('open').querySelector('.vig').style.setProperty('--vc', 'transparent'); M.busy = false; ledIdle(); M.tray.querySelectorAll('.pack').forEach(p => { if (p.dataset.used) p.remove(); }); if (M.tray.querySelector('.pack')) { M.busy = true; ledSay('OPEN YOUR PACKS', true); } }
 
 /* ================= gallery ================= */
 function gallery(ed = 'std') {
@@ -993,6 +1007,7 @@ $('mute').addEventListener('click', () => { const on = SFX.toggle(); $('mute').t
 $('mute').textContent = SFX.muted() ? '♪ sound off' : '♪ sound on';
 $('back').addEventListener('click', () => { SFX.click(); if (window.EMBED && parent.closeCards) parent.closeCards(); else location.href = './'; });
 $('binder').addEventListener('click', () => { SFX.click(); binder(); });
+$('odds').addEventListener('click', () => { SFX.click(); oddsSheet(); });
 $('acct').addEventListener('click', () => { SFX.click(); account(); });
 if (window.Account) Account.on(a => { $('acct').textContent = a.state === 'user' ? '☻ ' + a.name : 'save my cards'; $('acct').classList.toggle('hot', a.state === 'guest' && Store.cards().length > 0); });
 addEventListener('keydown', e => { if (e.key === 'Escape') { const s = document.querySelector('.zoom, .sheet'); if (s) s.remove(); else if (window.EMBED && parent.closeCards) parent.closeCards(); } });
@@ -1006,6 +1021,23 @@ function sheet(title, ...kids) {
 // ================= the binder: every card you own, best first =================
 const FACTS = new Map(ALLCARDS.map(c => [c.name + '|' + c.prompt, c.fact]));
 const rank = c => c.tier * 1000 + (c.ench ? 300 + (CardArt.ENCH[c.ench].grade === 'Ultra' ? 200 : CardArt.ENCH[c.ench].grade === 'Mythic' ? 100 : 0) : 0) + (c.full ? 250 : 0) + (c.finish ? FINISHES[c.finish].odds / 10 : 0) + (c.misprint ? 40 : 0) + (c.first ? 5 : 0);
+function oddsSheet() {
+  const pct = p => (p * 100 >= 1 ? Math.round(p * 100) : (p * 100).toFixed(1)) + '%';
+  const row = (col, name, sub, right) => h('div', { class: 'oddsrow', style: 'color:' + col }, h('i'), h('div', { style: 'color:#e6f2dc' }, name, h('small', { text: sub })), h('b', { style: 'font-weight:normal;color:' + col, text: right }));
+  sheet('What’s inside a pack',
+    h('div', { class: 'acct' },
+      h('p', { text: 'Every pack has 5 cards. Each card is a real answer from an Obscura prompt, and its rarity is how rare that answer is in the game: an Obscura card is an answer almost nobody thinks of. The pack’s theme (like Author or Sports) decides which prompts the answers come from. The last card is always uncommon or better.' }),
+      h('div', { class: 'pv-head', text: 'RARITY (each card)' }),
+      ...TIERS.map((T, i) => row(T.color, T.label.charAt(0) + T.label.slice(1).toLowerCase() + ' · ' + T.name, ['what most people say', 'a good answer', 'a sharp answer', 'almost nobody says it', 'the rarest answers in the game'][i], pct(ODDS[i]))),
+      h('div', { class: 'pv-head', text: 'LUCKY EXTRAS (any card can have them)' }),
+      row('#ffffff', '✧ Enchantment', Object.keys(CardArt.ENCH).length + ' kinds, like EX or GX tags · it shows up in your games', '1 in 20'),
+      row('#7deaff', '◈ Holo finish', 'Holo, Reverse, Cosmos, Cracked Ice, Etched, Galaxy, Rainbow, Gold Rush', '1 in 15+'),
+      row('#ffe08a', 'Full art', 'the picture fills the whole card', '1 in ' + LUCK.full),
+      row('#ff8f8f', 'Misprint', 'a printing error, glitched on purpose', '1 in ' + LUCK.misprint),
+      h('div', { class: 'pv-head', text: 'PACK EDITIONS' }),
+      ...PackArt.EDITIONS.filter(E => E.id !== 'std').map(E => row('#c8ff5a', E.name, E.perk || '', E.odds ? '1 in ' + E.odds : '')),
+      h('p', { text: 'The Obscura meter fills with every pack. At ' + PITY_MAX + ' packs without an Obscura card, the next pack has one guaranteed.' })));
+}
 function binder(filter = 'all') {
   const all = Store.cards().map(c => Object.assign(c, { fact: FACTS.get(c.name + '|' + c.prompt), size: 0 })).sort((a, b) => rank(b) - rank(a) || b.at - a.at);
   const total = all.reduce((t, c) => t + c.count, 0), sc = Store.showcase();

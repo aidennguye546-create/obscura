@@ -104,7 +104,9 @@ button.go:active { transform: translateY(3px); box-shadow: 0 0 0 2px #050d08, 0 
 .ptspop { position: absolute; left: 0; right: 0; top: 40%; text-align: center; z-index: 12; pointer-events: none; font-size: 34px; letter-spacing: 0.1em; color: var(--lc); text-shadow: 0 0 12px var(--lc), 0 3px 0 #000; animation: ptsup 1.3s cubic-bezier(.2,1.3,.4,1) forwards; }
 @keyframes ptsup { 0% { transform: translateY(20px) scale(0.6); opacity: 0; } 20% { transform: translateY(-10px) scale(1.15); opacity: 1; } 100% { transform: translateY(-90px) scale(1); opacity: 0; } }
 /* the lever */
-.lever { position: absolute; right: 0; top: 230px; width: 70px; height: 200px; z-index: 4; }
+.lever { position: absolute; right: 0; top: 230px; width: 70px; height: 200px; z-index: 4; cursor: grab; touch-action: none; }
+.lever::before { content: ''; position: absolute; left: -30px; right: -20px; top: -60px; bottom: 20px; } /* a generous invisible grab area */
+.pullme { cursor: pointer; }
 .lever .plate { position: absolute; left: 6px; top: 70px; width: 46px; height: 64px; border-radius: 10px; background: linear-gradient(90deg, #8a8f99, #e6eaf0 40%, #9aa0aa); box-shadow: inset 0 0 0 2px #2a2e35, 0 6px 10px rgba(0,0,0,0.6); }
 .lever .pivot { position: absolute; left: 21px; top: 92px; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, #555 60%, #111); z-index: 3; }
 .lever .rod { position: absolute; left: 26px; top: 0; width: 8px; height: 101px; transform-origin: 4px 101px; transform: rotate(var(--ang, -12deg)); z-index: 2;
@@ -486,6 +488,113 @@ button.ghost.hot { color: #050d08; background: var(--lime); border-color: var(--
 .scbtn.done { background: #1f4a30; color: var(--lime); }
 .broke { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 @media (max-width: 520px) { header { display: none; } .topbar2 { top: 44px; right: 8px; } .bslot { width: 96px; height: 134px; } .bslot .card { --w: 96px; } .sheet .shead b { font-size: 24px; } }
+
+/* ================= trading-card details: pixel corners, type colour, energy orbs, species strip ================= */
+.card .face { --s: calc(var(--w) * 0.032); --q: calc(var(--w) * 0.016); border-radius: 0;
+  clip-path: polygon(var(--s) 0, calc(100% - var(--s)) 0, calc(100% - var(--s)) var(--q), calc(100% - var(--q)) var(--q), calc(100% - var(--q)) var(--s), 100% var(--s),
+    100% calc(100% - var(--s)), calc(100% - var(--q)) calc(100% - var(--s)), calc(100% - var(--q)) calc(100% - var(--q)), calc(100% - var(--s)) calc(100% - var(--q)), calc(100% - var(--s)) 100%,
+    var(--s) 100%, var(--s) calc(100% - var(--q)), var(--q) calc(100% - var(--q)), var(--q) calc(100% - var(--s)), 0 calc(100% - var(--s)),
+    0 var(--s), var(--q) var(--s), var(--q) var(--q), var(--s) var(--q)); }
+.card .frame { border-radius: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tc) 26%, #0a1610) 0%, color-mix(in srgb, var(--tc) 12%, #07110b) 46%, #06100a 100%);
+  box-shadow: inset 0 0 0 2px #050d08, inset 0 0 0 3px color-mix(in srgb, var(--tc) 45%, transparent), inset 0 3px 10px rgba(0,0,0,0.6); }
+.card .frame::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.09;
+  background: repeating-conic-gradient(#fff 0 25%, transparent 0 50%) 0 0 / 4px 4px; mix-blend-mode: overlay; }
+.card .hd { position: relative; border-radius: 0; box-shadow: inset 0 -2px 0 var(--tc); }
+.card .hd .pt { color: #fff; text-shadow: 0 2px 0 #000; }
+.card .hd .pt small { color: var(--tc); font-size: 0.55em; }
+.card .torb { flex: 0 0 auto; width: calc(var(--w) * 0.075); height: calc(var(--w) * 0.075); display: grid; place-items: center; font-style: normal; font-size: calc(var(--w) * 0.05); line-height: 1; color: #050d08;
+  background: radial-gradient(circle at 35% 30%, #fff 0 12%, var(--tc) 40%, color-mix(in srgb, var(--tc) 55%, #000) 100%); border-radius: 50%; box-shadow: 0 0 0 1px #050d08, 0 0 0 2px color-mix(in srgb, var(--tc) 60%, #fff), 0 0 8px var(--tc); }
+.card .win { border-radius: 0; box-shadow: 0 0 0 1px #050d08, 0 0 0 3px color-mix(in srgb, var(--rc) 75%, #fff), 0 0 0 4px #050d08, 0 3px 0 4px rgba(0,0,0,0.4); }
+.card .win .subj { width: 42%; filter: drop-shadow(0 3px 0 rgba(0,0,0,0.35)); }
+.card .type { position: relative; margin: 0 calc(var(--w) * 0.02); padding: 2px 8px 1px; border: 0; font-size: calc(var(--w) * 0.042); letter-spacing: 0.06em; color: #1a1a1a; text-transform: none;
+  background: linear-gradient(180deg, #f4f0e0, #c9c0a4); clip-path: polygon(3% 0, 97% 0, 100% 50%, 97% 100%, 3% 100%, 0 50%); white-space: nowrap; overflow: hidden; }
+.card .type span:last-child { color: #6a1a1a; }
+.card .mv { border-left: 0; padding: 2px 4px; background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); box-shadow: inset 0 -1px 0 rgba(255,255,255,0.06); }
+.card .orbs { display: inline-flex; gap: 2px; min-width: calc(var(--w) * 0.2); }
+.card .orbs i { width: calc(var(--w) * 0.036); height: calc(var(--w) * 0.036); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff 0 15%, var(--tc) 45%, color-mix(in srgb, var(--tc) 50%, #000)); box-shadow: 0 0 0 1px #050d08; }
+.card .orbs.e i { background: radial-gradient(circle at 35% 30%, #fff 0 15%, var(--ec) 45%, #000); }
+.card .txt em { border: 1px solid rgba(255,255,255,0.12); padding: 2px 4px; background: rgba(0,0,0,0.25); font-style: italic; }
+.card .ft .illus { opacity: 0.55; font-size: 0.8em; }
+.card .ft .odds { font-size: 1.55em; line-height: 1; padding: 1px 6px 0; color: #fff; background: rgba(0,0,0,0.55); box-shadow: 0 0 0 1px #050d08, 0 0 0 2px var(--rc); text-shadow: 0 0 6px var(--rc); letter-spacing: 0.04em; }
+.card .txt em { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.bslot .card .ft .illus, .slot .card .ft .illus { display: none; }
+.oddspop { position: absolute; left: -50%; right: -50%; bottom: -96px; z-index: 9; text-align: center; pointer-events: none; font-size: 44px; letter-spacing: 0.08em; color: #fff; text-shadow: 0 0 16px var(--lc), 0 3px 0 #000; animation: oddsin 0.5s cubic-bezier(.3,1.7,.5,1) both; }
+.oddspop small { display: block; font-size: 18px; letter-spacing: 0.24em; color: var(--lc); text-shadow: 0 2px 0 #000; }
+@keyframes oddsin { from { transform: scale(2.4); opacity: 0; } }
+@media (max-width: 520px) { .oddspop { font-size: 32px; bottom: -80px; } }
+.card .back { border-radius: 0; }
+.pv-mini .card .face { clip-path: none; }
+
+/* ================= bigger cards, readable words ================= */
+.deck { --cw: min(340px, 84vw, 54vh); top: calc(50% - var(--cw) * 0.7); height: calc(var(--cw) * 1.4); left: 50%; right: auto; width: var(--cw); transform: translateX(-50%); }
+.deck .card { --w: var(--cw); }
+.best { width: min(300px, 80vw); height: calc(min(300px, 80vw) * 1.4); } .best .card { --w: min(300px, 80vw); }
+.slot { width: 160px; height: 224px; } .slot .card { --w: 160px; }
+.bslot { width: 170px; height: 238px; } .bslot .card { --w: 170px; }
+.zoom .zc { width: min(360px, 86vw, 60vh); height: calc(min(360px, 86vw, 60vh) * 1.4); } .zoom .zc .card { --w: min(360px, 86vw, 60vh); }
+.card .txt { font-size: calc(var(--w) * 0.066); }
+.card .type { font-size: calc(var(--w) * 0.047); }
+.card .ft { font-size: calc(var(--w) * 0.052); }
+.card .hd .nm { font-size: calc(var(--w) * 0.104); }
+@media (max-width: 520px) { .best { width: 250px; height: 350px; } .best .card { --w: 250px; } .slot { width: 150px; height: 210px; } .slot .card { --w: 150px; } .bslot { width: 160px; height: 224px; } .bslot .card { --w: 160px; } }
+.oddspop span { display: block; font-variant-numeric: tabular-nums; }
+.oddspop.done span { animation: oddsdone 0.5s cubic-bezier(.3,1.8,.5,1); }
+@keyframes oddsdone { 30% { transform: scale(1.3); color: var(--lc); } }
+/* ================= effects you can see: holo that shows on dark frames and moves by itself ================= */
+.card .holo { mix-blend-mode: screen; opacity: 0.38; }
+.card.t2 .holo { opacity: 0.22; }
+.card.foil .holo, .card.full .holo { opacity: 0.55; }
+.card .shine { position: absolute; inset: 0; z-index: 8; pointer-events: none; display: none; mix-blend-mode: screen;
+  background: linear-gradient(115deg, transparent 25%, rgba(255,126,179,0.55) 38%, rgba(255,216,110,0.6) 44%, rgba(142,245,168,0.6) 50%, rgba(115,216,255,0.55) 56%, rgba(199,155,255,0.5) 62%, transparent 75%);
+  background-size: 260% 100%; animation: shine 3.2s ease-in-out infinite; }
+.card.foil .shine, .card.full .shine, .card.t4 .shine { display: block; }
+.card.t3:not(.foil) .shine { display: block; opacity: 0.45; }
+@keyframes shine { 0% { background-position: 130% 0; } 60%, 100% { background-position: -130% 0; } }
+.card .twinkle { position: absolute; inset: 0; z-index: 9; pointer-events: none; display: none;
+  background-image: radial-gradient(2px 2px at 18% 22%, #fff, transparent), radial-gradient(2px 2px at 76% 14%, #fff, transparent), radial-gradient(3px 3px at 64% 58%, #fff, transparent), radial-gradient(2px 2px at 30% 76%, #fff, transparent), radial-gradient(2px 2px at 86% 84%, #fff, transparent), radial-gradient(3px 3px at 46% 36%, #fff, transparent);
+  animation: twinkle 1.6s steps(2) infinite; }
+.card.foil .twinkle, .card.t4 .twinkle, .card.full .twinkle { display: block; }
+@keyframes twinkle { 50% { opacity: 0.15; } }
+.card.ench .front { box-shadow: 0 0 0 2px var(--ec), 0 0 34px 8px var(--eg), inset 0 2px 0 rgba(255,255,255,0.7), 0 14px 34px rgba(0,0,0,0.65); }
+.card.ench .fx { z-index: 9; }
+
+/* ================= fit: the footer on one line, text kept inside, holo strong on the art and gentle on the words ================= */
+.card .ft { white-space: nowrap; gap: 4px; }
+.card .ft .illus { display: none; }
+.card .ft .odds { font-size: 1.32em; white-space: nowrap; }
+.card .txt { overflow: hidden; font-size: calc(var(--w) * 0.062); }
+.card .txt em { -webkit-line-clamp: 2; }
+.card.foil .holo, .card.full .holo { opacity: 0.3; }
+.card .holo { opacity: 0.26; }
+.card .shine { opacity: 0.75; }
+.card .win::before { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; display: none; mix-blend-mode: screen; opacity: 0.5;
+  background: linear-gradient(125deg, #ff7eb3, #ffd86e, #8ef5a8, #73d8ff, #c79bff, #ff7eb3); background-size: 300% 300%; animation: winholo 4s linear infinite; }
+.card.foil .win::before, .card.t4 .win::before { display: block; }
+@keyframes winholo { to { background-position: 300% 300%; } }
+.card .win { height: 41%; }
+.card .txt em { -webkit-line-clamp: 2; margin-top: calc(var(--w) * 0.01); }
+
+/* ================= slot reels ================= */
+.led.slots { display: flex; justify-content: center; align-items: center; gap: 5px; padding: 2px 6px; background: #120302; }
+.led .reelw { position: relative; width: 36px; height: 30px; overflow: hidden; border-radius: 3px; background: linear-gradient(180deg, #000, #2a0806 30%, #2a0806 70%, #000); box-shadow: inset 0 0 0 1px #6a1a0a, inset 0 5px 6px rgba(0,0,0,0.85), inset 0 -5px 6px rgba(0,0,0,0.85); }
+.led .strip b { display: block; height: 30px; line-height: 31px; text-align: center; font-size: 24px; font-weight: normal; text-shadow: 0 0 8px currentColor; }
+.led .reelw.stop { animation: rstop 0.3s ease; }
+@keyframes rstop { 35% { transform: translateY(3px); box-shadow: inset 0 0 0 1px #fff, 0 0 12px #fff; } }
+.led.tease .reelw:last-child { animation: rtease 0.16s linear infinite; }
+@keyframes rtease { 50% { box-shadow: inset 0 0 0 1px #ffd24a, 0 0 14px #ffd24a; } }
+.led.win .reelw { animation: rwin 0.22s steps(2) 6; }
+@keyframes rwin { 50% { background: #ffd24a; box-shadow: 0 0 16px #ffd24a; } }
+/* ================= the reveal: big cards, no clipping through each other ================= */
+.deck { --cw: min(420px, 88vw, 50vh); top: calc(50% - var(--cw) * 0.7 - 16px); isolation: isolate; transform-style: flat; }
+.deck .label { left: -40%; right: -40%; top: -60px; }
+.deck .counter { left: auto; right: 2px; bottom: -30px; text-align: right; font-size: 20px; }
+.deck .oddspop { top: calc(100% + 6px); bottom: auto; }
+.packtitle.gone { opacity: 0; transition: opacity 0.3s; }
+#open .center .pack.fly { transition-duration: 0.5s; }
+.deck .card.inpack { opacity: 0; transform: translateY(14%) scale(0.62); }
+.deck .card.peek { opacity: 1; transform: translateY(-40%) scale(0.82) rotate(var(--pr, 0deg)); }
+.deck .counter { top: -30px; bottom: auto; }
 </style>
 </head>
 <body>
@@ -573,43 +682,62 @@ const FINISHES = {
 };
 function rollFinish() { const ks = Object.keys(FINISHES).sort((a, b) => FINISHES[b].odds - FINISHES[a].odds); for (const k of ks) if (Math.random() < 1 / FINISHES[k].odds) return k; return null; }
 const ODDS = [0.6, 0.25, 0.11, 0.035, 0.005];
-function oneIn(c) {
+// the odds of pulling this exact card: its rarity, the pack theme it came from, its place among that theme's cards
+// of the same rarity, then every lucky extra on top. Ordinary cards land in the thousands; lucky ones in the billions.
+let THEME_BY_NAME = null;
+function oddsN(c) {
   let p = ODDS[c.tier];
+  THEME_BY_NAME = THEME_BY_NAME || new Map(THEMES.map(t => [t.name, t]));
+  const t = THEME_BY_NAME.get(c.themeName); if (t) p *= 1 / THEMES.length / Math.max(1, t.cards.filter(x => x[2] === c.tier).length);
   p *= c.finish ? 1 / FINISHES[c.finish].odds : 1; p *= c.full ? 1 / LUCK.full : 1; p *= c.misprint ? 1 / LUCK.misprint : 1; p *= c.first ? 1 / LUCK.first : 1;
   if (c.ench) { const E = CardArt.ENCH, tot = Object.values(E).reduce((t, e) => t + e.odds, 0); p *= (1 / 20) * (E[c.ench].odds / tot); }
-  const n = Math.round(1 / p); return n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : n.toLocaleString();
+  return Math.max(2, Math.round(1 / p));
+}
+const fmtOdds = n => { const k = (v, u) => (v >= 100 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, '')) + u;
+  return n >= 1e15 ? k(n / 1e15, 'Q') : n >= 1e12 ? k(n / 1e12, 'T') : n >= 1e9 ? k(n / 1e9, 'B') : n >= 1e6 ? k(n / 1e6, 'M') : n >= 1e5 ? Math.round(n / 1e3) + 'K' : n.toLocaleString(); };
+function oneIn(c) { return fmtOdds(oddsN(c)); }
+// roll a "1 in N" up from 1 to N: it races through the small numbers and slows down as it climbs
+function countUp(els, n, ms, tick) {
+  const t0 = performance.now(), L = Math.log(n); let lastT = 0;
+  return new Promise(done => (function step(now) {
+    const f = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - f, 2.4), v = f >= 1 ? n : Math.max(1, Math.round(Math.exp(L * e)));
+    els.forEach(el => { el.textContent = '1 in ' + fmtOdds(v); });
+    if (tick && now - lastT > 55 && f < 1) { lastT = now; tick(f); }
+    if (f < 1) requestAnimationFrame(step); else done();
+  })(t0));
 }
 const CRACKS = ['M50 8 L46 30 L54 44 L44 62 L52 80', 'M14 40 L30 46 L36 60 L50 62', 'M86 30 L70 40 L66 56 L52 64', 'M30 92 L40 80 L50 86 L60 78 L72 94'];
 function makeCard(c) {
   const T = TIERS[c.tier], A = CardArt, E = c.ench && A.ENCH[c.ench];
-  const emo = A.pickEmoji(c.name, c.prompt), cat = A.catOf(c.prompt);
+  const emo = A.pickEmoji(c.name, c.prompt), cat = A.catOf(c.prompt), TY = A.TYPES[cat] || A.TYPES.room;
+  const orbs = n => h('span', { class: 'orbs' }, Array.from({ length: n }, () => h('i')));
   const fx = h('canvas', { class: 'fx', width: 270, height: 378 });
   const nl = c.name.length + (E ? E.tag.length + 2 : 0), nmStyle = nl > 11 ? 'font-size:calc(var(--w) * ' + Math.max(0.05, 0.098 * 11 / nl).toFixed(3) + ')' : null;
-  const el = h('div', { class: 'card t' + c.tier + (c.finish ? ' foil fin-' + c.finish : '') + (c.full ? ' full' : '') + (c.misprint ? ' misprint' : '') + (E ? ' ench e-' + c.ench : ''), style: E ? '--ec:' + E.color + ';--eg:' + E.glow : null },
+  const el = h('div', { class: 'card t' + c.tier + (c.finish ? ' foil fin-' + c.finish : '') + (c.full ? ' full' : '') + (c.misprint ? ' misprint' : '') + (E ? ' ench e-' + c.ench : ''), style: '--tc:' + TY.col + (E ? ';--ec:' + E.color + ';--eg:' + E.glow : '') },
     h('div', { class: 'inner' },
       h('div', { class: 'face back', style: c.themeEmoji ? '--bp:url(' + A.pixelEmoji(c.themeEmoji, 16) + ')' : null }, h('div', { class: 'bpat' }), h('img', { src: sprite('krill'), alt: '' }), h('b', { text: 'OBSCURA' }), c.themeName && h('small', { class: 'bname', text: c.themeName.toUpperCase() + ' PACK' }),
         h('svg', { class: 'cracks', viewBox: '0 0 100 100', preserveAspectRatio: 'none' }, CRACKS.map(d => h('path', { d })))),
       h('div', { class: 'face front' },
         h('div', { class: 'frame' },
-          h('div', { class: 'hd' }, h('img', { class: 'crest', src: A.crest(c.name), alt: '' }), h('span', { class: 'nm', text: c.name, style: nmStyle }), E && h('i', { class: 'etag et-' + c.ench, text: E.tag }), h('span', { class: 'pt' }, String(T.pts), h('small', { text: ' PTS' }))),
+          h('div', { class: 'hd' }, h('img', { class: 'crest', src: A.crest(c.name), alt: '' }), h('span', { class: 'nm', text: c.name, style: nmStyle }), E && h('i', { class: 'etag et-' + c.ench, text: E.tag }), h('span', { class: 'pt' }, h('small', { text: 'PTS ' }), String(T.pts)), h('i', { class: 'torb', title: TY.name + ' type', text: TY.sym })),
           h('div', { class: 'win' },
             h('img', { class: 'scene', src: A.scene(cat, c.name + c.prompt), alt: '' }),
             h('div', { class: 'wrays' }),
-            h('div', { class: 'shadow' }), h('img', { class: 'subj', src: A.pixelEmoji(emo, 32), alt: '' }),
+            h('div', { class: 'shadow' }), h('img', { class: 'subj', src: A.cardArt(c.name, c.prompt).src, alt: '' }),
             h('img', { class: 'badge', src: sprite(T.art), alt: '' }),
             c.first && h('span', { class: 'first', text: '1ST' })),
-          h('div', { class: 'type' }, h('span', { text: T.name + ' tier' }), h('span', { text: E ? '✧ ' + E.name : T.label })),
+          h('div', { class: 'type' }, h('span', { text: 'NO.' + String(c.no).padStart(3, '0') + ' · ' + TY.name + ' answer' }), h('span', { text: T.name + ' tier' })),
           h('div', { class: 'txt' }, h('q', { text: c.prompt }),
             h('div', { class: 'moves' },
-              h('div', { class: 'mv' }, h('span', { class: 'cost', text: T.stars }), h('b', { text: 'Rarity' }), h('span', { class: 'dmg', text: T.label.charAt(0) + T.label.slice(1).toLowerCase() })),
-              E ? h('div', { class: 'mv ench' }, h('span', { class: 'cost', text: '✧' }), h('b', { text: E.name + ' · ' + E.grade }), h('span', { class: 'dmg', text: 'enchanted' }))
-                : h('div', { class: 'mv' }, h('span', { class: 'cost', text: '◎' }), h('b', { text: 'Said by' }), h('span', { class: 'dmg', text: ['most players', 'many players', 'a few players', 'almost nobody', 'hardly anyone ever'][c.tier] }))),
+              h('div', { class: 'mv' }, orbs(c.tier + 1), h('b', { text: 'Rarity' }), h('span', { class: 'dmg', text: T.label.charAt(0) + T.label.slice(1).toLowerCase() })),
+              E ? h('div', { class: 'mv ench' }, h('span', { class: 'orbs e' }, h('i')), h('b', { text: E.name + ' · ' + E.grade }), h('span', { class: 'dmg', text: 'enchanted' }))
+                : h('div', { class: 'mv' }, orbs(1), h('b', { text: 'Said by' }), h('span', { class: 'dmg', text: ['most players', 'many players', 'a few players', 'almost nobody', 'hardly anyone ever'][c.tier] }))),
             h('em', { text: c.fact || ['Loud, bright, impossible to miss.', 'A good spot. Plenty of people know it.', 'Easy to walk past. Well found.', 'Almost nobody ever sees one.', 'The rarest thing in the forest.'][c.tier] })),
-          h('div', { class: 'ft' }, h('span', { class: 'stars', text: T.stars }), h('span', { class: 'odds', text: '1 in ' + oneIn(c) }), h('span', { text: c.set + ' ' + String(c.no).padStart(3, '0') }))),
+          h('div', { class: 'ft' }, h('span', { class: 'stars', text: T.stars }), h('span', { class: 'odds', 'data-n': String(oddsN(c)), text: '1 in ' + oneIn(c) }), h('span', { class: 'illus', text: 'illus. obscura' }), h('span', { text: c.set + ' ' + String(c.no).padStart(3, '0') + '/' + String(c.size || 240).padStart(3, '0') }))),
         h('span', { class: 'tag f', text: c.finish ? '◈ ' + FINISHES[c.finish].name.toUpperCase() : '' }), h('span', { class: 'tag fa', text: 'FULL ART' }), h('span', { class: 'tag mp', text: 'MISPRINT' }),
         E && h('span', { class: 'ribbon', text: '✧ ' + E.name.toUpperCase() }),
-        h('div', { class: 'sheen' }), h('div', { class: 'holo' }), h('div', { class: 'cosmos' }), fx, h('div', { class: 'glare' }))));
-  if (E) CardArt.particles(fx, c.ench, 1.4);
+        h('div', { class: 'sheen' }), h('div', { class: 'holo' }), h('div', { class: 'cosmos' }), h('div', { class: 'shine' }), h('div', { class: 'twinkle' }), fx, h('div', { class: 'glare' }))));
+  if (E) CardArt.particles(fx, c.ench, 3);
   tilt(el);
   return el;
 }
@@ -726,12 +854,19 @@ function leverControls() {
   const { knob, rod } = M; let dragging = false, ang = -12, lastTick = -12, raf = null;
   const setAng = a => { ang = a; rod.style.setProperty('--ang', a + 'deg'); };
   const pivot = () => { const r = rod.getBoundingClientRect(), lr = rod.parentElement.getBoundingClientRect(); return { x: lr.left + 30, y: lr.top + 101 }; };
-  knob.addEventListener('pointerdown', e => { if (M.busy) return; SFX.unlock(); dragging = true; knob.setPointerCapture(e.pointerId); knob.classList.remove('nudge'); cancelAnimationFrame(raf); SFX.click(); });
-  knob.addEventListener('pointermove', e => { if (!dragging) return; const p = pivot(); let a = Math.atan2(e.clientX - p.x, -(e.clientY - p.y)) * 180 / Math.PI; a = Math.max(-12, Math.min(150, a));
+  // easy to pull: grab the knob, the rod or the plate; a short drag down is enough; a plain tap pulls it all the way
+  const grab = M.mach.querySelector('.lever'); let sy = 0, sx = 0, moved = 0;
+  const down = e => { if (M.busy) return; SFX.unlock(); dragging = true; sy = e.clientY; sx = e.clientX; moved = 0; grab.setPointerCapture(e.pointerId); knob.classList.remove('nudge'); cancelAnimationFrame(raf); SFX.click(); };
+  grab.addEventListener('pointerdown', down);
+  M.mach.querySelector('.pullme').addEventListener('pointerdown', e => { e.preventDefault(); M.fire(); });
+  grab.addEventListener('pointermove', e => { if (!dragging) return; moved = Math.max(moved, Math.hypot(e.clientX - sx, e.clientY - sy));
+    // follow the finger by how far it has moved down, not by the exact angle
+    const a = Math.max(-12, Math.min(150, -12 + Math.max(0, e.clientY - sy) * 2.2 + Math.max(0, e.clientX - sx) * 0.6));
     if (Math.abs(a - lastTick) > 11) { SFX.ratchet(); lastTick = a; }
-    setAng(a); if (a > 132) { dragging = false; fire(); } });
-  const release = () => { if (!dragging) return; dragging = false; springBack(); };
-  knob.addEventListener('pointerup', release); knob.addEventListener('pointercancel', release);
+    setAng(a); if (a > 80) { dragging = false; fire(); } });
+  const release = () => { if (!dragging) return; dragging = false; if (moved < 8) { M.fire(); return; } springBack(); };
+  grab.addEventListener('pointerup', release); grab.addEventListener('pointercancel', release);
+  addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !$('open').classList.contains('on') && !document.querySelector('.sheet, .zoom') && !M.busy) { e.preventDefault(); M.fire(); } });
   // spring back with a little overshoot
   function springBack() { let v = 0; (function step() { v += (-12 - ang) * 0.08; v *= 0.78; setAng(ang + v); if (Math.abs(v) > 0.05 || Math.abs(ang + 12) > 0.3) raf = requestAnimationFrame(step); else setAng(-12); })(); }
   async function fire() {
@@ -739,7 +874,7 @@ function leverControls() {
     const r = knob.getBoundingClientRect(); FX.sparks(r.left + r.width / 2, r.top + r.height, '#ffd24a', 14, Math.PI / 2, 1.4);
     await wait(180); springBack(); pull();
   }
-  M.fire = async () => { if (M.busy) return; SFX.unlock(); knob.classList.remove('nudge'); // the demo buttons pull it for you
+  M.fire = async () => { if (M.busy) return; M.busy = true; SFX.unlock(); knob.classList.remove('nudge'); // the demo buttons pull it for you
     for (let a = -12; a <= 150; a += 9) { setAng(a); if (a % 27 < 9) SFX.ratchet(); await wait(16); } fire(); };
 }
 // the LED: a scrolling ticker while idle, a fixed message while working
@@ -750,22 +885,34 @@ function meter(bump) {
 }
 function heat() { M.mach.dataset.heat = String(streak); }
 // the LED spins like a slot reel and slows down onto three symbols
+// the LED's three reels: strips of symbols that spin with motion blur and stop one after another with a bounce
+const SYMC = { '✦': '#c8ff5a', '★': '#ffd24a', '◆': '#7deaff', 'Ω': '#ff7a45', '7': '#ff3a5a', '♣': '#5fcf4a', '❦': '#ff6ab0', '∞': '#bfa7ff' };
 async function reels(lucky) {
-  const SYM = ['✦', '★', '◆', 'Ω', '7', '♣', '❦', '∞'], spans = [0, 1, 2].map(() => h('b', { class: 'reel' })); M.led.classList.remove('ok'); M.led.replaceChildren(...spans);
+  const SYM = Object.keys(SYMC), RH = 30;
   const final = lucky ? ['★', '★', '★'] : (() => { const a = SYM[Math.floor(Math.random() * 8)], b = SYM[Math.floor(Math.random() * 8)]; return [a, a, b === a ? '◆' : b]; })(); // two the same, so close
-  let delay = 40; for (let n = 0; n < 26; n++) { spans.forEach((sp, j) => { if (n < 14 + j * 5) sp.textContent = SYM[Math.floor(Math.random() * SYM.length)]; else sp.textContent = final[j]; }); SFX.reel(n); await wait(delay); delay *= 1.11; }
-  M.led.classList.add('ok'); if (lucky) { SFX.ding(); buzz([20, 30, 20]); }
+  M.led.classList.remove('ok', 'win', 'tease'); M.led.classList.add('slots');
+  const wins = final.map((f, j) => { const strip = h('div', { class: 'strip' }), n = 16 + j * 6;
+    for (let k = 0; k < n; k++) { const sy = k === n - 1 ? f : SYM[Math.floor(Math.random() * SYM.length)]; strip.append(h('b', { text: sy, style: 'color:' + SYMC[sy] })); }
+    return h('div', { class: 'reelw' }, strip); });
+  M.led.replaceChildren(...wins);
+  await Promise.all(wins.map((w, j) => { const strip = w.firstChild, n = strip.children.length, dur = 560 + j * 240;
+    const tk = setInterval(() => SFX.reel(6 + j * 6), 60);
+    return strip.animate([{ transform: 'translateY(0)', filter: 'blur(0)' }, { filter: 'blur(2px)', offset: 0.12 }, { filter: 'blur(1.5px)', offset: 0.7 }, { transform: 'translateY(' + (-(n - 1) * RH) + 'px)', filter: 'blur(0)' }],
+      { duration: dur, easing: 'cubic-bezier(.25,.65,.3,1.15)', fill: 'forwards' }).finished.then(() => { clearInterval(tk); SFX.click(); w.classList.add('stop');
+        if (j === 1 && final[0] === final[1]) { M.led.classList.add('tease'); SFX.jitter(); } }); }));
+  M.led.classList.remove('tease'); M.led.classList.add('ok');
+  if (lucky) { M.led.classList.add('win'); SFX.ding(); buzz([20, 30, 20]); const r = M.led.getBoundingClientRect(); FX.burst(r.left + r.width / 2, r.top + r.height / 2, ['#ffd24a', '#ffffff', '#c8ff5a'], 46, { power: 0.75 }); }
 }
-function ledIdle() { M.led.classList.remove('ok'); M.led.replaceChildren(h('span', { class: 'tick', text: TICKER.join('   ✦   ') + '   ✦   ' })); }
-function ledSay(t, ok) { M.led.classList.toggle('ok', !!ok); M.led.replaceChildren(h('span', { text: t })); }
+function ledIdle() { M.led.classList.remove('ok', 'slots', 'win', 'tease'); M.led.replaceChildren(h('span', { class: 'tick', text: TICKER.join('   ✦   ') + '   ✦   ' })); }
+function ledSay(t, ok) { M.led.classList.remove('slots', 'win', 'tease'); M.led.classList.toggle('ok', !!ok); M.led.replaceChildren(h('span', { text: t })); }
 function steam(big) { const m = M.mach.getBoundingClientRect(); for (const side of [0, 1]) for (let i = 0; i < (big ? 10 : 4); i++) FX.add({ x: m.left + (side ? m.width - 52 : 22), y: m.top + 300, vx: (side ? 1 : -1) * (20 + Math.random() * 40), vy: -40 - Math.random() * 60, g: -10, drag: 0.98, life: 1.2 + Math.random(), size: 30 + Math.random() * 30, grow: 0.8, kind: 'glow', color: 'rgba(220,255,230,0.18)' }); if (big) SFX.steam(); }
 async function pull() {
   if (spores < Store.PULL) { ledSay('NEED ' + Store.PULL + '✦'); M.busy = false; toast('Play any mode to earn ✦ · a game pays about 20, an Obscura answer +5'); SFX.nearmiss(); return; }
-  coinDrop(); await wait(380);
+  coinDrop(); await wait(300);
   Store.spend(Store.PULL); wallet(); SFX.coin();
   const now = Date.now(); streak = now - lastPull < 90000 ? Math.min(5, streak + 1) : 1; lastPull = now; heat();
   const fever = M.rig === 'fever' || Math.random() < 1 / 40;
-  if (streak > 1) { ledSay('STREAK ×' + streak, true); SFX.streak(streak); await wait(500); }
+  if (streak > 1) { ledSay('STREAK ×' + streak, true); SFX.streak(streak); await wait(380); }
   steam(true);
   const pick0 = M.balls.filter(x => !x.drop)[Math.floor(Math.random() * M.balls.length) % Math.max(1, M.balls.filter(x => !x.drop).length)], k = pick0 ? pick0.k : THEMES[0];
   const rigNow = M.rig; M.rig = null; const drops = [];
@@ -778,12 +925,12 @@ async function pull() {
   M.mach.classList.add('go', 'shake'); M.churn = 1.5; SFX.whir(1.8); SFX.rattle(1.5);
   const dr = M.mach.querySelector('.dome').getBoundingClientRect();
   const spin = reels(lucky);
-  for (let i = 0; i < 6; i++) { await wait(220); FX.sparks(dr.left + Math.random() * dr.width, dr.bottom, '#c8ff5a', 4, -Math.PI / 2, 1.2); }
+  for (let i = 0; i < 5; i++) { await wait(170); FX.sparks(dr.left + Math.random() * dr.width, dr.bottom, '#c8ff5a', 4, -Math.PI / 2, 1.2); }
   await spin;
   M.mach.classList.remove('shake');
   // one pack falls through the hole
   const pick = pick0 || M.balls[0]; pick.drop = true; SFX.drop();
-  await wait(600);
+  await wait(420);
   M.flap.classList.add('open'); SFX.thump();
   const minis = drops.map((d, j) => { const m = packEl(d.k, d.ed, 'mini land'); packTilt(m); m.style.animationDelay = (j * 0.18) + 's'; if (drops.length > 1) m.style.margin = '0 -6px'; return m; });
   M.tray.replaceChildren(...minis); const mini = minis[0];
@@ -812,12 +959,12 @@ async function openPack(k, ed, cards, mini, hintCard) {
   const to = center.getBoundingClientRect(); const s = from.width / to.width;
   pack.style.transform = 'translate(' + (from.left - to.left) + 'px,' + (from.top - to.top) + 'px) scale(' + s + ')'; pack.style.transformOrigin = '0 0';
   void pack.offsetWidth; pack.classList.add('fly'); pack.style.transform = 'none'; SFX.whoosh(-1); SFX.crinkle(5);
-  await wait(720); pack.classList.remove('fly'); packTilt(pack);
+  await wait(520); pack.classList.remove('fly'); packTilt(pack);
   // energy pours into the pack; a lucky pack glows
   const pr = pack.getBoundingClientRect(), cx = pr.left + pr.width / 2, cy = pr.top + pr.height / 2;
   const hc = hintCard ? (hintCard.tier >= 4 ? '#ffd24a' : TIERS[hintCard.tier].color) : '#c8ff5a';
   pack.style.setProperty('--hc', hc); pack.classList.add('charge'); SFX.charge(1); FX.converge(cx, cy, hc, 60, Math.max(innerWidth, innerHeight) * 0.6);
-  await wait(950); pack.classList.remove('charge'); FX.glow(cx, cy, hc + '88', 220, 0.6, 1); if (hintCard) { pack.classList.add('hinted'); SFX.sparkle(5, 1800); }
+  await wait(650); pack.classList.remove('charge'); FX.glow(cx, cy, hc + '88', 220, 0.6, 1); if (hintCard) { pack.classList.add('hinted'); SFX.sparkle(5, 1800); }
   // cards wait inside
   const els = cards.map(c => makeCard(c));
   els.slice().reverse().forEach((el, j) => { el.classList.add('inpack'); el.style.zIndex = j + 1; el.style.setProperty('--pr', ((Math.random() - 0.5) * 6).toFixed(1) + 'deg'); deck.append(el); });
@@ -825,17 +972,18 @@ async function openPack(k, ed, cards, mini, hintCard) {
   await tear(pack, hc);
   hint.remove();
   // the top flies off, light pours out, cards rise
-  pack.classList.add('torn'); SFX.tear(); SFX.beams(); FX.burst(cx, pr.top + pr.height * 0.15, ['#fff', hc], 40, { power: 0.8, up: 260 });
+  pack.classList.add('torn'); SFX.tear(); SFX.beams(); FX.burst(cx, pr.top + pr.height * 0.15, ['#fff', hc], 70, { power: 1, up: 300 });
+  FX.ring(cx, pr.top + pr.height * 0.15, '#ffffff', { grow: 800, size: 6, life: 0.5 }); FX.glow(cx, pr.top + pr.height * 0.2, hc + 'cc', 320, 0.5, 1); center.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-6px,3px)' }, { transform: 'translate(5px,-3px)' }, { transform: 'translate(0,0)' }], { duration: 260 });
   flyTop(pack.querySelector('.top'));
   // shreds of foil fly off the rip
   const pal = PackArt.palette(k, ed); for (let i = 0; i < 46; i++) { const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, sp = 200 + Math.random() * 500; FX.add({ x: pr.left + Math.random() * pr.width, y: pr.top + pr.height * 0.15, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 900, drag: 0.97, life: 1 + Math.random(), size: 2 + Math.random() * 4, color: [pal.bg1, pal.acc, '#e6ecf5', '#ffffff'][i % 4], flick: true }); }
   ov.querySelector('.vig').style.setProperty('--vc', hc + '55');
-  await wait(500);
-  SFX.rise(); els.forEach((el, i) => setTimeout(() => { el.classList.remove('inpack'); el.classList.add('peek'); }, i * 90));
-  await wait(900);
+  await wait(340);
+  SFX.rise(); els.forEach((el, i) => setTimeout(() => { el.classList.remove('inpack'); el.classList.add('peek'); }, i * 70));
+  await wait(650);
   pack.classList.add('gone'); SFX.fall();
   els.forEach((el, i) => { el.classList.remove('peek'); el.classList.add('settle'); el.style.setProperty('--k', String(els.length - 1 - i)); });
-  await wait(700); pack.remove();
+  await wait(480); pack.remove();
   reveal(cards, els, deck, rays);
 }
 let OPENED = null;
@@ -867,7 +1015,7 @@ function flyTop(top) {
 function reveal(cards, els, deck, rays) {
   const ov = $('open'), center = deck.parentElement, dark = ov.querySelector('.dark'), vig = ov.querySelector('.vig');
   const label = h('div', { class: 'label' }), counter = h('div', { class: 'counter' });
-  center.append(label, counter);
+  deck.append(label, counter); const pt = center.querySelector('.packtitle'); if (pt) pt.classList.add('gone');
   const hint = h('div', { class: 'hint', style: 'bottom:24px', text: 'tap to flip the card · tap again for the next one' }); ov.append(hint);
   let i = 0, busy = false;
   const show = () => { counter.textContent = (i + 1) + ' / ' + cards.length; els.forEach((el, j) => { el.style.setProperty('--k', String(Math.max(0, j - i))); });
@@ -899,13 +1047,17 @@ function reveal(cards, els, deck, rays) {
     center.style.transition = 'transform 0.25s cubic-bezier(.3,1.8,.5,1)'; center.style.transform = '';
     el.classList.remove('hover'); el.classList.add('up', 'pop'); SFX.flip(); SFX.combo(i); setTimeout(() => el.classList.remove('pop'), 700);
     buzz(c.tier >= 4 ? [60, 40, 120, 40, 220] : c.tier >= 2 ? [30, 40, 30] : 12);
+    deck.querySelectorAll('.oddspop').forEach(x => x.remove()); hint.style.visibility = 'hidden';
+    { const n = oddsN(c), num = h('span', { text: '1 in 1' }), pop = h('div', { class: 'oddspop', style: '--lc:' + (E ? E.color : col) }, h('small', { text: 'THE ODDS OF THIS CARD' }), num), badge = el.querySelector('.odds');
+      setTimeout(() => { deck.append(pop); const ms = 450 + 300 * Math.log10(n);
+        countUp([num, badge], n, ms, f => SFX.tick(f)).then(() => { pop.classList.add('done'); SFX.stamp(); if (n >= 1e6) { const rr = pop.getBoundingClientRect(); FX.burst(rr.left + rr.width / 2, rr.top + rr.height / 2, [E ? E.color : col, '#fff', '#ffe08a'], n >= 1e9 ? 90 : 45, { power: 0.9 }); SFX.sparkle(6, 1600); } }); }, 300); }
     const pop = h('div', { class: 'ptspop', style: '--lc:' + (E ? E.color : col), text: '+' + T.pts + ' PTS' }); center.append(pop); setTimeout(() => pop.remove(), 1400);
     dark.style.opacity = 0;
     setTimeout(() => SFX.reveal(c.tier), 90);
     const big = c.tier >= 2 || c.full || E;
     if (c.tier >= 1 || c.foil || E || c.misprint) slam((E ? '✧ ' + E.name.toUpperCase() + ' ' : '') + (c.misprint ? 'MISPRINT ' : '') + (c.full ? 'FULL ART ' : c.finish ? FINISHES[c.finish].name.toUpperCase() + ' ' : '') + T.label, E ? E.color : col);
     else label.classList.remove('on');
-    if (c.tier >= 1) FX.ring(cx, cy, col, { grow: 900, size: c.tier * 3 + 3, life: 0.7 });
+    FX.ring(cx, cy, col, { grow: 900, size: c.tier * 3 + 3, life: 0.7 }); FX.burst(cx, cy, [col, '#ffffff'], 24 + c.tier * 10, { power: 0.6 + c.tier * 0.1 });
     if (big) { rays.style.setProperty('--rc2', E ? E.color : col); rays.classList.add('on'); FX.burst(cx, cy, [col, '#fff'], 40 + c.tier * 25, { power: 0.8 + c.tier * 0.25 }); vig.style.setProperty('--vc', (E ? E.glow : col) + '66'); }
     else vig.style.setProperty('--vc', 'transparent');
     if (c.foil || c.full) { setTimeout(() => FX.stars(rectOf(el), '#fff', 26), 200); SFX.sparkle(6, 2200); }
@@ -918,7 +1070,7 @@ function reveal(cards, els, deck, rays) {
   }
   function away(dir = -1) {
     clearInterval(reveal.glow); const el = els[i]; el.classList.remove('drag'); el.classList.add('away'); el.style.transform = 'translate(' + (dir * 140) + '%, -12%) rotate(' + (dir * 28) + 'deg)';
-    SFX.whoosh(dir); rays.classList.remove('on'); label.classList.remove('on'); vig.style.setProperty('--vc', 'transparent'); i++;
+    SFX.whoosh(dir); rays.classList.remove('on'); label.classList.remove('on'); deck.querySelectorAll('.oddspop').forEach(x => x.remove()); hint.style.visibility = ''; vig.style.setProperty('--vc', 'transparent'); i++;
     if (i < els.length) show(); else { counter.remove(); hint.remove(); setTimeout(() => summary(cards), 450); }
   }
   // tap: flip, then send away; drag a face-up card to throw it
@@ -947,7 +1099,7 @@ function summary(cards) {
   // the meter: an Obscura resets it, anything else fills it
   const gotObs = cards.some(c => c.tier === 4); pity = gotObs ? 0 : pity + 1;
   cards.forEach((c, i) => { const dupe = Store.own(c);
-    const el = makeCard(c); el.classList.add('up'); el.style.animationDelay = (0.5 + i * 0.12) + 's';
+    const el = makeCard(c); el.classList.add('up'); el.style.animationDelay = (0.5 + i * 0.12) + 's'; { const b = el.querySelector('.odds'); b.textContent = '1 in 1'; setTimeout(() => countUp([b], Number(b.dataset.n), 900), 600 + i * 140); }
     const st = h('span', { class: 'stampn' + (dupe ? ' dupe' : ''), text: dupe ? 'ALREADY HAD · +' + DUPE[c.tier] + '✦' : 'NEW' });
     const slot = h('div', { class: 'slot', onclick: () => { showcase(c, prev, true); row.querySelectorAll('.slot').forEach(x => x.classList.toggle('pick', x === slot)); } }, el, st); row.append(slot);
     setTimeout(() => { SFX.whoosh(1); }, 500 + i * 120);

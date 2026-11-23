@@ -68,7 +68,7 @@
     ding: () => chord(1318.5, [0, 7, 12], { vol: 0.09, spread: 0.08 }),
     drop: () => { noise(0.25, { f: 2500, f1: 500, q: 2, vol: 0.12 }); },
     steam: () => { noise(1.1, { ft: 'highpass', f: 2500, f1: 1200, vol: 0.12, attack: 0.05 }); noise(0.9, { f: 600, q: 0.6, vol: 0.05, attack: 0.1 }); },
-    tick: () => tone(2400, 0.03, { type: 'square', vol: 0.015, lp: 4000, rv: 0.1 }),
+    tick: f => tone(f == null ? 2400 : 900 + f * 2600, 0.03, { type: 'square', vol: 0.015, lp: 4000, rv: 0.1 }), // rises as an odds counter climbs
     reel: n => { tone(900 + (n % 3) * 120, 0.03, { type: 'square', vol: 0.03, lp: 3000, rv: 0.2 }); },
     streak: n => chord(392 * Math.pow(2, (n - 1) * 2 / 12), [0, 4, 7, 12].slice(0, Math.min(4, n + 1)), { vol: 0.06, spread: 0.05 }),
     fanfare: () => { [[0, 0], [4, 0.12], [7, 0.24], [12, 0.36], [7, 0.5], [12, 0.62]].forEach(([s, d]) => { tone(523.3 * Math.pow(2, s / 12), 0.25, { type: 'square', vol: 0.05, lp: 3000, delay: d }); tone(523.3 * Math.pow(2, s / 12) / 2, 0.25, { type: 'sawtooth', vol: 0.03, lp: 1500, delay: d }); }); setTimeout(() => S.sparkle(14, 1400), 700); },
